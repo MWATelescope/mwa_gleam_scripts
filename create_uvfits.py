@@ -8,6 +8,10 @@ can operate from:
  splatted correlator output
  averaged correlator output
 
+Example:
+
+python ~/mwa/MWA_Tools/create_uvfits.py --instr=instr_config_20110927.txt --antenna=antenna_locations.txt --flag=mask_pfb.txt --inttime=8 --ra=317.66667 --dec=-26.66667 P00-drift_121_20110927130001
+
 
 uses class:
 Corr2UVFITS
