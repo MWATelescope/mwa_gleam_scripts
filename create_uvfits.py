@@ -22,7 +22,8 @@ needs various metadata to get the times/positions right
 """
 
 
-import getopt,sys,os,logging,shutil,datetime,re,subprocess,math,tempfile,string,glob
+import sys,os,logging,shutil,datetime,re,subprocess,math,tempfile,string,glob
+from optparse import OptionParser
 import ephem
 import pyfits
 from mwapy import ephem_utils
@@ -68,135 +69,82 @@ for external_program in external_programs.keys():
             sys.exit(1)
     else:
         logger.debug('Found %s=%s',external_program,external_paths[external_program])
-######################################################################
-def usage():
-    (xdir,xname)=os.path.split(sys.argv[0])
-    print "Usage:"
-    print "\t%s\t[--force=0/1] [--autoflag=0/1] [--instr=<instrument_config>] [--antenna=<antenna_locations>] [--flag=<flagfile>] [--inttime=<integration_time>] [--ra=<RA>] [--dec=<Dec>] [--timeoffset=<timeoffset>] [--conjugate=0/1] [--correlator=H/S] [--object=<object>] <directory> [<directory2> ...]\n" % xname
-    print "\t\tSpecify directories to process.  Each should contain correlator output with one of:\n\t\t\t<directory>/<directory>_das1.lacspc (etc)"
-    print "\t\t\t<directory>/<directory>.lacspc"
-    print "\t\t\t<directory>/<directory>.av.lacspc"
-    print "\t\tWill generate <directory>/<directory>.uvfits\n"
-    print "\t\tRequires external programs %s for operation; searches $MWA_PATH for these\n" % (", ".join(external_programs.keys()))
-    print "\t\t--help\t\t\t\tReturn usage information"
-    print "\t\t--debug\t\t\t\tTurn on debug-level outout"
-    print "\t\t--force=0/1\t\t\tForce regeneration of files"
-    print "\t\t--autoflag=0/1\t\t\tUse autoflagging in corr2uvfits? (default=True)"
-    print "\t\t--instr=<instrument_config>\tSpecify the instrument configuration file (default=instr_config.txt)"
-    print "\t\t--antenna=<antenna_locations>\tSpecify the antenna locations file (default=antenna_locations.txt)"
-    print "\t\t--flag=<flagfile>\t\tSpecify a static masking file for the channels"
-    print "\t\t--inttime=<integration_time>\tSpecify integration time in seconds; >1 indicates averaging"
-    print "\t\t--ra=<RA>\t\t\tPhase center RA (decimal degrees or HH:MM:SS) (default=meridian)"
-    print "\t\t--dec=<Dec>\t\t\tPhase center Dec (decimal degrees or DD:MM:SS) (default=zenith)"    
-    print "\t\t--timeoffset=<timeoffset>\tSpecify time offset in seconds between the file datetime and the observation starttime (default=2)"
-    print "\t\t--conjugate=0/1\t\t\tConjugate correlator input (default=True)"
-    print "\t\t--correlator=H/S\t\tSpecify hardware (H) or software (S) correlator (default=H)"
-    print "\t\t--object=<object>\t\tSpecify object name"
-
-    
+   
     
 
         
 ######################################################################
 def main():
     roots=[]
-    autoflag=True
     cwd=os.path.abspath(os.getcwd()) + '/'
-    instrument_config=cwd + "instr_config.txt"
-    antenna_locations=cwd + "antenna_locations.txt"
-    static_flag=None
-    force=False
-    inttime=1
-    ra=None
-    dec=None
-    timeoffset=2
-    conjugate=True
-    correlator='H'
-    objectname=None
 
-    try:
-        opts, args = getopt.getopt(sys.argv[1:], 
-                     "h",
-                    ["help",
-                     "debug",
-                     "autoflag=",
-                     "instr=",
-                     "antenna=",
-                     "flag=",
-                     "force=",
-                     "inttime=",
-                     "ra=",
-                     "RA=",
-                     "dec=",
-                     "DEC=",
-                     "timeoffset=",
-                     "conjugate=",
-                     "correlator=",
-                     "object="
-                     ])
-    except getopt.GetoptError,err:
-        logger.error('Unable to parse command-line options: %s\n',err)
-        usage()
+    usage="Usage: %prog [options] <directory> [<directory2>...]\n"
+    usage+='\tSpecify directories to process.  Each should contain correlator output with one of:\n\t\t\t<directory>/<directory>_das1.lacspc (etc)\n'
+    usage+="\t\t\t<directory>/<directory>.lacspc\n"
+    usage+="\t\t\t<directory>/<directory>.av.lacspc\n"
+    usage+="\t\tWill generate <directory>/<directory>.uvfits\n"
+    usage+="\t\tRequires external programs %s for operation; searches $MWA_PATH for these\n" % (", ".join(external_programs.keys()))    
+    parser = OptionParser(usage=usage)
+    parser.add_option('-v','--verbose',action="store_true",dest="verbose",default=False,
+                      help="Increase verbosity of output")
+    parser.add_option('--autoflag',dest='autoflag',default=True,
+                      help='Use autoflagging in corr2uvfits? [default: %default]')
+    parser.add_option('--instr',dest='instrument_config',default=cwd + "instr_config.txt",
+                      help='Specify the instrument configuration file [default: %default]')
+    parser.add_option('--antenna',dest='antenna_locations',default=cwd + "antenna_locations.txt",
+                      help='Specify the antenna locations file [default: %default]')
+    parser.add_option('--flag',dest='static_flag',default='',
+                      help='Specify a static masking file for the channels')
+    parser.add_option('--force',dest='force',action='store_true',default=False,
+                      help='Force regeneration of files?')
+    parser.add_option('--ra','--RA',dest='ra',default=None,
+                      help='Phase center RA (decimal degrees or HH:MM:SS) [default=meridian]')
+    parser.add_option('--dec','--Dec',dest='dec',default=None,
+                      help='Phase center Dec (decimal degrees or DD:MM:SS) [default=zenith]')
+
+    parser.add_option('--inttime',dest='inttime',default=1,
+                      help='Specify integration time in seconds; >1 indicates averaging [default: %default]')
+    parser.add_option('--object',dest='objectname',default='',
+                      help='Specify object name')
+    parser.add_option('--timeoffset',dest='timeoffset',default=2,
+                      help='Specify time offset in seconds between the file datetime and the observation starttime [default: %default]')
+    parser.add_option('--conjugate',dest='conjugate',default=True,
+                      help='Conjugate correlator input [default: %default]')
+    parser.add_option('--correlator',dest='correlator',default='H',
+                      choices=['H','S'],
+                      help='Specify hardware (H) or software (S) correlator [default: %default]')
+    
+    (options, args) = parser.parse_args()
+    ra=parse_RA(options.ra)
+    dec=parse_Dec(options.dec)
+    autoflag=options.autoflag
+    force=options.force
+    conjugate=options.conjugate
+    correlator=options.correlator
+    objectname=options.objectname
+    inttime=options.inttime
+    timeoffset=options.timeoffset
+    if ('/' in options.antenna_locations):
+        antenna_locations=options.antenna_locations
+    else:
+        antenna_locations=cwd + options.antenna_locations
+    if not os.path.exists(antenna_locations):
+        logger.error('Unable to find antenna_locations file %s' % antenna_locations)
         sys.exit(2)
-
-    for opt,val in opts:
-        # Usage info only
-        if opt in ("-h", "--help"):
-            usage()
-            sys.exit(1)
-        elif opt in ("--debug"):
-            logger.setLevel(logging.DEBUG)
-        elif opt in ("--ra","--RA"):
-            ra=parse_RA(val)
-        elif opt in ("--dec","--DEC"):
-            dec=parse_Dec(val)
-        elif opt in ("--autoflag"):
-            autoflag=parse_boolinput(val)
-        elif opt in ("--force"):
-            force=parse_boolinput(val)
-        elif opt in ("--conjugate"):
-            conjugate=parse_boolinput(val)
-        elif opt in ("--correlator"):
-            correlator=val
-        elif opt in ("--object"):
-            objectname=val
-        elif opt in ("--inttime"):
-            try:
-                inttime=int(val)
-            except ValueError,err:
-                logger.warning('Unable to parse option  --inttime=%s: %s', val,err)
-        elif opt in ("--timeoffset"):
-            try:
-                timeoffset=int(val)
-            except ValueError,err:
-                logger.warning('Unable to parse option  --timeoffset=%s: %s', val,err)
-        elif opt in ("--antenna"):
-            if ("/" in val):
-                antenna_locations=val
-            else:
-                antenna_locations=cwd + val
-            if not os.path.exists(antenna_locations):
-                logger.error('Unable to find antenna_locations file %s' % antenna_locations)
-                sys.exit(2)
-        elif opt in ("--instr"):
-            if ("/" in val):
-                instrument_config=val
-            else:
-                instrument_config=cwd + val
-            if not os.path.exists(instrument_config):
-                logger.error('Unable to find instrument_config file %s' % instrument_config)
-                sys.exit(2)
-        elif opt in ("--flag"):
-            if ("/" in val):
-                static_flag=val
-            else:
-                static_flag=cwd + val
-            if not os.path.exists(static_flag):
-                logger.error('Unable to find static_flag file %s' % static_flag)
-                sys.exit(2)
-                
-        else:
-            logger.warning('Unknown option %s', opt)
+    if ('/' in options.instrument_configuration):
+        instrument_configuration=options.instrument_configuration
+    else:
+        instrument_configuration=cwd + options.instrument_configuration
+    if not os.path.exists(instrument_configuration):
+        logger.error('Unable to find instrument_configuration file %s' % instrument_configuration)
+        sys.exit(2)
+    if ('/' in options.static_flag):
+        static_flag=options.static_flag
+    else:
+        static_flag=cwd + options.static_flag
+    if not os.path.exists(static_flag):
+        logger.error('Unable to find static_flag file %s' % static_flag)
+        sys.exit(2)
 
     roots=args
     for root in roots:
