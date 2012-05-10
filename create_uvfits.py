@@ -29,6 +29,11 @@ import pyfits
 from mwapy import ephem_utils
 import numpy
 
+instr_config_master='instr_config_32T.txt'
+antenna_locations_master='antenna_locations_32T.txt'
+static_mask_master='mask_pfb_32T.txt'
+
+
 # configure the logging
 logging.basicConfig(format='# %(levelname)s:%(name)s: %(message)s')
 logger=logging.getLogger('create_uvfits')
