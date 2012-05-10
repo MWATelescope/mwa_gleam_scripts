@@ -102,11 +102,11 @@ def main():
     parser.add_option('--dec','--Dec',dest='dec',default=None,
                       help='Phase center Dec (decimal degrees or DD:MM:SS) [default=zenith]')
 
-    parser.add_option('--inttime',dest='inttime',default=1,
+    parser.add_option('--inttime',dest='inttime',default=1,type=int,
                       help='Specify integration time in seconds; >1 indicates averaging [default: %default]')
     parser.add_option('--object',dest='objectname',default='',
                       help='Specify object name')
-    parser.add_option('--timeoffset',dest='timeoffset',default=2,
+    parser.add_option('--timeoffset',dest='timeoffset',default=2,type=int,
                       help='Specify time offset in seconds between the file datetime and the observation starttime [default: %default]')
     parser.add_option('--conjugate',dest='conjugate',default=True,
                       help='Conjugate correlator input [default: %default]')
