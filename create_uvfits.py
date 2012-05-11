@@ -5,13 +5,10 @@ standalone program to create UVFITS files for MWA 32T data
 based on elements of image_32T.py
 can operate from:
  individual das output files
- splatted correlator output
  averaged correlator output
 
 Example:
-
-python ~/mwa/MWA_Tools/create_uvfits.py --instr=instr_config_20110927.txt --antenna=antenna_locations.txt --flag=mask_pfb.txt --inttime=8 --ra=317.66667 --dec=-26.66667 P00-drift_121_20110927130001
-
+python ~/mwa/MWA_Tools/create_uvfits.py --inttime=8 -r test --force --image P00-drift_121_20110927130001_das?.LACSPC P00-drift_121_20110927130001_das?.LCCSPC
 
 uses class:
 Corr2UVFITS
@@ -272,6 +269,7 @@ def main():
             if (result is not None):
                 logger.info("Wrote %s" % result)
 
+    instr_config_localsource=True
     if instr_config_master in instrument_configuration:
         # need to construct it from the master
         out_instrument_configuration=get_instr_config(observation_num, instrument_configuration)
@@ -279,6 +277,7 @@ def main():
             logger.error('Unable to generate instr_config file for GPS time %d from %s' % (observation_num, instrument_configuration))
             sys.exit(2)
         out_instrument_configuration_name='instr_config_%d.txt' % (observation_num)
+        instr_config_localsource=False
         if (os.path.exists(out_instrument_configuration_name)):
             os.remove(out_instrument_configuration_name)
         fout=open(out_instrument_configuration_name,'w')
@@ -380,7 +379,8 @@ def main():
                             conjugate=conjugate,correlator=correlator,timeoffset=timeoffset,force=force,
                             fake=False)
 
-    if (not corr2uvfits.write_header_file()):
+    if (not corr2uvfits.write_header_file(
+            'header_%d.txt' % observation.observation_number)):
         logger.error('Error in writing header file')
         return None
     uvfitsname=corr2uvfits.write_uvfits()
@@ -388,7 +388,10 @@ def main():
         logger.error('Error in writing UVFITS file')
         return None
     logger.info('%s written!' % (uvfitsname))
-
+    if not options.verbose:
+        os.remove(corr2uvfits.headername)
+        if not instr_config_localsource:
+            os.remove(instrument_configuration)
                 
             
 ##################################################
@@ -479,6 +482,7 @@ class Corr2UVFITS:
         # processing steps
         self.basename_processed=0
         self.has_headerfile=0
+        self.headername=None
 
         self.HA=None
 
@@ -698,6 +702,7 @@ class Corr2UVFITS:
             headerfile.close()
             self.has_header_file=1
             logger.info('Header file written to %s' %  outputname)
+            self.headername=outputname
         except IOError, err:
             logger.error('Could not write output file: %s', outputname,err)
 
@@ -714,17 +719,9 @@ class Corr2UVFITS:
             logger.error('No header file written')
             return
         curpath=os.path.abspath(os.getcwd())
-        antenna_dir=os.path.abspath(os.path.dirname(self.antenna_locations))
-        instr_dir=os.path.abspath(os.path.dirname(self.instr_config))
+        #antenna_dir=os.path.abspath(os.path.dirname(self.antenna_locations))
+        #instr_dir=os.path.abspath(os.path.dirname(self.instr_config))
 
-        if not (curpath + '/antenna_locations.txt' == antenna_dir + '/' + self.antenna_locations):
-            if (os.path.exists('antenna_locations.txt')):
-                os.remove('antenna_locations.txt')
-            shutil.copyfile(self.antenna_locations,'antenna_locations.txt')
-        if not (curpath + '/instr_config.txt' == instr_dir + '/' + self.instr_config):
-            if (os.path.exists('instr_config.txt')):
-                os.remove('instr_config.txt')
-            shutil.copyfile(self.instr_config,'instr_config.txt')
         if (self.flag and not (self.corrtype == 'B')):
             logger.warning('For flagging, correlation type must be \'Both\'')
             self.corrtype='B'
@@ -760,6 +757,9 @@ class Corr2UVFITS:
                 return None
             else:
                 command+=' -F %s' % self.flagfile
+        command+=' -S %s' % self.antenna_locations
+        command+=' -I %s' % self.instr_config
+        command+=' -H %s' % self.headername
         if (not os.path.exists(uvfitsname) or self.force):
             if (os.path.exists(uvfitsname)):
                 logger.info('UVFITS file %s exists but force==True' % (uvfitsname))
@@ -884,6 +884,11 @@ def get_instr_config(gpstime, instr_config):
         return None
     lines=fin.readlines()
     outlines=''
+    (xdir,xname)=os.path.split(sys.argv[0])
+    outlines+='# corr2uvfits header written by %s\n' % (xname)
+    now=datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S")
+    outlines+='# %s\n' % now
+
     iscommentblock=False
     file_gpstime=None
     config_data={}
