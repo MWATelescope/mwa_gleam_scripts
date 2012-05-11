@@ -31,7 +31,7 @@ import mwaconfig
 
 import ephem
 from mwapy import dbobj, ephem_utils
-from obssched.base import schedule, obssource, tiles
+from obssched.base import schedule
 from receiverStatusPy import StatusTools
 try:
     import primarybeammap
@@ -173,7 +173,7 @@ class MWA_Observation():
                     self._RFstream.hex))
 
                 self.delays=[int(x) for x in self._RFstream.hex.split(',')]
-                self.azimuth,za=StatusTools.delays2azza(self.delays)
+                self.azimuth,za=delays2azza(self.delays)
                 self.elevation=90-za
                 self.RA,self.Dec=ephem_utils.azel2radec(self.azimuth,self.elevation,
                                                         self.observation_number)
@@ -379,6 +379,121 @@ def find_closest_observation(gpstime, maxdiff=10,db=db):
                 gpstime,searchtime,searchtime-gpstime))
             return searchtime
     return None
+
+
+
+
+##################################################
+def delays2azza(xx):
+    """
+    # From Chris Williams
+    # receiverStatusPy/StatusTools.py
+    ################################
+    # delays2azza(xx)
+    #
+    # This takes a 16-element integer array of delay settings (each element of the array xx should be an integer from 0 to 31 in
+    # units of the delay step on the delay boards).  It uses several triangles of elements to determine roughly what the pointing
+    # direction is from the delay settings that the beamformer has
+    #
+    # It returns a tuple containing (average azimuth, average zenith angle) determined by averaging the angles determined by the
+    # selected triangles
+    """
+    dip_sep=1.10
+    delaystep=435 # delay in picoseconds
+    dtor=0.0174532925
+    
+    azs=[]
+    zas=[]
+
+    #choose triangles to back out the delays...
+
+    ii=[0,0,3,0]
+    jj=[15,15,12,3]
+    kk=[12,3,15,12]
+
+    for a in range(len(ii)):
+
+        i=ii[a]
+        j=jj[a]
+        k=kk[a]
+        
+        d1=delaystep*xx[i]
+        ox1=(-1.5+(i%4)*1.0)*dip_sep
+        oy1=(1.5-math.floor(i/4))*dip_sep
+        
+        d2=delaystep*xx[j]
+        ox2=(-1.5+(j%4)*1.0)*dip_sep
+        oy2=(1.5-math.floor(j/4))*dip_sep
+        
+        d3=delaystep*xx[k]
+        ox3=(-1.5+(k%4)*1.0)*dip_sep
+        oy3=(1.5-math.floor(k/4))*dip_sep
+        
+        az,za=triangulate(d1,ox1,oy1,d2,ox2,oy2,d3,ox3,oy3)
+        
+        if az is not None:
+            azs.append(az)
+            zas.append(za)
+        else:
+            #Bad triangle...
+            #logging.warning("Bad delay triangle: %i %i %i"%(i,j,k))
+            pass
+    if len(azs)==0 or len(zas)==0:
+        logging.warning("Can't triangulate a pointing...")
+        return None,None
+    else:
+        azavg=sum(azs)/len(azs)
+        zaavg=sum(zas)/len(zas)
+
+    return azavg,zaavg
+
+##################################################
+def triangulate(d1,ox1,oy1,d2,ox2,oy2,d3,ox3,oy3):
+    """
+    ################################
+    # triangulate(d1,ox1,oy1,d2,ox2,oy2,d3,ox3,oy3)
+    #
+    # This function triangulates the azimuth and zenith angle from 3 positions/delays of dipoles on a tile
+    #
+    # d1,d2,d3 are the delays (in picoseconds) between the three elements
+    # ox[1,2,3] are the x position offsets between the 3 elements
+    # oy[1,2,3] are the y position offsets between the 3 elements
+    #
+    # It returns a tuple which contains the (azimuth, zenith angle) in degrees
+    # that is pointed at by the combination of 3 elements (its the intersection of 3 great circles)
+    # It will return (None,None) if the triangle is colinear (i.e. not a triangle!)
+    """
+
+    dtor=0.0174532925
+    c=0.000299798 # c in m/picosecond
+
+    try:
+        # take the arctan to get the azimuth
+        az=math.atan2((d3-d1)*(oy2-oy1)-(d2-d1)*(oy3-oy1),(d2-d1)*(ox3-ox1)-(d3-d1)*(ox2-ox1))
+
+        if d1-d2 == 0 and d1-d3 == 0:
+            return 0.0,0.0
+
+        if abs((ox2-ox3)*math.sin(az)+(oy2-oy3)*math.cos(az)) > 1e-15: #check if the triangle is bad (if its colinear)
+            za=math.asin((d2-d3)*c/((ox2-ox3)*math.sin(az)+(oy2-oy3)*math.cos(az)))
+        elif abs((ox1-ox3)*math.sin(az)+(oy1-oy3)*math.cos(az)) > 1e-15:
+            za=math.asin((d1-d3)*c/((ox1-ox3)*math.sin(az)+(oy1-oy3)*math.cos(az)))
+        else:
+            return None,None
+        azd=az/dtor
+        zad=za/dtor
+    except:
+        #if there are math range errors, return None
+        return None,None
+
+    if zad < 0:
+        zad*=-1
+        azd+=180
+    while azd <0:
+        azd+=360
+    while azd >= 360:
+        azd-=360
+    return azd,zad
 
 ######################################################################
 

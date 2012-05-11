@@ -23,28 +23,46 @@ needs various metadata to get the times/positions right
 
 
 import sys,os,logging,shutil,datetime,re,subprocess,math,tempfile,string,glob
+import bisect
 from optparse import OptionParser
 import ephem
 import pyfits
 from mwapy import ephem_utils
+try:
+    from obssched.base import schedule
+except:
+    logger.error("Unable to open connection to database")
+    sys.exit(1)
+    
+import splat_average, get_observation_info
 import numpy
 
 instr_config_master='instr_config_32T.txt'
 antenna_locations_master='antenna_locations_32T.txt'
 static_mask_master='mask_pfb_32T.txt'
 
+_CHANSPERDAS=192
+_CHANSPERCOARSE=32
+_NDAS=4
+# 32 antennas * 2 polns
+_NINP=64
 
 # configure the logging
 logging.basicConfig(format='# %(levelname)s:%(name)s: %(message)s')
 logger=logging.getLogger('create_uvfits')
 logger.setLevel(logging.INFO)
 
+# open up database connection
+try:
+    db = schedule.getdb()
+except:
+    logger.error("Unable to open connection to database")
+    sys.exit(1)
+
 ######################################################################
 # external routines
 # the value after is 1 (if critical) or 0 (if optional)
-external_programs={'corr2uvfits': 1,
-                   'splatdas': 0,
-                   'average_corr.py': 0}
+external_programs={'corr2uvfits': 0}
                    
 # go through and find the external routines in the search path
 # or $MWA_PATH
@@ -80,8 +98,12 @@ for external_program in external_programs.keys():
         
 ######################################################################
 def main():
-    roots=[]
     cwd=os.path.abspath(os.getcwd()) + '/'
+
+    dir=os.path.dirname(__file__)
+    if (len(dir)==0):
+        dir='.'
+    dir+='/'
 
     usage="Usage: %prog [options] <directory> [<directory2>...]\n"
     usage+='\tSpecify directories to process.  Each should contain correlator output with one of:\n\t\t\t<directory>/<directory>_das1.lacspc (etc)\n'
@@ -92,13 +114,20 @@ def main():
     parser = OptionParser(usage=usage)
     parser.add_option('-v','--verbose',action="store_true",dest="verbose",default=False,
                       help="Increase verbosity of output")
+    parser.add_option('-r','--root',dest='root',default='',
+                      help='Root name of input')
+    parser.add_option('--inttime',dest='inttime',default=1,type=int,
+                      help='Specify integration time in seconds; >1 indicates averaging [default: %default]')
+    parser.add_option('--object',dest='objectname',default='',
+                      help='Specify object name')
+
     parser.add_option('--autoflag',dest='autoflag',default=True,
                       help='Use autoflagging in corr2uvfits? [default: %default]')
-    parser.add_option('--instr',dest='instrument_config',default=cwd + "instr_config.txt",
+    parser.add_option('--instr',dest='instrument_config',default=dir + instr_config_master,
                       help='Specify the instrument configuration file [default: %default]')
-    parser.add_option('--antenna',dest='antenna_locations',default=cwd + "antenna_locations.txt",
+    parser.add_option('--antenna',dest='antenna_locations',default=dir + antenna_locations_master,
                       help='Specify the antenna locations file [default: %default]')
-    parser.add_option('--flag',dest='static_flag',default='',
+    parser.add_option('--flag',dest='static_flag',default=dir + static_mask_master,
                       help='Specify a static masking file for the channels')
     parser.add_option('--force',dest='force',action='store_true',default=False,
                       help='Force regeneration of files?')
@@ -107,12 +136,12 @@ def main():
     parser.add_option('--dec','--Dec',dest='dec',default=None,
                       help='Phase center Dec (decimal degrees or DD:MM:SS) [default=zenith]')
 
-    parser.add_option('--inttime',dest='inttime',default=1,type=int,
-                      help='Specify integration time in seconds; >1 indicates averaging [default: %default]')
-    parser.add_option('--object',dest='objectname',default='',
-                      help='Specify object name')
     parser.add_option('--timeoffset',dest='timeoffset',default=2,type=int,
                       help='Specify time offset in seconds between the file datetime and the observation starttime [default: %default]')
+    parser.add_option('-i','--inputs',dest='inputs',default=_NINP,
+                      help='Number of input correlator streams (2*number of anteannas) [default=%default]')
+    parser.add_option('-d','--das',dest='das',default=_NDAS,
+                      help='Number of DASs [default=%default]')
     parser.add_option('--conjugate',dest='conjugate',default=True,
                       help='Conjugate correlator input [default: %default]')
     parser.add_option('--correlator',dest='correlator',default='H',
@@ -120,8 +149,14 @@ def main():
                       help='Specify hardware (H) or software (S) correlator [default: %default]')
     
     (options, args) = parser.parse_args()
-    ra=parse_RA(options.ra)
-    dec=parse_Dec(options.dec)
+    if (options.ra is not None):
+        ra=parse_RA(options.ra)
+    else:
+        ra=None
+    if (options.dec is not None):
+        dec=parse_Dec(options.dec)
+    else:
+        dec=None
     autoflag=options.autoflag
     force=options.force
     conjugate=options.conjugate
@@ -136,8 +171,8 @@ def main():
     if not os.path.exists(antenna_locations):
         logger.error('Unable to find antenna_locations file %s' % antenna_locations)
         sys.exit(2)
-    if ('/' in options.instrument_configuration):
-        instrument_configuration=options.instrument_configuration
+    if ('/' in options.instrument_config):
+        instrument_configuration=options.instrument_config
     else:
         instrument_configuration=cwd + options.instrument_configuration
     if not os.path.exists(instrument_configuration):
@@ -151,7 +186,98 @@ def main():
         logger.error('Unable to find static_flag file %s' % static_flag)
         sys.exit(2)
 
-    roots=args
+
+
+
+    files=args
+    # get the basic time/pointing information
+
+    observation_num=get_observation_info.find_observation_num(files[0], maxdiff=10, db=db)
+    if observation_num is None:
+        logger.error('No matching observation found for filename=%s\n' % (options.filename))
+        sys.exit(1)
+    observation=get_observation_info.MWA_Observation(observation_num,db=db)
+    print observation
+
+    if instr_config_master in instrument_configuration:
+        # need to construct it from the master
+        out_instrument_configuration=get_instr_config(observation_num, instrument_configuration)
+        if (out_instrument_configuration is None):
+            logger.error('Unable to generate instr_config file for GPS time %d from %s' % (observation_num, instrument_configuration))
+            sys.exit(2)
+        out_instrument_configuration_name='instr_config_%d.txt' % observation_num
+        if (os.path.exists(out_instrument_configuration_name)):
+            os.remove(out_instrument_configuration_name)
+        fout=open(out_instrument_configuration_name,'w')
+        fout.write(out_instrument_configuration)
+        fout.close()
+        logger.info('Wrote instr_config to %s\n' % (out_instrument_configuration_name))
+    if ra is None:
+        ra=observation.RA
+        dec=observation.Dec
+        logger.info('Setting (RA,Dec) to (%.5f, %.5f) deg\n' % (ra,dec))
+    ntimes=0
+    if ('LACSPC' in files[0].upper()):
+        acsize=os.path.getsize(files[0])
+        ntimes=acsize/((_CHANSPERDAS)*_NINP*4)
+    elif ('LCCSPC' in files[0].upper()):
+        ccsize=os.path.getsize(files[0])        
+        ntimes=ccsize/(_CHANSPERDAS*_NINP*(_NINP-1)/2*8)
+    if ntimes == 0:
+        logger.error('Unable to get number of integrations')
+        sys.exit(2)
+    logger.info('Found %d integrations in file %s\n' % (ntimes,files[0]))
+    ac_names=['','','','']
+    cc_names=['','','','']
+    for file in files:
+        if ('LACSPC' in file.upper()):
+            if ('das1' in file):
+                ac_names[0]=file
+            elif ('das2' in file):
+                ac_names[1]=file
+            elif ('das3' in file):
+                ac_names[2]=file
+            elif ('das4' in file):
+                ac_names[3]=file
+        if ('LCCSPC' in file.upper()):
+            if ('das1' in file):
+                cc_names[0]=file
+            elif ('das2' in file):
+                cc_names[1]=file
+            elif ('das3' in file):
+                cc_names[2]=file
+            elif ('das4' in file):
+                cc_names[3]=file
+
+    correct_chan=splat_average.channel_order(observation.center_channel)
+    if (inttime>1):
+        outname_ac=options.root + '.av.lacspc'
+        outname_cc=options.root + '.av.lccspc'
+        logger.info('Averaging output by factor of %d' % inttime)
+    else:
+        outname_ac=options.root + '.lacspc'
+        outname_cc=options.root + '.lccspc'
+        
+    logger.info('SPLAT and averaging AC...')
+    retval=splat_average.splat_average_ac(ac_names, outname_ac, ntimes, 
+                                          options.das*_CHANSPERDAS, options.inputs, 
+                                          inttime, correct_chan)
+    if retval is None:
+        logger.error('Error writing AC file')
+        sys.exit(2)
+    logger.info('Wrote %s' % outname_ac)
+
+    logger.info('SPLAT and averaging CC...')
+    retval=splat_average.splat_average_cc(cc_names, outname_cc, ntimes, 
+                                          options.das*_CHANSPERDAS, options.inputs, 
+                                          inttime, correct_chan)
+    if retval is None:
+        logger.error('Error writing CC file')
+        sys.exit(2)
+    logger.info('Wrote %s' % outname_cc)
+
+    
+    return
     for root in roots:
         uvfitsname=None
         logger.info('# Moving to %s' % root)
@@ -677,6 +803,65 @@ def runit(command,stdin=None,fake=0,verbose=1, **kwargs):
             result_error=result_error.split('\n')
         return result,result_error
     return None
+
+######################################################################
+def get_instr_config(gpstime, instr_config):
+
+    try:
+        fin=open(instr_config, 'r')
+    except:
+        logger.error('Unable to open master instrument config %s' % (instr_config))
+        return None
+    lines=fin.readlines()
+    outlines=''
+    iscommentblock=False
+    file_gpstime=None
+    config_data={}
+    for line in lines:
+        if (line.startswith('##############################')):
+            if (iscommentblock):
+                iscommentblock=False
+            else:
+                iscommentblock=True
+
+        if (line.startswith('#') and not iscommentblock):
+            continue
+        elif (line.startswith('#') and iscommentblock):
+            outlines+=line
+        elif line.lower().startswith('date'):
+            try:
+                datetimestring=line.split('=')[1].rstrip().lstrip()
+                year=int(datetimestring[:4])
+                month=int(datetimestring[4:6])
+                day=int(datetimestring[6:8])
+                hour=int(datetimestring[8:10])
+                minute=int(datetimestring[10:12])
+                second=int(datetimestring[12:14])
+                file_gpstime=int(dateobs2gps('%04d-%02d-%02dT%02d:%02d:%02d' %
+                                             (year,month,day,hour,minute,second)))
+                config_data[file_gpstime]='# Data starting at %04d-%02d-%02dT%02d:%02d:%02d\n' % (
+                    year,month,day,hour,minute,second)
+                config_data[file_gpstime]+='# GPS time %d\n' % file_gpstime
+            except:
+                logger.error('Unable to parse datetimestring\n%s' % line)
+                return None
+            continue
+        else:
+            if (file_gpstime is not None):
+                config_data[file_gpstime]+=line
+    s=sorted(config_data.keys())
+    itouse=bisect.bisect_right(s,gpstime)-1
+    if (itouse<0):
+        logger.error('Cannot find a configuration to match gpstime %d' % gpstime)
+        return None
+    gpstimetouse=s[itouse]
+    outlines+='# For GPS time %d\n' % gpstime
+    outlines+=config_data[gpstimetouse]
+    return outlines
+
+                
+    
+
 ######################################################################
 def ct2lst_mwa(yr,mn,dy,UT):
     """
