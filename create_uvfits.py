@@ -24,7 +24,7 @@ needs various metadata to get the times/positions right
 
 import sys,os,logging,shutil,datetime,re,subprocess,math,tempfile,string,glob
 import bisect
-from optparse import OptionParser
+from optparse import OptionParser,OptionGroup
 import ephem
 import pyfits
 from mwapy import ephem_utils
@@ -33,6 +33,11 @@ try:
 except:
     logger.error("Unable to open connection to database")
     sys.exit(1)
+try:
+    import primarybeammap
+    _useplotting=True
+except ImportError:
+    _useplotting=False    
     
 import splat_average, get_observation_info
 import numpy
@@ -50,7 +55,7 @@ _NINP=64
 # configure the logging
 logging.basicConfig(format='# %(levelname)s:%(name)s: %(message)s')
 logger=logging.getLogger('create_uvfits')
-logger.setLevel(logging.INFO)
+logger.setLevel(logging.WARNING)
 
 # open up database connection
 try:
@@ -62,7 +67,7 @@ except:
 ######################################################################
 # external routines
 # the value after is 1 (if critical) or 0 (if optional)
-external_programs={'corr2uvfits': 0}
+external_programs={'corr2uvfits': 1}
                    
 # go through and find the external routines in the search path
 # or $MWA_PATH
@@ -99,19 +104,22 @@ for external_program in external_programs.keys():
 ######################################################################
 def main():
     cwd=os.path.abspath(os.getcwd()) + '/'
+    basedir=cwd
 
     dir=os.path.dirname(__file__)
     if (len(dir)==0):
         dir='.'
     dir+='/'
 
-    usage="Usage: %prog [options] <directory> [<directory2>...]\n"
-    usage+='\tSpecify directories to process.  Each should contain correlator output with one of:\n\t\t\t<directory>/<directory>_das1.lacspc (etc)\n'
-    usage+="\t\t\t<directory>/<directory>.lacspc\n"
-    usage+="\t\t\t<directory>/<directory>.av.lacspc\n"
-    usage+="\t\tWill generate <directory>/<directory>.uvfits\n"
-    usage+="\t\tRequires external programs %s for operation; searches $MWA_PATH for these\n" % (", ".join(external_programs.keys()))    
+    usage="Usage: %prog [options] file_das1.LACSPC file_das2.LACSPC ... file_das1.LCCSPC file_das2.LCCSPC...\n"
+    usage+="\tNeeds an autocorrelation (.LACSPC) and crosscorrelation (.LCCSPC) file for each DAS\n"
+    usage+="\tTries to determine basic information about the observation from the filename, but can specify <DATETIME> or <GPS> to override\n"
+    usage+="\tSame with RA,Dec\n"
+    usage+="\tRequires external programs %s for operation; searches $MWA_PATH for these\n" % (", ".join(external_programs.keys()))    
+    usage+="\nExample:\n\tpython ~/mwa/MWA_Tools/create_uvfits.py --inttime=8 --force -v --image P00-drift_121_20110927130001_das?.LACSPC P00-drift_121_20110927130001_das?.LCCSPC\n"
+
     parser = OptionParser(usage=usage)
+    
     parser.add_option('-v','--verbose',action="store_true",dest="verbose",default=False,
                       help="Increase verbosity of output")
     parser.add_option('-r','--root',dest='root',default='',
@@ -120,33 +128,42 @@ def main():
                       help='Specify integration time in seconds; >1 indicates averaging [default: %default]')
     parser.add_option('--object',dest='objectname',default='',
                       help='Specify object name')
-
-    parser.add_option('--autoflag',dest='autoflag',default=True,
-                      help='Use autoflagging in corr2uvfits? [default: %default]')
-    parser.add_option('--instr',dest='instrument_config',default=dir + instr_config_master,
-                      help='Specify the instrument configuration file [default: %default]')
-    parser.add_option('--antenna',dest='antenna_locations',default=dir + antenna_locations_master,
-                      help='Specify the antenna locations file [default: %default]')
-    parser.add_option('--flag',dest='static_flag',default=dir + static_mask_master,
-                      help='Specify a static masking file for the channels')
+    parser.add_option('--image',action="store_true",dest="image",default=False,
+                      help="Generate an image for this pointing?")
     parser.add_option('--force',dest='force',action='store_true',default=False,
                       help='Force regeneration of files?')
-    parser.add_option('--ra','--RA',dest='ra',default=None,
-                      help='Phase center RA (decimal degrees or HH:MM:SS) [default=meridian]')
-    parser.add_option('--dec','--Dec',dest='dec',default=None,
-                      help='Phase center Dec (decimal degrees or DD:MM:SS) [default=zenith]')
 
-    parser.add_option('--timeoffset',dest='timeoffset',default=2,type=int,
+    extragroup=OptionGroup(parser,'Extra Options',
+                           "These will override default behavior")
+    
+    extragroup.add_option('--autoflag',dest='autoflag',default=True,
+                      help='Use autoflagging in corr2uvfits? [default: %default]')
+    extragroup.add_option('--instr',dest='instrument_config',default=dir + instr_config_master,
+                      help='Specify the instrument configuration file [default: %default]')
+    extragroup.add_option('--antenna',dest='antenna_locations',default=dir + antenna_locations_master,
+                      help='Specify the antenna locations file [default: %default]')
+    extragroup.add_option('--flag',dest='static_flag',default=dir + static_mask_master,
+                      help='Specify a static masking file for the channels [default: %default]')
+    extragroup.add_option('--ra','--RA',dest='ra',default=None,
+                      help='Phase center RA (decimal degrees or HH:MM:SS) [default=lookup/meridian]')
+    extragroup.add_option('--dec','--Dec',dest='dec',default=None,
+                      help='Phase center Dec (decimal degrees or DD:MM:SS) [default=lookup/zenith]')
+    extragroup.add_option('-d','--datetime',dest="datetimestring",
+                      help="Search for information on <DATETIME> (YYYYMMDDhhmmss) [default=lookup]",
+                      metavar="DATETIME")
+    extragroup.add_option('-g','--gps',dest="gpstime",
+                      help="Search for information on <GPS> (s)  [default=lookup]",type='int',
+                      metavar="GPS")
+    extragroup.add_option('-m','--maxdiff',dest="maxtimediff",type='int',
+                      help="Maximum time difference for search (in sec)", default=10)
+    extragroup.add_option('--timeoffset',dest='timeoffset',default=2,type=int,
                       help='Specify time offset in seconds between the file datetime and the observation starttime [default: %default]')
-    parser.add_option('-i','--inputs',dest='inputs',default=_NINP,
-                      help='Number of input correlator streams (2*number of anteannas) [default=%default]')
-    parser.add_option('-d','--das',dest='das',default=_NDAS,
-                      help='Number of DASs [default=%default]')
-    parser.add_option('--conjugate',dest='conjugate',default=True,
+    extragroup.add_option('--conjugate',dest='conjugate',default=True,
                       help='Conjugate correlator input [default: %default]')
-    parser.add_option('--correlator',dest='correlator',default='H',
+    extragroup.add_option('--correlator',dest='correlator',default='H',
                       choices=['H','S'],
                       help='Specify hardware (H) or software (S) correlator [default: %default]')
+    parser.add_option_group(extragroup)
     
     (options, args) = parser.parse_args()
     if (options.ra is not None):
@@ -164,6 +181,10 @@ def main():
     objectname=options.objectname
     inttime=options.inttime
     timeoffset=options.timeoffset
+    if (options.verbose):
+        logger.setLevel(logging.INFO)
+
+    # determine the antenna_locations file
     if ('/' in options.antenna_locations):
         antenna_locations=options.antenna_locations
     else:
@@ -171,6 +192,7 @@ def main():
     if not os.path.exists(antenna_locations):
         logger.error('Unable to find antenna_locations file %s' % antenna_locations)
         sys.exit(2)
+    # determine the instrument_configuration file
     if ('/' in options.instrument_config):
         instrument_configuration=options.instrument_config
     else:
@@ -178,6 +200,8 @@ def main():
     if not os.path.exists(instrument_configuration):
         logger.error('Unable to find instrument_configuration file %s' % instrument_configuration)
         sys.exit(2)
+
+    # determine the static flagging file
     if ('/' in options.static_flag):
         static_flag=options.static_flag
     else:
@@ -186,18 +210,66 @@ def main():
         logger.error('Unable to find static_flag file %s' % static_flag)
         sys.exit(2)
 
-
-
-
     files=args
-    # get the basic time/pointing information
+    if len(files)<2*_NDAS:
+        logger.error('Must supply %d files for input' % (2*_NDAS))
+        sys.exit(2)
+    if (len(options.root)==0 or options.root is None):
+        options.root=re.sub('_das\d\..*','',files[0])
+        logger.warning('No output root specified; will use %s' % options.root)
 
-    observation_num=get_observation_info.find_observation_num(files[0], maxdiff=10, db=db)
+    # get the basic time/pointing information
+    observation_num=None
+    try:
+        # check if a datetimestring is input
+        if observation_num is None and options.datetimestring is not None:
+            observation_num=find_observation_num(options.datetimestring, maxdiff=options.maxtimediff, db=db)
+            if observation_num is None:
+                logger.error('No matching observation found for datetimestring=%s\n' % (options.datetimestring))
+        # check if a GPS time is input
+        if observation_num is None and options.gpstime is not None:
+            observation_num=find_closest_observation((options.gpstime),maxdiff=options.maxtimediff,db=db)
+            if observation_num is None:
+                logger.error('No matching observation found for gpstime=%d\n' % (options.gpstime))
+        if observation_num is None:
+            # try to parse the input filename
+            observation_num=get_observation_info.find_observation_num(files[0], maxdiff=options.maxtimediff, db=db)
+    except:
+        logger.error('Error trying to match observation in database')
+        
+
     if observation_num is None:
         logger.error('No matching observation found for filename=%s\n' % (options.filename))
         sys.exit(1)
-    observation=get_observation_info.MWA_Observation(observation_num,db=db)
+    try:
+        observation=get_observation_info.MWA_Observation(observation_num,db=db)
+    except:
+        logger.error('Error retrieving observation info for %d' % observation_num)
+        sys.exit(1)
+    print "\n##############################"
     print observation
+    print "##############################\n"
+    if (options.image):
+        if (not _useplotting):
+            logger.warning('Unable to import primarybeammap to generate image\n')
+        else:
+            datetimestring='%04d%02d%02d%02d%02d%02d' % (observation.year,observation.month,
+                                                         observation.day,
+                                                         observation.hour,observation.minute,
+                                                         observation.second)
+
+
+            logger.info('Creating sky image for %04d/%02d/%02d %02d:%02d:%02d, %.2f MHz, delays=%s' % (
+                observation.year,observation.month,observation.day,
+                observation.hour,observation.minute,observation.second,
+                channel2frequency(observation.center_channel),
+                ','.join([str(x) for x in observation.delays])))
+            result=primarybeammap.make_primarybeammap(datetimestring, observation.delays,
+                                                      frequency=channel2frequency(observation.center_channel),
+                                                      center=True,
+                                                      title=observation.filename)
+            if (result is not None):
+                logger.info("Wrote %s" % result)
 
     if instr_config_master in instrument_configuration:
         # need to construct it from the master
@@ -205,17 +277,23 @@ def main():
         if (out_instrument_configuration is None):
             logger.error('Unable to generate instr_config file for GPS time %d from %s' % (observation_num, instrument_configuration))
             sys.exit(2)
-        out_instrument_configuration_name='instr_config_%d.txt' % observation_num
+        out_instrument_configuration_name='instr_config_%d.txt' % (observation_num)
         if (os.path.exists(out_instrument_configuration_name)):
             os.remove(out_instrument_configuration_name)
         fout=open(out_instrument_configuration_name,'w')
         fout.write(out_instrument_configuration)
         fout.close()
-        logger.info('Wrote instr_config to %s\n' % (out_instrument_configuration_name))
-    if ra is None:
-        ra=observation.RA
-        dec=observation.Dec
-        logger.info('Setting (RA,Dec) to (%.5f, %.5f) deg\n' % (ra,dec))
+        logger.info('Wrote instr_config to %s' % (out_instrument_configuration_name))
+        instrument_configuration=out_instrument_configuration_name
+
+
+    # try to get pointing information from database lookup
+    if ra is None and observation.RA is not None:
+        ra=parse_RA(str(observation.RA))
+        dec=parse_Dec(str(observation.Dec))
+        logger.info('Setting (RA,Dec) to (%s, %s)' % (ra,dec))
+
+    # determine number of time samples
     ntimes=0
     if ('LACSPC' in files[0].upper()):
         acsize=os.path.getsize(files[0])
@@ -226,30 +304,26 @@ def main():
     if ntimes == 0:
         logger.error('Unable to get number of integrations')
         sys.exit(2)
-    logger.info('Found %d integrations in file %s\n' % (ntimes,files[0]))
-    ac_names=['','','','']
-    cc_names=['','','','']
-    for file in files:
-        if ('LACSPC' in file.upper()):
-            if ('das1' in file):
-                ac_names[0]=file
-            elif ('das2' in file):
-                ac_names[1]=file
-            elif ('das3' in file):
-                ac_names[2]=file
-            elif ('das4' in file):
-                ac_names[3]=file
-        if ('LCCSPC' in file.upper()):
-            if ('das1' in file):
-                cc_names[0]=file
-            elif ('das2' in file):
-                cc_names[1]=file
-            elif ('das3' in file):
-                cc_names[2]=file
-            elif ('das4' in file):
-                cc_names[3]=file
+    logger.info('Found %d integrations in file %s' % (ntimes,files[0]))
 
-    correct_chan=splat_average.channel_order(observation.center_channel)
+    # figure out the files for AC and CC for each DAS
+    ac_names=['']*_NDAS
+    cc_names=['']*_NDAS
+    for filename in files:
+        dasnumber=int(re.sub('\..*','',re.sub('.*?das','',filename)))
+        if ('LACSPC' in filename.upper()):
+            ac_names[dasnumber-1]=filename
+        if ('LCCSPC' in filename.upper()):
+            cc_names[dasnumber-1]=filename
+
+    for k in xrange(_NDAS):
+        if len(ac_names[k])==0 or not os.path.exists(ac_names[k]):
+            logger.error('Cannot find AC file for DAS %d: %s' % (k,ac_names[k]))
+            sys.exit(2)
+        if len(cc_names[k])==0 or not os.path.exists(cc_names[k]):
+            logger.error('Cannot find CC file for DAS %d: %s' % (k,cc_names[k]))
+            sys.exit(2)
+                         
     if (inttime>1):
         outname_ac=options.root + '.av.lacspc'
         outname_cc=options.root + '.av.lccspc'
@@ -257,59 +331,62 @@ def main():
     else:
         outname_ac=options.root + '.lacspc'
         outname_cc=options.root + '.lccspc'
-        
-    logger.info('SPLAT and averaging AC...')
-    retval=splat_average.splat_average_ac(ac_names, outname_ac, ntimes, 
-                                          options.das*_CHANSPERDAS, options.inputs, 
-                                          inttime, correct_chan)
-    if retval is None:
-        logger.error('Error writing AC file')
-        sys.exit(2)
-    logger.info('Wrote %s' % outname_ac)
 
-    logger.info('SPLAT and averaging CC...')
-    retval=splat_average.splat_average_cc(cc_names, outname_cc, ntimes, 
-                                          options.das*_CHANSPERDAS, options.inputs, 
-                                          inttime, correct_chan)
-    if retval is None:
-        logger.error('Error writing CC file')
-        sys.exit(2)
-    logger.info('Wrote %s' % outname_cc)
-
+    # determine the channel ordering
+    correct_chan=splat_average.channel_order(observation.center_channel)
     
-    return
-    for root in roots:
-        uvfitsname=None
-        logger.info('# Moving to %s' % root)
-        basedir=root
-        if ("." in basedir):
-            basedir=basedir.split(".")[0]
-        if (not os.path.exists(basedir)):
-            logger.error('Directory %s does not exist',basedir)
-            return None
-        try:
-            os.chdir(basedir)
-        except OSError,err:
-            logger.error('Unable to change directory to: %s\n%s',basedir,err)
+    if (not os.path.exists(outname_ac) or force):
+        if os.path.exists(outname_ac):
+            logger.warning('AC file %s exists, but force=yes' % outname_ac)
+        
+        logger.info('SPLAT and averaging AC...')
+        retval=splat_average.splat_average_ac(ac_names, outname_ac, ntimes, 
+                                              _NDAS*_CHANSPERDAS, 
+                                              _NINP, 
+                                              inttime, correct_chan)
+        if retval is None:
+            logger.error('Error writing AC file')
+            sys.exit(2)
+        logger.info('Wrote %s' % outname_ac)
+    else:
+        if os.path.exists(outname_ac):
+            logger.info('AC file %s exists: not overwriting' % (outname_ac))
+    if (not os.path.exists(outname_cc) or force):
+        if os.path.exists(outname_cc):
+            logger.warning('CC file %s exists, but force=yes' % outname_cc)
+        logger.info('SPLAT and averaging CC...')
+        retval=splat_average.splat_average_cc(cc_names, outname_cc, ntimes, 
+                                              _NDAS*_CHANSPERDAS, 
+                                              _NINP, 
+                                              inttime, correct_chan)
+        if retval is None:
+            logger.error('Error writing CC file')
+            sys.exit(2)
+        logger.info('Wrote %s' % outname_cc)
+    else:
+        if os.path.exists(outname_cc):
+            logger.info('CC file %s exists: not overwriting' % (outname_cc))
 
-        corr2uvfits=Corr2UVFITS(basename=root,RA=ra,Dec=dec,
-                                objectname=objectname,inttime=inttime,
-                                flag=autoflag,
-                                flagfile=static_flag,
-                                instr_config=instrument_config, antenna_locations=antenna_locations,
-                                conjugate=conjugate,correlator=correlator,timeoffset=timeoffset,force=force,
-                                fake=False)
-        if (not corr2uvfits.write_header_file()):
-            logger.error('Error in writing header file')
-            os.chdir('../')
-            return None
-        uvfitsname=corr2uvfits.write_uvfits()
-        if (not uvfitsname):
-            logger.error('Error in writing UVFITS file')
-            os.chdir('../')
-            return None
-        logger.info('%s/%s written!' % (basedir,uvfitsname))
-        os.chdir('../')                
+    corr2uvfits=Corr2UVFITS(basename=options.root,RA=ra,Dec=dec,
+                            year=observation.year,month=observation.month,
+                            day=observation.day, 
+                            time='%02d:%02d:%02d' % (observation.hour,observation.minute,observation.second),
+                            channel=observation.center_channel,
+                            objectname=objectname,inttime=inttime,
+                            flag=autoflag,
+                            flagfile=static_flag,
+                            instr_config=instrument_configuration, antenna_locations=antenna_locations,
+                            conjugate=conjugate,correlator=correlator,timeoffset=timeoffset,force=force,
+                            fake=False)
+
+    if (not corr2uvfits.write_header_file()):
+        logger.error('Error in writing header file')
+        return None
+    uvfitsname=corr2uvfits.write_uvfits()
+    if (not uvfitsname):
+        logger.error('Error in writing UVFITS file')
+        return None
+    logger.info('%s written!' % (uvfitsname))
 
                 
             
@@ -320,11 +397,17 @@ class Corr2UVFITS:
     """
 
     ##################################################
-    def __init__(self,basename=None,objectname=None,RA=None,Dec=None,inttime=1,totaltime=None,flag=0,flagfile=None,antenna_locations=None,instr_config=None,conjugate=0,correlator='s',timeoffset=2,force=False,fake=None):
+    def __init__(self,basename=None,objectname=None,RA=None,Dec=None,
+                 year=None,month=None,day=None,time=None,channel=None,
+                 inttime=1,totaltime=None,flag=0,flagfile=None,
+                 antenna_locations=None,instr_config=None,
+                 conjugate=0,correlator='s',timeoffset=2,force=False,fake=None):
         """
-        __init__(self,basename=None,objectname=None,RA=None,Dec=None,inttime=1,totaltime=None,flag=0,
-        flagfile=None,antenna_locations=None,instr_config=None,conjugate=0,correlator='s',timeoffset=2,force=False,
-        fake=None)
+        __init__(self,basename=None,objectname=None,RA=None,Dec=None,
+                 year=None,month=None,day=None,time=None,channel=None,
+                 inttime=1,totaltime=None,flag=0,flagfile=None,
+                 antenna_locations=None,instr_config=None,
+                 conjugate=0,correlator='s',timeoffset=2,force=False,fake=None)
         allows setting of various parameters for conversion to uvfits files
         RA in decimal hours
         Dec in decimal degrees
@@ -339,7 +422,6 @@ class Corr2UVFITS:
         except:
             self.revision=0
     
-        # first step: corr2uvfits
         curpath=os.path.abspath(os.getcwd())
 
         self.antenna_locations=antenna_locations
@@ -377,6 +459,22 @@ class Corr2UVFITS:
         # in seconds
         self.timeoffset=timeoffset
 
+        self.year=year
+        self.month=month
+        self.day=int(day)
+        self.channel=channel
+        self.time=time
+
+
+        if (self.year is not None and self.month is not None and self.day is not None and self.time is not None):
+            self.datetime=datetime.datetime(self.year,self.month,self.day,
+                                            int(self.time[0:2]),
+                                            int(self.time[3:5]),
+                                            int(self.time[6:8]))+datetime.timedelta(seconds=self.timeoffset)
+            # this should correctly handle boundaries
+            self.year,self.month,self.day=self.datetime.year,self.datetime.month,self.datetime.day
+            self.time=self.datetime.strftime('%H:%M:%S')
+
         # processing steps
         self.basename_processed=0
         self.has_headerfile=0
@@ -404,44 +502,6 @@ class Corr2UVFITS:
         else:
             suffix=''
         if (self.basename):
-            if (not (os.path.exists(self.basename + suffix + '.lccspc') or os.path.exists(self.basename + suffix + '.LCCSPC')) or self.force):
-                # do splatdas if necessary to create basic auto and cross correlation files
-                if (not (os.path.exists(self.basename + '.lccspc') or os.path.exists(self.basename + '.LCCSPC')) or self.force):
-                    if ((os.path.exists(self.basename + '.lccspc'))):
-                        logger.info('splated file %s exists but force==True' % (self.basename + '.lccspc'))
-                    if ((os.path.exists(self.basename + '.LCCSPC'))):
-                        logger.info('splated file %s exists but force==True' % (self.basename + '.LCCSPC'))
-                    
-                    if (os.path.exists(self.basename + '_das1.LACSPC') or os.path.exists(self.basename + '_das1.LCCSPC')):
-                        # need to do splatdas first
-                        [datetime_str,self.year,self.month,self.day,time,self.channel]=self.parse_basename()
-                        command='%s -c %d -o %s -1 %s_das1 -2 %s_das2 -3 %s_das3 -4 %s_das4' % (
-                            external_paths['splatdas'],self.channel,self.basename,
-                            self.basename,self.basename,self.basename,self.basename)
-                        logger.info('Running splatdas...\n')
-                        result=runit(command,fake=self.fake)
-                        if (hasstring(result[1],'Error')):
-                            logger.error('Error running splatdas:\n\t%s',''.join(result[1]))
-                            return None
-                    else:
-                        logger.error('Cannot find das1 file %s or %s' % (
-                                self.basename + '_das1.LACSPC',self.basename + '_das1.lacspc'))
-                        return None
-                # do average_corr.py if necessary
-                if (self.inttime > 1 and (not (os.path.exists(self.basename + suffix + '.lccspc') or os.path.exists(self.basename + suffix + '.LCCSPC')) or self.force)):
-                    if ((os.path.exists(self.basename + suffix + '.lccspc'))):
-                        logger.info('averaged file %s exists but force==True' % (self.basename + suffix + '.lccspc'))
-                    if ((os.path.exists(self.basename + suffix + '.LCCSPC'))):
-                        logger.info('averaged file %s exists but force==True' % (self.basename + suffix + '.LCCSPC'))
-
-                    command='%s -a %d %s' % (external_paths['average_corr.py'],self.inttime,self.basename)
-                    logger.info('Running average_corr.py...\n')
-                    result=runit(command,fake=self.fake)
-                    if (hasstring(result[1],'Error')):
-                        logger.error('Error running average_corr.py:\n\t%s',''.join(result[1]))
-                        return None
-                    
-
             self.ccname=self.basename + suffix + ".LCCSPC"
             self.acname=self.basename + suffix +".LACSPC"
             # try an alternate extension
@@ -453,16 +513,25 @@ class Corr2UVFITS:
                 return None
 
             s=self.basename.split('_')
-            [datetime_str,self.year,self.month,self.day,time,self.channel]=self.parse_basename()
-            try:
-                self.datetime=datetime.datetime(self.year,self.month,self.day,int(time[0:2]),int(time[2:4]),int(time[4:6]))+datetime.timedelta(seconds=self.timeoffset)
-                # this should correctly handle boundaries
-                self.year,self.month,self.day=self.datetime.year,self.datetime.month,self.datetime.day
-                self.time=self.datetime.strftime('%H:%M:%S')
-            except (IndexError,ValueError),err:
-                logger.error('Unable to parse time: %s\n%s', time,err)
-                self.basename_processed=0
-                return
+            if (self.year is None or self.month is None or self.day is None or self.channel is None or self.datetime is None):
+                try:
+                    [datetime_str,self.year,self.month,self.day,time,self.channel]=self.parse_basename()
+                except:
+                    logger.error('Unable to parse root name %s' % self.basename)
+                    return None
+                try:
+                    self.datetime=datetime.datetime(self.year,self.month,
+                                                    self.day,
+                                                    int(time[0:2]),
+                                                    int(time[2:4]),
+                                                    int(time[4:6]))+datetime.timedelta(seconds=self.timeoffset)
+                    # this should correctly handle boundaries
+                    self.year,self.month,self.day=self.datetime.year,self.datetime.month,self.datetime.day
+                    self.time=self.datetime.strftime('%H:%M:%S')
+                except (IndexError,ValueError),err:
+                    logger.error('Unable to parse time: %s\n%s', time,err)
+                    self.basename_processed=0
+                    return
             # even though ct2lst talks about local time, actually we pass it UT
             self.lst=ct2lst_mwa((self.year),(self.month),(self.day),self.time)
             LST=ephem_utils.dec2sexstring(self.lst,digits=0,roundseconds=0)
@@ -498,10 +567,10 @@ class Corr2UVFITS:
             if (sundist < 45):
                 logger.warning('Sun is only %.1f degrees away from the field',sundist)
             else:
-                logger.warning('Sun is %.1f degrees away from the field',sundist)
+                logger.info('Sun is %.1f degrees away from the field',sundist)
 
             if (self.conjugate):
-                logger.warning('Conjugating correlator input')
+                logger.info('Conjugating correlator input')
 
         return 1
     ##################################################
@@ -627,7 +696,7 @@ class Corr2UVFITS:
             headerfile.write(header)
             headerfile.close()
             self.has_header_file=1
-            logger.info('# Header file written to %s' %  outputname)
+            logger.info('Header file written to %s' %  outputname)
         except IOError, err:
             logger.error('Could not write output file: %s', outputname,err)
 

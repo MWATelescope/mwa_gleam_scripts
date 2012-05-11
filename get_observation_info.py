@@ -32,7 +32,6 @@ import mwaconfig
 import ephem
 from mwapy import dbobj, ephem_utils
 from obssched.base import schedule
-from receiverStatusPy import StatusTools
 try:
     import primarybeammap
     _useplotting=True
