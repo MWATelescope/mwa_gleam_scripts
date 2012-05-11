@@ -216,6 +216,7 @@ def main():
         sys.exit(2)
     if (len(options.root)==0 or options.root is None):
         options.root=re.sub('_das\d\..*','',files[0])
+        options.root=os.path.split(options.root)[-1]
         logger.warning('No output root specified; will use %s' % options.root)
 
     # get the basic time/pointing information
