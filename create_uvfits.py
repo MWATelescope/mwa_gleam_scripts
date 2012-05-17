@@ -119,6 +119,8 @@ def main():
     
     parser.add_option('-v','--verbose',action="store_true",dest="verbose",default=False,
                       help="Increase verbosity of output")
+    parser.add_option('-c','--clean',action="store_true",dest="clean",default=False,
+                      help="Clean temporary files?")
     parser.add_option('-r','--root',dest='root',default='',
                       help='Root name of input')
     parser.add_option('--inttime',dest='inttime',default=1,type=int,
@@ -148,6 +150,9 @@ def main():
     extragroup.add_option('-d','--datetime',dest="datetimestring",
                       help="Search for information on <DATETIME> (YYYYMMDDhhmmss) [default=lookup]",
                       metavar="DATETIME")
+    extragroup.add_option('--dir',dest="directory",default='',
+                      help="Output directory [default=current directory]",
+                      metavar="DIRECTORY")
     extragroup.add_option('-g','--gps',dest="gpstime",
                       help="Search for information on <GPS> (s)  [default=lookup]",type='int',
                       metavar="GPS")
@@ -277,10 +282,22 @@ def main():
             logger.error('Unable to generate instr_config file for GPS time %d from %s' % (observation_num, instrument_configuration))
             sys.exit(2)
         out_instrument_configuration_name='instr_config_%d.txt' % (observation_num)
+        if (options.directory is not None and len(options.directory)>0):
+            out_instrument_configuration_name=options.directory + '/' + out_instrument_configuration_name
         instr_config_localsource=False
         if (os.path.exists(out_instrument_configuration_name)):
-            os.remove(out_instrument_configuration_name)
-        fout=open(out_instrument_configuration_name,'w')
+            try:
+                os.remove(out_instrument_configuration_name)
+            except OSError,err:
+                logger.error('Unable to remove existing instr_config %s: %s\n' % (out_instrument_configuration_name,err))
+                sys.exit(2)
+                
+        try:
+            fout=open(out_instrument_configuration_name,'w')
+        except OSError,err:
+            logger.error('Unable to write to instr_config %s\n' % (out_instrument_configuration_name))
+            sys.exit(2)
+
         fout.write(out_instrument_configuration)
         fout.close()
         logger.info('Wrote instr_config to %s' % (out_instrument_configuration_name))
@@ -332,6 +349,10 @@ def main():
         outname_ac=options.root + '.lacspc'
         outname_cc=options.root + '.lccspc'
 
+    if (options.directory is not None and len(options.directory)>0):
+        outname_ac=options.directory + '/' + outname_ac
+        outname_cc=options.directory + '/' + outname_cc
+
     # determine the channel ordering
     correct_chan=splat_average.channel_order(observation.center_channel)
     
@@ -378,21 +399,28 @@ def main():
                             instr_config=instrument_configuration, antenna_locations=antenna_locations,
                             conjugate=conjugate,correlator=correlator,timeoffset=timeoffset,force=force,
                             fake=False)
-
-    if (not corr2uvfits.write_header_file(
-            'header_%d.txt' % observation.observation_number)):
+    corr2uvfits.ccname=outname_cc
+    corr2uvfits.acname=outname_ac
+    outheader='header_%d.txt' % observation.observation_number
+    if (options.directory is not None and len(options.directory)>0):
+        outheader=options.directory + '/' + outheader
+          
+    if (not corr2uvfits.write_header_file(outheader)):
         logger.error('Error in writing header file')
         return None
-    uvfitsname=corr2uvfits.write_uvfits()
+    uvfitsname=corr2uvfits.write_uvfits(directory=options.directory)
     if (not uvfitsname):
         logger.error('Error in writing UVFITS file')
         return None
     logger.info('%s written!' % (uvfitsname))
-    if not options.verbose:
+    if options.clean:
+        logger.info('Removing temporary files')
         os.remove(corr2uvfits.headername)
         if not instr_config_localsource:
             os.remove(instrument_configuration)
-                
+        os.remove(outname_ac)
+        os.remove(outname_cc)
+
             
 ##################################################
 class Corr2UVFITS:
@@ -492,7 +520,8 @@ class Corr2UVFITS:
         if (self.basename):
             if (not self.process_basename()):
                 logger.error('Error processing basename: %s', self.basename)
-                
+        self.acname=None
+        self.ccname=None
 
     ##################################################
     def process_basename(self):
@@ -502,21 +531,8 @@ class Corr2UVFITS:
         from that it and the RA of the source it computes the HA (hrs)
         returns 1 on success
         """
-        if (self.inttime > 1):
-            suffix='.av'
-        else:
-            suffix=''
-        if (self.basename):
-            self.ccname=self.basename + suffix + ".LCCSPC"
-            self.acname=self.basename + suffix +".LACSPC"
-            # try an alternate extension
-            if (not os.path.exists(self.ccname)):
-                self.ccname=self.basename + suffix +".lccspc"
-                self.acname=self.basename + suffix +".lacspc"
-            if (not os.path.exists(self.ccname)):
-                logger.error('Cannot access CC file: %s',self.ccname)                
-                return None
 
+        if (self.basename):
             s=self.basename.split('_')
             if (self.year is None or self.month is None or self.day is None or self.channel is None or self.datetime is None):
                 try:
@@ -709,9 +725,9 @@ class Corr2UVFITS:
         return 1
 
     ##################################################
-    def write_uvfits(self,fake=0):
+    def write_uvfits(self,directory='',fake=0):
         """
-        uvfitsname=write_uvfits(self,fake=0)
+        uvfitsname=write_uvfits(self,directory='',fake=0)
         writes the uvfits file from the correlator output, using the header file created  by self.write_header_file()
         if the file exists, will only overwrite if self.force
         """
@@ -727,6 +743,8 @@ class Corr2UVFITS:
             self.corrtype='B'
             
         uvfitsname='%s.uvfits' % (self.basename)
+        if (directory is not None and len(directory)>0):
+            uvfitsname=directory + '/' + uvfitsname
         if (self.corrtype == 'B'):
             command=self.corr2uvfits + ' -c %s -a %s' % (self.ccname,self.acname)
         if (self.corrtype == 'C'):
