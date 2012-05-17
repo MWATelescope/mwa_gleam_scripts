@@ -123,6 +123,9 @@ def main():
                       help="Clean temporary files?")
     parser.add_option('-r','--root',dest='root',default='',
                       help='Root name of input')
+    parser.add_option('--dir',dest="directory",default='',
+                      help="Output directory [default=current directory]",
+                      metavar="DIRECTORY")
     parser.add_option('--inttime',dest='inttime',default=1,type=int,
                       help='Specify integration time in seconds; >1 indicates averaging [default: %default]')
     parser.add_option('--object',dest='objectname',default='',
@@ -150,9 +153,6 @@ def main():
     extragroup.add_option('-d','--datetime',dest="datetimestring",
                       help="Search for information on <DATETIME> (YYYYMMDDhhmmss) [default=lookup]",
                       metavar="DATETIME")
-    extragroup.add_option('--dir',dest="directory",default='',
-                      help="Output directory [default=current directory]",
-                      metavar="DIRECTORY")
     extragroup.add_option('-g','--gps',dest="gpstime",
                       help="Search for information on <GPS> (s)  [default=lookup]",type='int',
                       metavar="GPS")
