@@ -198,6 +198,19 @@ class instrument_configuration():
         else:
             rxslotoffset={1:0,2:16,3:32,4:48}
 
+        slotispowered={}
+        for receiver in self.active_receivers:
+            slotispowered[int(receiver)]=True
+            try:
+                slot_power=dbobj.execute('select slot_power from obsc_recv_cmds where rx_id=%s and starttime=%d' % (
+                        receiver,self.gpstime), db=self.db)[0][0]
+                # if any of them is False
+                if 'f' in slot_power:
+                    slotispowered[int(receiver)]=False
+            except:
+                logger.warning('Unable to retrieve slot power information for gpstime=%d, Rx=%s' % (self.gpstime,receiver))
+                pass
+
         # loop over each input 
         # figure out which receiver and tile it connects to
         for inputnumber in xrange(_NINP):
@@ -212,15 +225,11 @@ class instrument_configuration():
                     receiver,slot,self.gpstime,self.gpstime), db=self.db)[0][0]
             cable_electrical_length=dbobj.execute('select eleclength from cable_info ci inner join tile_connection tc on ci.name = tc.cable_name where tc.tile=%s and ci.begintime < %d and ci.endtime >  %d and tc.begintime <  %d and tc.endtime > %d' % (
                     tile,self.gpstime,self.gpstime,self.gpstime,self.gpstime), db=self.db)[0][0]
+
+            # flagging
             flagthisinput=False
-            try:
-                slotispowered=dbobj.execute('select slot_power from obsc_recv_cmds where rx_id=%s and starttime=%d' % (
-                        receiver,self.gpstime), db=self.db)[0][0]
-                # if any of them is False
-                if 'f' in slotispowered:
-                    flagthisinput=True
-            except:
-                pass
+            if not slotispowered[int(receiver)]:
+                flagthisinput=True
 
             if tile in self.tiles_to_flag or str(tile) in self.tiles_to_flag:
                 flagthisinput=True
