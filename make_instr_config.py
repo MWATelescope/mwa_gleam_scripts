@@ -18,6 +18,7 @@ import itertools
 from optparse import OptionParser,OptionGroup
 import ephem
 import pyfits
+import pgdb
 from mwapy import ephem_utils, dbobj
     
 import splat_average, get_observation_info
@@ -156,7 +157,7 @@ class instrument_configuration():
             return
         if (flaggingname is not None):    
             flagged_tiles = dbobj.execute('select flagged_tiles from tile_flags where starttime < %d and stoptime > %d and name = %s' %
-                                          (self.gpstime, self.gpstime, flaggingname), db=self.db)    
+                                          (self.gpstime, self.gpstime, pgdb.escape_string(flaggingname)), db=self.db)    
         else:
             flagged_tiles = list(itertools.chain.from_iterable(dbobj.execute('select flagged_tiles from tile_flags where starttime < %d and stoptime > %d' %
                                                                              (self.gpstime, self.gpstime), db=self.db)))
@@ -203,7 +204,7 @@ class instrument_configuration():
             slotispowered[int(receiver)]=True
             try:
                 slot_power=dbobj.execute('select slot_power from obsc_recv_cmds where rx_id=%s and starttime=%d' % (
-                        receiver,self.gpstime), db=self.db)[0][0]
+                        pgdb.escape_string(receiver),self.gpstime), db=self.db)[0][0]
                 # if any of them is False
                 if 'f' in slot_power:
                     slotispowered[int(receiver)]=False
@@ -224,7 +225,8 @@ class instrument_configuration():
             tile=dbobj.execute('select tile from tile_connection where receiver_id = %s and receiver_slot = %d and begintime < %d and endtime > %d' % (
                     receiver,slot,self.gpstime,self.gpstime), db=self.db)[0][0]
             cable_electrical_length=dbobj.execute('select eleclength from cable_info ci inner join tile_connection tc on ci.name = tc.cable_name where tc.tile=%s and ci.begintime < %d and ci.endtime >  %d and tc.begintime <  %d and tc.endtime > %d' % (
-                    tile,self.gpstime,self.gpstime,self.gpstime,self.gpstime), db=self.db)[0][0]
+                    pgdb.escape_string(tile),self.gpstime,self.gpstime,
+                    self.gpstime,self.gpstime), db=self.db)[0][0]
 
             # flagging
             flagthisinput=False
