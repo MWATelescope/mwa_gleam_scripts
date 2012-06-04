@@ -256,10 +256,10 @@ def main():
 ######################################################################
 def make_primarybeammap(datetimestring, delays, frequency, center=False, sunline=True,
                         low=1, high=2000, plothourangle=True, extension='png',
-                        figsize=8, title=None, verbose=False):
+                        figsize=8, title=None, directory=None, verbose=False):
     """
     filename=make_primarybeammap(datetimestring, delays, frequency, center=False, sunline=True,
-    low=1, high=2000, plothourangle=True, extension='png', figsize=8, title=None, verbose=False)
+    low=1, high=2000, plothourangle=True, extension='png', figsize=8, title=None, directory=None, verbose=False)
     if center==True, will center the image on the LST
     otherwise will have a fixed range (RA=-12 to 12)
 
@@ -538,6 +538,8 @@ def make_primarybeammap(datetimestring, delays, frequency, center=False, sunline
         filename='%s_%.2fMHz.%s' % (datetimestring,frequency,extension)
     else:
         filename='%s_%.2fMHz.%s' % (datetimestring,frequency[0],extension)
+    if directory is not None:
+        filename=directory + '/' + filename
     try:
         pylab.savefig(filename)
     except RuntimeError,err:
