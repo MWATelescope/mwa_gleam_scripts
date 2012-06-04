@@ -4,10 +4,9 @@
 # Format: Antenna_name east north height
 # antenna names must be 8 chars or less
 # fields are separated by white space
-# This is a PRELIMINARY version based on surveyed tile locations. Coords have been corrected
+# This is the as-built version based on tile groundscreen placements. Coords have been corrected
 # for UTM grid convergence, but not Earth curvature which might affect heights by ~15cm on 1km baselines.
-# 18 May 2012
-
+# 4 June 2012
 Ant11 -152.29 0263.32 0377.01
 Ant12 -097.87 0267.70 0377.28
 Ant13 -091.02 0263.53 0377.31
@@ -45,7 +44,7 @@ Ant52 0174.96 -045.88 0375.01
 Ant53 -024.22 0074.51 0376.35
 Ant54 0089.30 -083.06 0375.76
 Ant55 0151.19 -262.42 0376.47
-Ant56 -065.07 -019.85 0376.18
+Ant56 -070.09 -024.85 0376.18
 Ant57 -120.54 -042.37 0376.06
 Ant58 -090.02 0122.70 0377.03
 Ant61 -107.79 0214.69 0377.26
@@ -99,7 +98,7 @@ Ant118 -891.98 1085.64 0370.38
 Ant121 0713.88 1402.76 0374.61
 Ant122 0285.56 0615.78 0375.13
 Ant123 0235.81 0765.92 0375.81
-Ant124 0230.38 0817.22 0375.75
+Ant124 0225.37 0817.23 0375.75
 Ant125 0058.94 0812.76 0376.00
 Ant126 -061.38 0808.04 0375.17
 Ant127 0032.72 0947.75 0376.28
