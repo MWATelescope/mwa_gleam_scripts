@@ -1,3 +1,5 @@
+# MWA 128T antenna locations.
+#
 # lines beginning with '#' and blank lines are ignored. Do not leave spaces in empty lines.
 # locations of antennas relative to the centre of the array in local topocentric
 # "east", "north", "height". Units are meters.
