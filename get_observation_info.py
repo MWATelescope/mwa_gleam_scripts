@@ -25,7 +25,6 @@ delays = 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
 import logging, sys, os, glob, string, re, urllib, math, time
 from optparse import OptionParser
 import numpy
-import pgdb
 
 import mwaconfig
 
@@ -187,7 +186,8 @@ class MWA_Observation():
                     logger.warning('Unable to get Receiver Commands for Rx=%d, starttime=%d\n' % (1,self.observation_number))
                 else:
                     try:
-                        self.delays=[int(x) for x in recv_cmds.xdelaysetting.split('}')[0].replace('{','').split(',')]
+                        #self.delays=[int(x) for x in recv_cmds.xdelaysetting.split('}')[0].replace('{','').split(',')]
+                        self.delays=recv_cmds.xdelaysetting[0]
                         logger.info('Found delays in Obsc_Recv_Cmds (%s)\n' % (','.join([str(x) for x in self.delays])))
                     except:
                         logger.warning('Unable to get xdelaysettings from Receiver Commands for Rx=%d, starttime=%d\n' % (1,self.observation_number))
