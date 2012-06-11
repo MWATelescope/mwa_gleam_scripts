@@ -1050,7 +1050,8 @@ def parse_RA(s):
     and return HH:MM:SS
     """
     if (s.count(':')>0):
-        return trim_string(s)
+        #return trim_string(s)
+        return string.strip(s)
     else:
         return ephem_utils.dec2sexstring(float(s)/15,digits=1,roundseconds=0)
     
@@ -1062,7 +1063,8 @@ def parse_Dec(s):
     and return sDD:MM:SS.ss
     """
     if (s.count(':')>0):
-        return trim_string(s)
+#        return trim_string(s)
+        return string.strip(s)
     else:
         return ephem_utils.dec2sexstring(float(s),digits=1,roundseconds=0)
 ######################################################################
