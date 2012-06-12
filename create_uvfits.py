@@ -242,7 +242,7 @@ def main():
         
 
     if observation_num is None:
-        logger.error('No matching observation found for filename=%s\n' % (options.filename))
+        logger.error('No observation found\n')
         sys.exit(1)
     try:
         observation=get_observation_info.MWA_Observation(observation_num,db=db)
