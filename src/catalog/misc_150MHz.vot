@@ -1,0 +1,181 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Produced with vo.table version 0.7.2
+     http://www.stsci.edu/trac/ssb/astrolib
+     Author: Michael Droettboom <support@stsci.edu> -->
+<VOTABLE version="1.0" xmlns="http://www.ivoa.net/xml/VOTable/v1.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://www.ivoa.net/xml/VOTable/v1.0">
+ <RESOURCE type="results">
+  <TABLE>
+   <FIELD ID="col0" datatype="double" name="a1" precision="F17"/>
+   <FIELD ID="col1" datatype="double" name="index" precision="F17"/>
+   <FIELD ID="col2" datatype="double" name="a2" precision="F17"/>
+   <FIELD ID="col3" datatype="double" name="S_nu_" precision="F17" ucd="phot.flux.density"/>
+   <FIELD ID="col4" datatype="double" name="th" precision="F17"/>
+   <FIELD ID="col5" datatype="double" name="mfreq" precision="F17"/>
+   <FIELD ID="col6" datatype="double" name="dra" precision="F17"/>
+   <FIELD ID="col7" datatype="double" name="_Dec" precision="F17" ucd="pos.eq.dec;meta.main"/>
+   <FIELD ID="col8" datatype="double" name="ddec" precision="F17"/>
+   <FIELD ID="col9" datatype="double" name="_Ra" precision="F17" ucd="pos.eq.ra;meta.main"/>
+   <FIELD ID="col10" arraysize="4" datatype="char" name="Name"/>
+   <DATA>
+    <TABLEDATA>
+     <TR>
+      <TD>0</TD>
+      <TD>-4.21</TD>
+      <TD>0</TD>
+      <TD>158.77652645381423</TD>
+      <TD>0</TD>
+      <TD>0.16</TD>
+      <TD>0</TD>
+      <TD>-29.007779254098303</TD>
+      <TD>0</TD>
+      <TD>266.41666487860323</TD>
+      <TD>sgr</TD>
+     </TR>
+     <TR>
+      <TD>0</TD>
+      <TD>-2.2999999999999998</TD>
+      <TD>0</TD>
+      <TD>2157.6401177045509</TD>
+      <TD>0</TD>
+      <TD>0.16</TD>
+      <TD>0</TD>
+      <TD>-12.095555534192547</TD>
+      <TD>0</TD>
+      <TD>139.52374391194883</TD>
+      <TD>hyd</TD>
+     </TR>
+     <TR>
+      <TD>0</TD>
+      <TD>-0.80000000000000016</TD>
+      <TD>0</TD>
+      <TD>170</TD>
+      <TD>0</TD>
+      <TD>0.14999999999999999</TD>
+      <TD>0</TD>
+      <TD>-37.208333182952806</TD>
+      <TD>0</TD>
+      <TD>50.673750603309465</TD>
+      <TD>for</TD>
+     </TR>
+     <TR>
+      <TD>0</TD>
+      <TD>-0.99999999999999978</TD>
+      <TD>0</TD>
+      <TD>318</TD>
+      <TD>0</TD>
+      <TD>0.159</TD>
+      <TD>0</TD>
+      <TD>4.9925831228814728</TD>
+      <TD>0</TD>
+      <TD>252.78396246509459</TD>
+      <TD>her</TD>
+     </TR>
+     <TR>
+      <TD>0</TD>
+      <TD>-0.73000000000000009</TD>
+      <TD>0</TD>
+      <TD>9160</TD>
+      <TD>0</TD>
+      <TD>0.14999999999999999</TD>
+      <TD>0</TD>
+      <TD>58.811780980501673</TD>
+      <TD>0</TD>
+      <TD>350.86640785220482</TD>
+      <TD>cas</TD>
+     </TR>
+     <TR>
+      <TD>0</TD>
+      <TD>-0.51999999999999991</TD>
+      <TD>0</TD>
+      <TD>7346.4561220397518</TD>
+      <TD>0</TD>
+      <TD>0.16</TD>
+      <TD>0</TD>
+      <TD>-43.019167845759931</TD>
+      <TD>0</TD>
+      <TD>201.36500065729629</TD>
+      <TD>cen</TD>
+     </TR>
+     <TR>
+      <TD>0</TD>
+      <TD>-0.79999999999999993</TD>
+      <TD>0</TD>
+      <TD>475.95009045191392</TD>
+      <TD>0</TD>
+      <TD>0.16</TD>
+      <TD>0</TD>
+      <TD>-45.779165327092045</TD>
+      <TD>0</TD>
+      <TD>79.957083594188177</TD>
+      <TD>pic</TD>
+     </TR>
+     <TR>
+      <TD>0</TD>
+      <TD>-0.86000000000000032</TD>
+      <TD>0</TD>
+      <TD>1446</TD>
+      <TD>0</TD>
+      <TD>0.14999999999999999</TD>
+      <TD>0</TD>
+      <TD>12.391111479957338</TD>
+      <TD>0</TD>
+      <TD>187.70583809094305</TD>
+      <TD>vir</TD>
+     </TR>
+     <TR>
+      <TD>0</TD>
+      <TD>-0.68999999999999984</TD>
+      <TD>0</TD>
+      <TD>10900</TD>
+      <TD>0</TD>
+      <TD>0.14999999999999999</TD>
+      <TD>0</TD>
+      <TD>40.733889002311216</TD>
+      <TD>0</TD>
+      <TD>299.86792615009085</TD>
+      <TD>cyg</TD>
+     </TR>
+     <TR>
+      <TD>0</TD>
+      <TD>-0.30000000000000016</TD>
+      <TD>0</TD>
+      <TD>1838</TD>
+      <TD>0</TD>
+      <TD>0.14999999999999999</TD>
+      <TD>0</TD>
+      <TD>22.014444185570628</TD>
+      <TD>0</TD>
+      <TD>83.633330462109996</TD>
+      <TD>crab</TD>
+     </TR>
+     <TR>
+      <TD>0</TD>
+      <TD>-1.0000000000000002</TD>
+      <TD>0</TD>
+      <TD>90</TD>
+      <TD>0</TD>
+      <TD>0.14999999999999999</TD>
+      <TD>0</TD>
+      <TD>-43.032333035385129</TD>
+      <TD>0</TD>
+      <TD>126.10400679676121</TD>
+      <TD>vel</TD>
+     </TR>
+     <TR>
+      <TD>0</TD>
+      <TD>-0.99999999999999978</TD>
+      <TD>0</TD>
+      <TD>497</TD>
+      <TD>0</TD>
+      <TD>0.14999999999999999</TD>
+      <TD>0</TD>
+      <TD>-60.80683142573821</TD>
+      <TD>0</TD>
+      <TD>243.48996013691817</TD>
+      <TD>X1</TD>
+     </TR>
+    </TABLEDATA>
+   </DATA>
+  </TABLE>
+ </RESOURCE>
+</VOTABLE>

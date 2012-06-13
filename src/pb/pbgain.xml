@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>  
+<?xml-stylesheet type="text/xsl" ?>  
+<casaxml xmlns="http://casa.nrao.edu/schema/psetTypes.html"  
+xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"  
+xsi:schemaLocation="http://casa.nrao.edu/schema/casa.xsd  
+file:///opt/casa/code/xmlcasa/xml/casa.xsd">  
+
+  <task type="function" name="pbgain">
+    <shortdescription>Generate a primary beam image for the MWA</shortdescription>  
+ 
+    <description>  
+      Generates a primary beam image for 
+    </description>  
+    
+    <input>  
+      <param type="string" name="imagename" mustexist="true">  
+	<description>name of input image file</description>  
+	<value></value>  
+      </param> 
+      <param type="string" name="pbimage">  
+	<description>name of output beam image</description>  
+	<value></value>  
+      </param> 
+       <param type="bool" name="overwrite">  
+	<description>overwrite</description>  
+	<value>False</value>  
+      </param> 
+       <param type="bool" name="isodipole">  
+	<description>Use an isotropic dipole instead of short dipole</description>  
+	<value>False</value>  
+       </param> 
+       <param type="bool" name="dbdelay">
+	 <description>Get delays automatically from the MC database NOT IMPLEMENTED YET!</description>
+	 <value>False</value>
+       </param>
+       <param type="string" name="dbhost" subparam="True">
+	 <description>MC Database host</description>
+	 <value></value>
+       </param>
+       <param type="string" name="dbuser" subparam="True">
+	 <description>MC Database username</description>
+	 <value></value>
+       </param>
+       <param type="string" name="dbpass" subparam="True">
+	 <description>MC Database password</description>
+	 <value></value>
+       </param>
+       <param type="intArray" name="delays" subparam="True">
+	 <description>16-element array of delays</description>
+	 <value></value>
+       </param>
+
+
+      <constraints>
+	<when param="dbdelay">
+	  <equals type="bool" value="False">
+	    <default param="delays">
+	      <value type="vector">
+		<value>0</value><value>0</value><value>0</value><value>0</value><value>0</value><value>0</value><value>0</value><value>0</value><value>0</value><value>0</value><value>0</value><value>0</value><value>0</value><value>0</value><value>0</value><value>0</value>
+	      </value>
+	    </default>
+	  </equals>
+	  <equals type="bool" value="True">
+	    <default param="dbhost">
+	      <value type="string">mwa.mit.edu</value>
+	    </default>
+	    <default param="dbuser">
+	      <value type="string">mwa</value>
+	    </default>
+	    <default param="dbpass">
+	      <value type="string">BowEoRTie</value>
+	    </default>
+	  </equals>
+	</when>
+      </constraints>
+	       
+
+    </input>  
+    <returns type="void"/> 
+    <example>
+      Example:
+      pbgain(image='test.image',pbeam='testbeam.image',dbdelay=False,delays=[0]*16)
+    </example>
+    
+  </task>
+</casaxml>

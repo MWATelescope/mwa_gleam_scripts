@@ -1,0 +1,33 @@
+Cataloging tools
+Danny Jacobs 27-Feb-2012
+daniel.c.jacobs@asu.edu
+
+These are a couple of tools for managing catalogs
+
+Requirements:
+aipy 1.0
+pyephem 3.7.4.1
+
+Installing
+--------------
+distributed here as part of the mwacasa package. 
+From this directory do:
+Move the mwacasa root directory,
+cd ..
+python setup.py install
+
+
+Usage
+---------------
+Typically used within an AIPY cal file. Provides access
+to catalogs within via the aipy.cal.get_catalog method.
+
+Currently supports votables and text files. 
+
+
+TODO: document import formats!
+
+
+
+
+
