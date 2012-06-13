@@ -1,0 +1,68 @@
+# correlate some data
+../corr_gpu_complex -n 16 -i simdat16_ha-2.00.dat -o simdat16_ha-2.00
+../corr_cpu_complex -d -n 16 -i simdat16_ha-1.5.dat -o simdat16_ha-1.5
+../corr_cpu_complex -d -n 16 -i simdat16_ha-1.0.dat -o simdat16_ha-1.0
+
+# run the converter:
+./corr2uvfits -a simdat16_ha-2.0.LACSPC -c simdat16_ha-2.0.LCCSPC -o simdat16_ha_-2.0.uvfits -H header_ha-2.0.txt -d
+./corr2uvfits -a simdat16_ha-2.0.LACSPC -c simdat16_ha-2.0.LCCSPC -o simdat16_ha_-1.5.uvfits -H header_ha-1.5.txt -d
+./corr2uvfits -a simdat16_ha-2.0.LACSPC -c simdat16_ha-2.0.LCCSPC -o simdat16_ha_-1.0.uvfits -H header_ha-1.0.txt -d
+
+# import into miriad
+rm -rf test.uv
+fits op='uvin' in='testout.uvfits' out='test.uv'
+
+# image it
+rm -rf test.beam test*.map
+invert vis=test.uv stokes=xx,yy imsize=128,128 map=test_xx.map,test_yy.map beam=test.beam options=mfs
+
+# ALTENATE: use "make_big_sim" scripts.
+# run make_big_sim.pro in IDL: this generates a bunch of data files
+# run make_big_sim.pl in perl, this converts to uvfits.
+
+
+# import a bunch of files
+rm -rf test*.uv
+fits op='uvin' in='simdat16_ha_-2.00.uvfits' out='test0.uv'
+fits op='uvin' in='simdat16_ha_-1.50.uvfits' out='test1.uv'
+fits op='uvin' in='simdat16_ha_-1.00.uvfits' out='test2.uv'
+fits op='uvin' in='simdat16_ha_-0.50.uvfits' out='test3.uv'
+fits op='uvin' in='simdat16_ha_0.00.uvfits' out='test4.uv'
+fits op='uvin' in='simdat16_ha_0.50.uvfits' out='test5.uv'
+fits op='uvin' in='simdat16_ha_1.00.uvfits' out='test6.uv'
+fits op='uvin' in='simdat16_ha_1.50.uvfits' out='test7.uv'
+fits op='uvin' in='simdat16_ha_2.00.uvfits' out='test8.uv'
+
+fits op='uvin' in='simdat16_ha_-2.25.uvfits' out='test10.uv'
+fits op='uvin' in='simdat16_ha_-1.75.uvfits' out='test11.uv'
+fits op='uvin' in='simdat16_ha_-1.25.uvfits' out='test12.uv'
+fits op='uvin' in='simdat16_ha_-0.75.uvfits' out='test13.uv'
+fits op='uvin' in='simdat16_ha_-0.25.uvfits' out='test14.uv'
+fits op='uvin' in='simdat16_ha_0.25.uvfits' out='test15.uv'
+fits op='uvin' in='simdat16_ha_0.75.uvfits' out='test16.uv'
+fits op='uvin' in='simdat16_ha_1.25.uvfits' out='test17.uv'
+fits op='uvin' in='simdat16_ha_1.75.uvfits' out='test18.uv'
+
+fits op='uvin' in='simdat16_ha_-2.10.uvfits' out='test20.uv'
+fits op='uvin' in='simdat16_ha_-1.60.uvfits' out='test21.uv'
+fits op='uvin' in='simdat16_ha_-1.10.uvfits' out='test22.uv'
+fits op='uvin' in='simdat16_ha_-0.60.uvfits' out='test23.uv'
+fits op='uvin' in='simdat16_ha_-0.10.uvfits' out='test24.uv'
+fits op='uvin' in='simdat16_ha_0.40.uvfits' out='test25.uv'
+fits op='uvin' in='simdat16_ha_0.90.uvfits' out='test26.uv'
+fits op='uvin' in='simdat16_ha_1.40.uvfits' out='test27.uv'
+fits op='uvin' in='simdat16_ha_1.90.uvfits' out='test28.uv'
+
+# uvcat into a big file. needs to be in chronological order.
+uvcat vis=test10.uv,test20.uv,test0.uv,test11.uv,test21.uv,test1.uv,test12.uv,test22.uv,test2.uv,test13.uv,test23.uv,test3.uv,test14.uv,test24.uv,test4.uv,test25.uv,test15.uv,test5.uv,test16.uv,test26.uv,test6.uv,test17.uv,test27.uv,test7.uv,test18.uv,test28.uv,test8.uv out=test.uv
+puthd in=test.uv/systemp value=100.0
+puthd in=test.uv/jyperk value=50.0
+puthd in=test.uv/inttime value=5.0
+
+# make bandpass calibrations...
+mfcal vis=test.uv
+
+# plot the calibrations
+gpplt vis=test.uv device='/xs'
+gpplt vis=test.uv device='/xs' options=bandpass
+

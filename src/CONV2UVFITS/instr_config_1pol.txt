@@ -1,0 +1,22 @@
+# this file maps inputs into the receiver/correlator to antennas and polarisations.
+# in addition, a cable length "delta" (in meters) can be specified
+# the first column is not actually used by the uvfits writer, but is there as
+# an aide to human readers. Inputs are ordered from 0 to n_inp-1
+#
+# INPUT   ANTENNA   POL     DELTA
+0         0         X        0.0
+1         1         X        0.0
+2         2         X        0.0
+3         3         X        0.0
+4         4         X        0.0
+5         5         X        0.0
+6         6         X        0.0
+7         7         X        0.0
+8         8         X        0.0
+9         9         X        0.0
+10        10        X        0.0
+11        11        X        0.0
+12        12        X        0.0
+13        13        X        0.0
+14        14        X        0.0
+15        15        X        0.0

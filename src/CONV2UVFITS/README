@@ -1,0 +1,38 @@
+MWA 32T UVFITS visibility writer.
+--------------------------------
+
+Author: Randall Wayth. Feb, 2008.
+
+REQUIREMENTS:
+cfitsio v3: installed in a location where the compiler/linker will see it.
+
+CONTENTS:
+SLALIB_C: 				SLA library. (not to be redistributed outside the MWA project)
+uvifts.c uvfits.h: 		reader/writer of uvfits files
+corr2uvfits.c: 			reads raw binary correlation files, reformats, calls uvfits writer
+Makefile
+header.txt: 			example file of key-value pairs with observational metadata
+antenna_locations.txt: 	example file of antenna locations
+instr_config.txt: 		example file of the instrument configuration
+
+BUILDING:
+make the program by typing "make". This will create a standalone program called "corr2uvfits".
+type ./corr2uvfits
+for a summary of command line arguments.
+
+A quick EXAMPLE:
+after correlation you have two files. e.g. simdat16.LACSPC (auto correlations) and simdat16.LCCSPC (cross correlations)
+
+create/update your configuration files (see the top of the supplied example files for details) :
+antenna_locations.txt
+instr_config.txt
+header.txt
+You can call these config files whatever you like, but be sure to specify the file name on the command line if
+you do not use the default names.
+
+run it:
+ # example: minimal command line args
+./corr2uvfits -a simdat16.LACSPC -c simdat16_.LCCSPC -o simdat16.uvfits
+ # example: turn on debugging. Specify a different header file.
+./corr2uvfits -a simdat16.LACSPC -c simdat16_.LCCSPC -o simdat16.uvfits -H myheader.txt -d
+

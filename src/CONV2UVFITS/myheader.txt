@@ -1,0 +1,16 @@
+# Sample UVFITS writer header file.
+# blank lines and lines beginning with '#' are ignored
+# line format: key value comments
+FIELDNAME testfield
+N_SCANS   1     # number of scans (time instants) in correlation products
+N_INPUTS  16    # number of inputs into the correlation products
+N_CHANS   128   # number of channels in spectrum
+CORRTYPE  C     # correlation type to use. 'C'(cross), 'B'(both), or 'A'(auto)
+INT_TIME  5.0   # integration time of scan (seconds)
+FREQCENT  150.0 # observing center freq in MHz
+BANDWIDTH 1.28  # total bandwidth in MHz
+HA_HRS    1.9  # the HA at the *start* of the scan. (hours)
+RA_HRS    0.0   # the RA of the desired phase centre (hours)
+DEC_DEGS  -40.0000 # the DEC of the desired phase centre (degs)
+DATE      20070921  # YYYYMMDD (UTC)
+TIME      180600    # HHMMSS (UTC)
