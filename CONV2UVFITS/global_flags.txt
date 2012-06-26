@@ -1,0 +1,6 @@
+# global flags file for corr2uvfits.
+# comment lines start with #. Don't leave spaces on blank lines
+# antenna and channel indices start from 0
+#
+# examples:
+# CHAN_ALL_ANT_ALL_TIME 15
