@@ -1,5 +1,5 @@
 # Makefile for corr2uvfits.
-INCS=-I$(SIM_INC) -I/opt/local/include/ -L/opt/local/lib/
+INCS=-I$(SIM_INC) 
 CFLAGS=-g -O -Wall $(INCS) -D_FILE_OFFSET_BITS=64 -L.
 
 TARGETS=corr2uvfits
