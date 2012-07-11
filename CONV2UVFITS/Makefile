@@ -15,4 +15,5 @@ libsla.a:
 	cd SLALIB_C ; make
 	rm -f SLALIB_C/*.o
 clean:
-	rm -f *.o $(TARGETS) libsla.a SLALIB_C/*.o
+	rm -f *.o $(TARGETS) libsla.a SLALIB_C/*.o 
+	rm -rf corr2uvfits.dSYM
