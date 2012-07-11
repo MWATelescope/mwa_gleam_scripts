@@ -1,0 +1,79 @@
+
+
+
+                 -------------------------------
+                  T p o i n t   S o f t w a r e
+                 -------------------------------
+
+
+                      THE SLALIB/C LIBRARY
+
+                       Installation Notes
+
+                        19 December 2005
+
+
+
+The library is supplied in the simplest and most straightforward
+format:  ANSI C source code, one module per file.  No assumptions are
+made about the recipient's software development environment, and it
+is up to the recipient to place the source code in an appropriate
+directory and to establish appropriate arrangements for compiling
+the files and, as appropriate, using the object modules to build a
+linkable library.
+
+For use on Unix platforms a make file is included.  This will build
+a linkable library using the GNU C compiler and place it and the
+header files in suitable places.  The make file should be inspected
+before it is invoked and the choice of destination directories vetted:
+if necessary, the first few lines of the make file can be edited to
+observe local conventions.  On some Unix platforms it may be necessary
+to execute a ranlib comment to prepare the slalib.a library for use.
+
+Note that the source code for the SLALIB/C function slaAddet (for
+example) is in the file addet.c.  Two header files (slalib.h and
+slamac.h) are supplied:  these need to be accessible to users.
+
+On different platforms, some preliminary editing of the files may be
+needed in order to introduce the correct end-of-line character
+sequence.
+
+Of the 193 files supplied, 188 are the source code (186 .c files and
+2 .h files).  The remaining 5 files are:
+
+  manual.txt    A simple (but detailed) manual consisting of
+                extracted preamble comments.
+
+  manual        The Perl script that produces manual.txt.
+
+  sla_A4.pdf    A comprehensive manual in PDF form (A4).
+
+  sla_US.pdf    "       "          "    "  "    "  (US).
+
+  makefile      The Unix make file.
+
+  read.me       The file you are reading.
+
+  slatest.src   A C program that executes all the SLALIB/C functions
+                and reports any malfunctions.
+
+The library is protected by copyright, and license holders are bound by
+strict non-disclosure restrictions.  These restrictions also apply to
+modified forms of the source code (whether produced by hand or by
+automatic translation, and whatever the language of the result), to
+linkable object libraries, and to applications, applets and plug-ins
+that use "front-end" or "wrapper" code to expose the general-purpose
+character of the library.
+
+-----------------------------------------------------------------------
+TPOINT SOFTWARE                                 tel/fax +44-1235-531198
+19 Sutton Wick Lane, Drayton
+Abingdon
+Oxon OX14 4HH
+United Kingdom                                   www.tpsoft.demon.co.uk
+_______________________________________________________________________
+
+         The contents of this notice are for the SLALIB/C
+         license holder only and must not be made public
+         or otherwise disclosed to third parties.
+-----------------------------------------------------------------------
