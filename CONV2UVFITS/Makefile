@@ -1,5 +1,5 @@
 # Makefile for corr2uvfits.
-INCS=-I$(SIM_INC) 
+INCS=-I$(SIM_INC) `python -c "print ' -I'.join('${INCLUDE}'.split(':'))"`
 CFLAGS=-g -O -Wall $(INCS) -D_FILE_OFFSET_BITS=64 -L.
 
 TARGETS=corr2uvfits
@@ -15,4 +15,5 @@ libsla.a:
 	cd SLALIB_C ; make
 	rm -f SLALIB_C/*.o
 clean:
-	rm -f *.o $(TARGETS) libsla.a SLALIB_C/*.o
+	rm -f *.o $(TARGETS) libsla.a SLALIB_C/*.o 
+	rm -rf corr2uvfits.dSYM
