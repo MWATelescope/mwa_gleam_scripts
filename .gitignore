@@ -1,0 +1,7 @@
+*.pyc
+dist
+*.swp
+casapy.log
+build
+CONV2UVFITS/corr2uvfits
+CONV2UVFITS/libsla.a
