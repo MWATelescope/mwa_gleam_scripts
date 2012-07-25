@@ -5,3 +5,14 @@ casapy.log
 build
 CONV2UVFITS/corr2uvfits
 CONV2UVFITS/libsla.a
+casatasks/flagChanGaps.py
+casatasks/flagChanGaps_cli.py
+casatasks/flagDC.py
+casatasks/flagDC_cli.py
+casatasks/mwatasks.py
+casatasks/mytasks_flagChanGaps.py
+casatasks/mytasks_flagDC.py
+casatasks/mytasks_pbgain.py
+casatasks/pbgain.py
+casatasks/pbgain_cli.py
+configs/mwapy.egg-info
