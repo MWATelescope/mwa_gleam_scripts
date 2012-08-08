@@ -1,0 +1,39 @@
+# lines beginning with '#' and blank lines are ignored
+# locations of antennas relative to the centre of the array in local topocentric
+# "east", "north", "height". Units are meters.
+# Format: Antenna_name east north height
+# antenna names must be 8 chars or less
+# fields are separated by white space
+
+Tile01   -038.26    140.36    000.66
+Tile02   -102.30    156.08    001.24
+Tile03   -095.92    124.66    001.08
+Tile04   -077.86    097.43    000.81
+Tile05   -125.40    100.62    001.01
+Tile06   -116.81    065.18    000.78
+Tile07   -160.53    054.72    000.72
+Tile08   -120.68    016.33    000.54
+Tile09   -105.43   -021.91    000.08
+Tile10   -137.81   -088.99   -000.18
+Tile11   -106.99   -117.34   -000.21
+Tile12   -081.73   -111.03   -000.14
+Tile13   -087.14   -134.24   -000.31
+Tile14   -063.15   -111.76   -000.07
+Tile15   -038.71   -090.85    000.14
+Tile16   -024.09   -112.88    000.12
+#Tile17   -002.85   -149.73    000.22
+#Tile18    022.68   -093.58    000.14
+#Tile19    059.38   -085.44   -000.10
+#Tile20    122.75   -077.33   -000.48
+#Tile21    142.91   -083.04   -000.48
+#Tile22    132.38   -033.43   -000.91
+#Tile23    176.26    016.87   -001.50
+#Tile24    177.05    023.43   -001.55
+#Tile25    170.64    020.26   -001.49
+#Tile26    107.31    033.03   -000.98
+#Tile27    121.05    041.47   -001.11
+#Tile28    089.57    061.27   -000.75
+#Tile29    121.73    103.56   -000.91
+#Tile30    045.22    086.43   -000.28
+#Tile31    032.64    126.03    000.00
+#Tile32    004.22    172.95    000.35

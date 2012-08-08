@@ -1,0 +1,10 @@
+0.0.2
+10 July 2012 - D. Jacobs
+Update README with more prereqs.
+make in casatasks now runs to completion. 
+Updated casascript install notes: ~/.casa/init.py
+
+
+0.0.1
+09 July 2012 - D. Jacobs
+Reorg release.
