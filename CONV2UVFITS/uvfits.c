@@ -11,6 +11,7 @@ For the FITS-IDI format, see: http://www.aips.nrao.edu/FITS-IDI.html
 #include <math.h>
 #include <fitsio.h>
 #include <float.h>
+#include "slalib.h"
 #include "uvfits.h"
 
 #define NAXIS 6
@@ -437,7 +438,7 @@ int writeUVFITS(char *filename, uvdata *data) {
   fits_update_key(fptr,TDOUBLE, "OBSRA", &dtemp, NULL, &status);
   fits_update_key(fptr,TDOUBLE, "OBSDEC", &(data->source->dec), NULL, &status);
   fits_update_key(fptr,TSTRING, "TELESCOP", "MWA" , NULL, &status);
-  fits_update_key(fptr,TSTRING, "INSTRUME", "32T" , NULL, &status);
+  fits_update_key(fptr,TSTRING, "INSTRUME", "128T" , NULL, &status);
   temp=2000.0;
   fits_update_key(fptr,TFLOAT, "EPOCH", &temp, NULL, &status);
   /* the following is a fix for an AIPS bug. Technically, shouldn't need it */
@@ -586,7 +587,7 @@ int writeSourceData(fitsfile *fptr, uvdata *data) {
 int writeAntennaData(fitsfile *fptr, uvdata *data) {
 
   int status=0,i,itemp=0,year,mon,day;
-  double temp=0;
+  double temp=0,mjd;
   char *ptemp;
   char *col_names[] = {"ANNAME", "STABXYZ", "NOSTA", "MNTSTA", "STAXOF",
                        "POLTYA", "POLAA", "POLCALA", "POLTYB", "POLAB", "POLCALB"};
@@ -594,6 +595,8 @@ int writeAntennaData(fitsfile *fptr, uvdata *data) {
                         "1A","1E","3E","1A","1E","3E"};
   char *col_units[] = {"","METERS","","","METERS","","DEGREES","","","DEGREES",""};
   char tempstr[80];
+
+  if (debug) fprintf(stdout,"Writing antenna table\n");
 
   /* convert JD date to Calendar date. I don't think
      sub-day accuracy is needed here. */
@@ -608,8 +611,12 @@ int writeAntennaData(fitsfile *fptr, uvdata *data) {
   fits_update_key(fptr,TDOUBLE,"ARRAYZ", &(data->array->xyz_pos[2]), NULL, &status);
   fits_update_key(fptr,TFLOAT,"FREQ", &(data->cent_freq) , NULL, &status);
 
-  /* TODO FIXME: finish this */
-  temp = 1.32584e2;
+  /* GSTIAO is the GST at zero hours in the time system of TIMSYS (i.e. UTC) */
+  mjd = trunc(data->date[0] - 2400000.5);
+  temp = slaGmst(mjd)*180.0/M_PI;  // technically, slaGmst takes UT1, but it won't matter here.
+  if (debug) {
+    fprintf(stdout,"GMST is: %g degs\n",temp);
+  }
   fits_update_key(fptr,TDOUBLE,"GSTIA0",&temp , NULL, &status);
   temp = 3.60985e2;
   fits_update_key(fptr,TDOUBLE,"DEGPDY",&temp, NULL, &status);

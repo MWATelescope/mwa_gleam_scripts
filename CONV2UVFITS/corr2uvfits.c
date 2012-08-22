@@ -28,7 +28,7 @@ $Date: 2011-10-18 22:53:40 +0800 (Tue, 18 Oct 2011) $:    Date of last commit
 #define EARTH_RAD 6378100.0       // meters
 #define SIZ_PRODNAME 8            // size of char array with text type of pol products.
 #define VLIGHT 299792458.0        // speed of light. m/s
-#define AUTOFLAG_N_NEIGHBOURS 2   // number of neighbours to use to form a median for channel flagging.
+#define AUTOFLAG_N_NEIGHBOURS 3   // number of neighbours to use to form a median for channel flagging.
 
 #define CHAN_ALL_ANT_ALL_TIME      "CHAN_ALL_ANT_ALL_TIME"
 
@@ -326,7 +326,7 @@ int autoFlag(uvdata *uvdata, float sigma, int n_neighbours) {
             // use the local median,stdev as the median,stdev for this channel
             local_median = local_medians[n_points/2];
             local_stdev  = local_stdevs[n_points/2];
-            if(debug_flag) fprintf(fpd,"ant: %d, pol: %d, chan: %d. Local median: %g, local stdev: %g\n",ant,pol,chan,local_median,local_stdev);
+            if(debug_flag) fprintf(fpd,"ant: %d, pol: %d, chan: %d. lower: %d, upper: %d, Local median: %g, local stdev: %g\n",ant,pol,chan,lower,upper,local_median,local_stdev);
             // now scan data to find outliers and flag them
             in_flag=0;
             for(t=0; t<uvdata->n_vis; t++) {
@@ -585,13 +585,14 @@ int readScan(FILE *fp_ac, FILE *fp_cc,int scan, Header *header, InpConfig *inps,
 
   /* set default ha/dec from header, if HA was specified. Otherwise, it will be calculated below */
   dec_app = header->dec_degs*(M_PI/180.0);
+  mjd = uvdata->date[scan] - 2400000.5;  // get Modified Julian date of scan.
   if (lock_pointing==0) {
     ha = (header->ha_hrs_start+(scan+0.5)*header->integration_time/3600.0*1.00274)*(M_PI/12.0);
   } else {
     ha = (header->ha_hrs_start)*(M_PI/12.0);
+    mjd = uvdata->date[0] - 2400000.5;  // get Modified Julian date of scan.
   }
 
-  mjd = uvdata->date[scan] - 2400000.5;  // get Modified Julian date of scan.
   lmst = slaRanorm(slaGmst(mjd) + arr_lon_rad);  // local mean sidereal time, given array location
     /* convert mean RA/DEC of phase center to apparent for current observing time. This applies precession,
        nutation, annual abberation. */
@@ -992,7 +993,7 @@ void printusage(const char *progname) {
   fprintf(stderr,"-S filename\tThe name of the file containing antenna name and local x,y,z. Default: %s\n",stationfilename);
   fprintf(stderr,"-I filename\tThe name of the file containing instrument config. Default: %s\n",configfilename);
   fprintf(stderr,"-H filename\tThe name of the file containing observing metadata. Default: %s\n",header_filename);
-  fprintf(stderr,"-A lon,lat \tSpecify East Lon and Lat of array center (degrees). Comma separated, no spaces. Default: MWA 32T\n");
+  fprintf(stderr,"-A lon,lat \tSpecify East Lon and Lat of array center (degrees). Comma separated, no spaces. Default: MWA\n");
   fprintf(stderr,"-l         \tLock the phase center to the initial HA/DEC\n");
   fprintf(stderr,"-f mode    \tturn on automatic flagging. Requires autocorrelations\n");
   fprintf(stderr,"\t\t0:\tno flagging\n");
@@ -1148,7 +1149,7 @@ void initData(uvdata *data) {
   data->visdata=NULL;
   data->pol_type=1;    /* default is Stokes pol products */
   data->array->n_ant=0;
-  strcpy(data->array->name,"MWA-32T");
+  strcpy(data->array->name,"MWA");
 }
 
 
