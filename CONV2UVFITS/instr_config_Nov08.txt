@@ -1,0 +1,71 @@
+# this file maps inputs into the receiver/correlator to antennas and polarisations.
+# in addition, a cable length "delta" (in meters) can be specified
+# the first column is not actually used by the uvfits writer, but is there as
+# an aide to human readers. Inputs are ordered from 0 to n_inp-1
+# lines beginning with '#' and blank lines are ignored. Do not leave spaces in empty lines.
+#
+# INPUT   ANTENNA   POL      DELTA   FLAG
+0         12        Y        208.0   0   # receiver 1 tile 13
+1         12        X        208.0   0   # this is a measured cable len
+2         8         Y        127.0   0   # tile 9
+3         8         X        127.0   0
+4         4         Y        169.0   0   # tile 5
+5         4         X        169.0   0
+6         28        Y        170.0   0   # tile 29
+7         28        X        170.0   0   # this is a measured cable len relative to tile 5
+8         0         Y        156.0   1   # tile 1
+9         0         X        156.0   1
+10        24        Y        189.0   0   # tile 25
+11        24        X        189.0   0
+12        20        Y        168.0   0   # tile 21
+13        20        X        168.0   0
+14        16        Y        197.7   0   # tile 17
+15        16        X        197.7   0
+16        14        Y        120.0   0   # receiver 3 tile 15
+17        14        X        120.0   0   # this is a measured cable len relative to tile 5
+18        10        Y        173.0   0   # tile 11
+19        10        X        173.0   0
+20        6         Y        195.0   0   # tile 7
+21        6         X        195.0   0
+22        2         Y        167.0   0   # tile 3
+23        2         X        167.0   0
+24        30        Y        134.0   0   # tile 31
+25        30        X        134.0   0
+26        26        Y        131.0   0   # tile 27
+27        26        X        131.0   0
+28        22        Y        181.0   1   # tile 23
+29        22        X        181.0   1
+30        18        Y        112.0   0   # tile 19
+31        18        X        112.0   0
+32        13         Y       143.0   1   # receiver 2 tile 14
+33        13         X       143.0   1
+34        9         Y        183.0   1   # tile 10
+35        9         X        183.0   1
+36        5         Y        150.0   0   # tile 6
+37        5         X        150.0   0
+38        1        Y         196.0   0   # tile 2
+39        1        X         196.0   0
+40        29        Y        107.3   0   # tile 30
+41        29        X        107.3   0
+42        25        Y        120.0   0   # tile 26
+43        25        X        120.0   0   # this is a measured cable len relative to tile 5
+44        21        Y        139.0   1   # tile 22
+45        21        X        139.0   1
+46        17        Y        109.0   1   # tile 18
+47        17        X        109.0   1
+48        15         Y       126.0   0   # receiver 4 tile 16
+49        15         X       126.0   0
+50        11         Y       155.0   0   # tile 12
+51        11         X       155.0   0
+52        7        Y         136.0   0   # tile 8
+53        7        X         136.0   0
+54        3        Y         137.0   0   # tile 4
+55        3        X         137.0   0
+56        31        Y        192.0   1   # tile 32
+57        31        X        192.0   0
+58        27        Y        115.0   0   # tile 28
+59        27        X        115.0   0
+60        23        Y        176.0   0   # tile 24
+61        23        X        176.0   0
+62        19        Y        158.0   0   # tile 20
+63        19        X        158.0   0
