@@ -1273,7 +1273,7 @@ void azel2xyz(double az, double el, double *x, double *y, double *z) {
 
 
 /*************************
- count the number of antennas actuall present in this data.
+ count the number of antennas actually present in this data.
  might be less than the number of antennas in the array configuration 
 **************************/
 int countPresentAntennas(InpConfig *inputs) {
@@ -1283,6 +1283,12 @@ int countPresentAntennas(InpConfig *inputs) {
     
     for(i=0; i<inputs->n_inputs; i++) ant_present[inputs->ant_index[i]] =1;
     for(i=0; i<MAX_ANT; i++) total_ants += ant_present[i];
+
+    if (!ant_present[0]) {
+        fprintf(stderr,"WARNING: Antenna column in instr_config file did not appear to have an antenna with index 0\n");
+        fprintf(stderr,"This is probably a mistake. Please ensure antenna IDs are zero-indexed in instr_config file.\n");
+        fprintf(stderr,"Continuing and hoping for the best...\n");
+    }
 
     return total_ants;
 
