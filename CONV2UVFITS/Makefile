@@ -1,5 +1,5 @@
 # Makefile for corr2uvfits.
-INCS=-I$(SIM_INC) `python -c "print ' -I'.join('${INCLUDE}'.split(':'))"`
+INCS=$(shell python -c "if len('${INCLUDE}')>0:print ' '.join(['-I ' + s for s in '${INCLUDE}'.split(':')])") -L ../cfitsio/ -I ../cfitsio/
 CFLAGS=-g -O -Wall $(INCS) -D_FILE_OFFSET_BITS=64 -L.
 
 TARGETS=corr2uvfits
