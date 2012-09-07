@@ -1,4 +1,5 @@
-INCS=$(shell python -c "print ' '.join(['-I ' + s for s in '${INCLUDE}'.split(':')])")
+INCS=$(shell python -c "if len('${INCLUDE}')>0:print ' '.join(['-I ' + s for s in '${INCLUDE}'.split(':')])") -L ../cfitsio/ -I ../cfitsio/
+
 all: build_lfiles
 
 build_lfiles: build_lfiles.o mwac_utils.o antenna_mapping.o
