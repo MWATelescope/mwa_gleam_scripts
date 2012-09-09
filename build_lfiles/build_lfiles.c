@@ -550,6 +550,10 @@ SHUTDOWN:
 	free(lacspc_tmp);
 
     }
+    else {
+	rename(tmp_lacfilename,lacfilename);
+	rename(tmp_lccfilename,lccfilename);
+    }
 
 
     free(lcc_base);
