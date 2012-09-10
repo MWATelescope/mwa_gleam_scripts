@@ -1,10 +1,12 @@
 *.pyc
 dist
 *.swp
+cfitsio/libcfitsio.a
 casapy.log
 build
 CONV2UVFITS/corr2uvfits
 CONV2UVFITS/libsla.a
+build_lfiles/build_lfiles
 casatasks/flagChanGaps.py
 casatasks/flagChanGaps_cli.py
 casatasks/flagDC.py
@@ -16,3 +18,5 @@ casatasks/mytasks_pbgain.py
 casatasks/pbgain.py
 casatasks/pbgain_cli.py
 configs/mwapy.egg-info
+casatasks/*-e
+*#*
