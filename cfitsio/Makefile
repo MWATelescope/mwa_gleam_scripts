@@ -18,7 +18,7 @@
 # testprog targets. See also changes and comments in configure.in
 #
 
-prefix		= /home/djacobs/src/MWA_Tools/cfitsio
+prefix		= /home/mwa/MWA_Tools/cfitsio
 exec_prefix	= ${prefix}
 DESTDIR		= 
 CFITSIO_LIB	= ${DESTDIR}${exec_prefix}/lib

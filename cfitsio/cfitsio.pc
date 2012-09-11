@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 prefix=/home/mwa/MWA_Tools/cfitsio
+=======
+prefix=/Users/dlk/transients/software/MWA_Tools/cfitsio
+>>>>>>> 677ae4eb2c72b837898fa71925107e9b088ff62e
 exec_prefix=${prefix}
 libdir=${exec_prefix}/lib
 includedir=${prefix}/include
