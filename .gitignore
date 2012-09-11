@@ -2,6 +2,10 @@
 dist
 *.swp
 cfitsio/libcfitsio.a
+cfitsio/Makefile
+cfitsio/config.status
+cfitsio/config.log
+cfitsio/cfitsio.pc
 casapy.log
 build
 CONV2UVFITS/corr2uvfits
