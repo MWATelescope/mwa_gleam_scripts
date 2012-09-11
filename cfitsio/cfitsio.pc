@@ -1,4 +1,4 @@
-prefix=/Users/dlk/transients/software/MWA_Tools/cfitsio
+prefix=/home/mwa/MWA_Tools/cfitsio
 exec_prefix=${prefix}
 libdir=${exec_prefix}/lib
 includedir=${prefix}/include
