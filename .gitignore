@@ -20,3 +20,4 @@ casatasks/pbgain_cli.py
 configs/mwapy.egg-info
 casatasks/*-e
 *#*
+*.o
