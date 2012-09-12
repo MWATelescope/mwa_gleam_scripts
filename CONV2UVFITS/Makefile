@@ -9,6 +9,7 @@ SRCDIR=CONV2UVFITS
 all: $(TARGETS)
 
 corr2uvfits: corr2uvfits.c uvfits.c libsla.a
+	ranlib libsla.a
 	cc $(CFLAGS) -o corr2uvfits corr2uvfits.c uvfits.c -lcfitsio -lsla -lm
 
 libsla.a:
