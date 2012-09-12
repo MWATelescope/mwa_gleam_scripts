@@ -1,0 +1,63 @@
+#! /bin/bash
+# a script for building all of the various MWA_Tools.. tools
+# this should probably be a ./configure thingy but we just scientists and can't have nice things
+#DJACOBS 
+##
+#To point to your own CFITSIO set the the CFITSIO environment variable to
+#the root prefix of the library. eg
+#if you have /usr/local/lib/libcfitsio.a
+#then do 
+#export CFITSIO=/usr/local/
+
+
+
+echo "This is make_MWA_Tools.sh"
+
+if [ -z $CFITSIO ]
+then
+echo '$CFITSIO is not set, using internal CFITSIO'
+export CFITSLIB=../cfitsio/
+export CFITSINC=../cfitsio/
+cd cfitsio
+./configure
+make
+    if [ "$?" -ne 0 ];
+        then
+        echo 'internal cfitsio install failed'
+        cd ..
+        exit
+    fi
+cd ..
+else
+echo 'using $CFITSIO = '${CFITSIO}
+export CFITSLIB=${CFITSIO}/lib/
+export CFITSINC=${CFITSIO}/include/
+fi
+
+echo "building LFILE converter"
+cd build_lfiles
+make
+if [ "$?" -ne 0 ];
+    then
+    echo "!!!!!!!!!!!!!!!!!!!!!!"
+    echo 'build_lfiles make failed !'
+    cd ..
+    exit
+fi
+cd ..
+
+
+echo "Building corr2uvfits"
+cd CONV2UVFITS
+make
+if [ "$?" -ne 0 ];
+    then
+    echo "!!!!!!!!!!!!!!!!!!!!!!"
+    echo 'CONV2UVFITS make failed'
+    cd ..
+    exit
+fi
+
+
+
+
