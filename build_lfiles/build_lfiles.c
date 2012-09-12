@@ -61,6 +61,7 @@ void usage() {
     fprintf(stdout,"\t-n\t <nseconds> -- how many seconds to process\n");
     fprintf(stdout,"\t-T\t <factor> [default == 1] -- by what factor to average in time\n");
     fprintf(stdout,"\t-F\t <factor> [default == 1] -- by what factor to average in frequency\n");
+    fprintf(stdout,"\t-p\t -- image in primary header -- NOW ASSUMED IF MODE == 0\n");
 
     exit(EXIT_FAILURE);
 }
@@ -151,7 +152,8 @@ int main(int argc, char **argv) {
 
     if (nfiles == 0) {
 	mode = 0;
-	input_file[0] = strdup("/tmp/last_dump.vis");
+	input_file[0] = strdup("/tmp/last_dump.fits");
+	nfiles = 1;
 
     }
     if (output_file == NULL) {
@@ -180,7 +182,8 @@ int main(int argc, char **argv) {
     lcc_base = lccspc_h;
     lac_base = lacspc_h;
 
-
+    if (mode == 0)
+	primary = 0;
 
     if (mode == 1 || mode == 0) {
 	fitsfile *fptr;      /* FITS file pointer, defined in fitsio.h */
@@ -308,7 +311,15 @@ int main(int argc, char **argv) {
 
 			status = 0;
 			npixels = naxes[0] * naxes[1];
-			float complex *ptr = cuda_matrix_h + (ifile * nrows * nvis);
+
+			if (nfrequency != (naxes[1]*nfiles)) {
+			    fprintf(stderr, "nfiles (%d) * nrows (%ld) not equal to nfrequency (%d) are the FITS files the dimension you expected them to be?\n",\
+				    nfiles,naxes[1],nfrequency);
+			    exit(EXIT_FAILURE);
+			}
+
+
+			float complex *ptr = cuda_matrix_h + (ifile * naxes[1] * nvis);
 			if (fits_read_img(fptr,TFLOAT,fpixel,npixels,&nullval,(float *)ptr,&anynull,&status)) {
 			    printerror(status);
 			}
@@ -328,7 +339,7 @@ int main(int argc, char **argv) {
 	    }
 
 	    printf("Extracting matrix\n");	
-	    extractMatrix_slow(full_matrix_h, cuda_matrix_h);
+	    extractMatrix(full_matrix_h, cuda_matrix_h);
 	    /* now build lfile data */	
 	    int input1=0,input2=0;
 	    for (input1 = 0; input1 < ninput; input1++) {
