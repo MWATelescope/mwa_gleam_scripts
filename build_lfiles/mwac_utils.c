@@ -1,6 +1,6 @@
 #include <stdlib.h>
 #include <stdio.h>
-//#include <plot.h>
+// #include <plot.h>
 #include "mwac_utils.h"
 #include "antenna_mapping.h"
 
@@ -105,12 +105,7 @@ void get_baseline_lu(int st1, int st2, int pol1, int pol2, float complex *data,
 
 	for (i=0;i<nfrequency;i++) {
 		in_index = i*(nstation*nstation*npol*npol) + (st1*nstation*npol*npol) + (st2*npol*npol) + (pol1*npol) + pol2;
-		if  (st2>st1) {
-			*out = conj(in[in_index]);
-		}
-		else {
-			*out = in[in_index];
-		}
+		*out = in[in_index];
 		out++;
 	}
 

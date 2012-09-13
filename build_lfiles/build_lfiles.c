@@ -16,6 +16,9 @@
 
 #include "fitsio.h"
 
+/* globals */
+FILE *fpd;	//file hand for debug messages. Set this in main()
+
 void printerror( int status)
 {
     /*****************************************************/
@@ -87,6 +90,8 @@ int main(int argc, char **argv) {
 
     extern int npol;
     extern int nstation;
+
+    fpd = stdout;
 
     nstation = 32;
     nfrequency = 1536;
@@ -196,7 +201,9 @@ int main(int argc, char **argv) {
 
 	int ifile = 0;
 	int ihdu = 1+start_sec;
-	int stophdu = ihdu + nseconds;
+	int stophdu = ihdu + nseconds-1;
+
+	fprintf(fpd,"Start HDU: %d, stop HDU: %d\n",ihdu,stophdu);
 
 	sprintf(lccfilename,"%s.LCCSPC",output_file);
 	sprintf(lacfilename,"%s.LACSPC",output_file);
@@ -226,36 +233,34 @@ int main(int argc, char **argv) {
 
 	fill_mapping_matrix();
 
-	while (ihdu < stophdu) {
+	while (ihdu <= stophdu) {
 
 	    for (ifile = 0; ifile < nfiles; ifile++) {
+                fprintf(fpd,"Opening file %s for time step %d\n",input_file[ifile],ihdu);
 
 		if (!fits_open_file(&fptr, input_file[ifile], READONLY, &status))
 		{
 		    status=0;
 		    if (fits_get_num_hdus(fptr,&numhdus,&status)) {
 			printerror(status);
-		    }	
+		    }
+		    fprintf(fpd,"There are %d HDUs in this file\n",numhdus);
+		    if (stophdu > numhdus) {
+			stophdu = numhdus;
+		    } 
 
 		    /* move to the last one and see what it is */
-
 		    if (fits_movabs_hdu(fptr, numhdus, &hdutype, &status)){
 			printerror(status);
 		    }
 		    if (fits_get_hdu_type(fptr, &hdutype, &status)) {
 			printerror(status);
 		    }
+
 		    /* Get the HDU type */
 		    if (hdutype == BINARY_TBL && numhdus >= ihdu) {
 
-			printf("Detected Binary Table: %d HDUs\n",numhdus);
-
-			// binary table based file have an extra HDU
-			// so we should drop stophdu by 1 BUT ONLY
-			// if we are going to run over the end of the file
-			if (stophdu > (numhdus-primary)) {
-			    stophdu = (numhdus-primary);
-			} 
+			printf("Detected Binary Table HDU\n");
 
 			if ( fits_get_hdu_num(fptr, &hdunum) == 1 ) {
 
@@ -297,10 +302,6 @@ int main(int argc, char **argv) {
 		    }
 		    else {
 			printf("Not binary table: assuming image extension\n");
-			// move to the relevant HDU
-			if (stophdu > (numhdus-primary)) {
-			    stophdu = (numhdus-primary);
-			}
 
 			if (fits_movabs_hdu(fptr, ihdu+primary, &hdutype, &status)){
 			    printerror(status);
