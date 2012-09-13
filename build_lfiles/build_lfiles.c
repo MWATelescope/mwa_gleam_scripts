@@ -93,11 +93,11 @@ int main(int argc, char **argv) {
     npol = 2;
     ninput = nstation*npol;
 
-    char lccfilename[32];	
-    char lacfilename[32];
+    char lccfilename[1024];	
+    char lacfilename[1024];
 
-    char tmp_lccfilename[32];	
-    char tmp_lacfilename[32];
+    char tmp_lccfilename[1024];	
+    char tmp_lacfilename[1024];
 
 
     if (argc == 1) {
@@ -152,12 +152,12 @@ int main(int argc, char **argv) {
 
     if (nfiles == 0) {
 	mode = 0;
-	input_file[0] = strdup("/tmp/last_dump.fits");
+	input_file[0] = "/tmp/last_dump.fits";
 	nfiles = 1;
 
     }
     if (output_file == NULL) {
-	output_file = strdup("last_dump");
+	output_file = "last_dump";
     }
     float complex *cuda_matrix_h = NULL;
     float complex *full_matrix_h = NULL;
@@ -207,8 +207,17 @@ int main(int argc, char **argv) {
 
 	FILE *autos=NULL;
 	FILE *cross=NULL;
-	autos = fopen(tmp_lacfilename,"w");
-	cross = fopen(tmp_lccfilename,"w");
+
+	// if averaging later, then write to a temp file
+	// otherwise write directly to output file
+    	if (tscrunch_factor != 1 || fscrunch_factor != 1) {
+		autos = fopen(tmp_lacfilename,"w");
+		cross = fopen(tmp_lccfilename,"w");
+	}
+	else {
+		autos = fopen(lacfilename,"w");
+		cross = fopen(lccfilename,"w");
+	}
 
 	if (autos == NULL || cross == NULL) {
 	    fprintf(stderr,"Cannot open %s or %s\n",lacfilename,lccfilename);
@@ -239,7 +248,7 @@ int main(int argc, char **argv) {
 		    /* Get the HDU type */
 		    if (hdutype == BINARY_TBL && numhdus >= ihdu) {
 
-			printf("Detected Binary Table: %d HDUs\n");
+			printf("Detected Binary Table: %d HDUs\n",numhdus);
 
 			// binary table based file have an extra HDU
 			// so we should drop stophdu by 1 BUT ONLY
@@ -481,9 +490,8 @@ SHUTDOWN:
 	FILE *autos=NULL;
 	FILE *cross=NULL;
 	
-        tmp_autos = fopen(tmp_lacfilename,"r");
+       	tmp_autos = fopen(tmp_lacfilename,"r");
 	tmp_cross = fopen(tmp_lccfilename,"r");
-
 	autos = fopen(lacfilename,"w");
 	cross = fopen(lccfilename,"w");
 
@@ -556,19 +564,13 @@ SHUTDOWN:
 	fclose(cross);
 	fclose(tmp_cross);
 
-
 	free(lccspc_tmp);
 	free(lacspc_tmp);
 
     }
-    else {
-	rename(tmp_lacfilename,lacfilename);
-	rename(tmp_lccfilename,lccfilename);
-    }
-
 
     free(lcc_base);
     free(lac_base);
 
-
+    return 0;
 }
