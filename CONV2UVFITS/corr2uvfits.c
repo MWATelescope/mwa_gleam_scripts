@@ -29,6 +29,7 @@ $Date: 2011-10-18 22:53:40 +0800 (Tue, 18 Oct 2011) $:    Date of last commit
 #define SIZ_PRODNAME 8            // size of char array with text type of pol products.
 #define VLIGHT 299792458.0        // speed of light. m/s
 #define AUTOFLAG_N_NEIGHBOURS 3   // number of neighbours to use to form a median for channel flagging.
+#define VEL_FACTOR  1.204         // the velocity factor of electic fields in RG-6 like coax.
 
 #define CHAN_ALL_ANT_ALL_TIME      "CHAN_ALL_ANT_ALL_TIME"
 
@@ -690,10 +691,8 @@ int readScan(FILE *fp_ac, FILE *fp_cc,int scan, Header *header, InpConfig *inps,
            Then if ant1 has more delay than ant2, then this is like having phi be positive where
            the visibility is V = Iexp(-j*2*pi*phi)
            Hence we want to add the difference ant2-ant1 (in wavelengths) to phi to correct for the length difference.
-           the magic 1.2 factor comes from the speed change of the electric field in the cables, such that
-           the cables are electrically longer than they are physically. This is for RG6 coax.
          */
-        cable_delay = (inps->cable_len_delta[inp2] - inps->cable_len_delta[inp1])*1.204;
+        cable_delay = (inps->cable_len_delta[inp2] - inps->cable_len_delta[inp1]);
         
         /* only process the appropriate correlations */
         if (header->corr_type=='A' && inp1!=inp2) continue;
@@ -869,7 +868,7 @@ int readArray(char *filename, double lat_radian, ant_table *antennas, int *n_ant
 *******************************/
 int readInputConfig(char *filename, InpConfig *inp) {
   FILE *fp=NULL;
-  char line[MAX_LINE],pol_char;
+  char line[MAX_LINE],pol_char,cable_len[128];
   int index=0,dummy,nscan,i,inp_flag;
 
   if( (fp=fopen(filename,"r"))==NULL) {
@@ -885,10 +884,19 @@ int readInputConfig(char *filename, InpConfig *inp) {
 
     inp_flag=0;
 
-    nscan = sscanf(line,"%d %d %c %f %d",&dummy,inp->ant_index+index,&pol_char,inp->cable_len_delta+index,&inp_flag);
+    nscan = sscanf(line,"%d %d %c %s %d",&dummy,inp->ant_index+index,&pol_char,cable_len,&inp_flag);
     if(nscan < 4) {
         fprintf(stderr,"Failed scanning instr config file with line: <%s>\n",line);
         return 1;
+    }
+
+    // decode the string with the cable length. for a prefix of "EL_" this means the value is an electrical length
+    // not a physical one, so no velocity factor should be applied.
+    if (strncmp(cable_len,"EL_",3)==0) {
+        inp->cable_len_delta[index] = atof(cable_len+3);
+    }
+    else {
+        inp->cable_len_delta[index] = atof(cable_len)*VEL_FACTOR;
     }
 
     inp->inpFlag[index] = inp_flag;
