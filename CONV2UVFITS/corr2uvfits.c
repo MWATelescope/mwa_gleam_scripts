@@ -506,7 +506,7 @@ int readScan(FILE *fp_ac, FILE *fp_cc,int scan, Header *header, InpConfig *inps,
   float *visdata=NULL,vis_weight=1.0;
 
   /* allocate space to read binary correlation data. Size is complex float * n_channels */
-  visdata = malloc(2*sizeof(float)*uvdata->n_freq);
+  visdata = calloc(2*uvdata->n_freq,sizeof(float));
   if (visdata==NULL) {
       fprintf(stderr,"ERROR: no malloc for visdata array in readScan\n");
       exit(1);
