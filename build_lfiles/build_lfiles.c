@@ -68,6 +68,7 @@ void usage() {
     fprintf(stdout,"\t-T\t <factor> [default == 1] -- by what factor to average in time\n");
     fprintf(stdout,"\t-F\t <factor> [default == 1] -- by what factor to average in frequency\n");
     fprintf(stdout,"\t-p\t -- image in primary header -- NOW ASSUMED IF MODE == 0\n");
+    fprintf(stdout,"\t-a\t append to output instead of clobber\n");
     fprintf(stdout,"\t-d\t enable debugging messages\n");
 
     exit(EXIT_FAILURE);
@@ -129,6 +130,8 @@ int main(int argc, char **argv) {
     npol = 2;
     ninput = nstation*npol;
 
+    // should we append or overwrite the output file
+    int appendtofile=0;
     char lccfilename[1024];        
     char lacfilename[1024];
 
@@ -142,7 +145,7 @@ int main(int argc, char **argv) {
 
     memset(num_hdus_in_file,0,sizeof(num_hdus_in_file));
 
-    while ((arg = getopt(argc, argv, "m:i:f:F:s:v:n:o:pT:d")) != -1) {
+    while ((arg = getopt(argc, argv, "m:i:f:F:s:v:n:o:apT:d")) != -1) {
 
         switch (arg) {
             case 'h':
@@ -176,6 +179,9 @@ int main(int argc, char **argv) {
                 break;
             case 'p':
                 primary = 0;
+                break;
+            case 'a':
+                appendtofile = 1;
                 break;
             case 'T':
                 tscrunch_factor = atoi(optarg);
@@ -268,8 +274,14 @@ int main(int argc, char **argv) {
                 cross = fopen(tmp_lccfilename,"w");
         }
         else {
-                autos = fopen(lacfilename,"w");
-                cross = fopen(lccfilename,"w");
+	  if (!appendtofile) {
+	    autos = fopen(lacfilename,"w");
+	    cross = fopen(lccfilename,"w");
+	  }
+	  else {
+	    autos = fopen(lacfilename,"a");
+	    cross = fopen(lccfilename,"a");
+	  }
         }
 
         if (autos == NULL || cross == NULL) {
