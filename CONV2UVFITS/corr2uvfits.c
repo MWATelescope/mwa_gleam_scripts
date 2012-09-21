@@ -19,7 +19,7 @@ $Date: 2011-10-18 22:53:40 +0800 (Tue, 18 Oct 2011) $:    Date of last commit
 #include "slalib.h"
 #include "uvfits.h"
 
-#define MAX_ANT 32
+#define MAX_ANT 128
 #define MAX_BASELINES (MAX_ANT*(MAX_ANT+1)/2) // including autocorrelations 
 #define MAX_LINE 1024
 #define MWA_LAT -26.703319        // Array latitude. degrees North
@@ -1044,7 +1044,7 @@ int readHeader(char *header_filename, Header *header) {
     header->ref_hour=0;
     header->ref_minute=0;
     header->ref_second=0;
-    header->field_name[0] = '\0';
+    memset(header->field_name,0,SIZE_SOURCE_NAME+1);
     header->invert_freq = 0;    // correlators have now been fixed
     header->conjugate = 0;      // just in case.
     header->geom_correct = 1;   // default, stop the fringes
@@ -1053,7 +1053,7 @@ int readHeader(char *header_filename, Header *header) {
         if(line[0]=='\n' || line[0]=='#' || line[0]=='\0') continue; // skip blank/comment lines
 
         nscan = sscanf(line,"%s %s",key,value);
-        if (strncmp(key,"FIELDNAME",MAX_LINE)==0) strcpy(header->field_name,value);
+        if (strncmp(key,"FIELDNAME",MAX_LINE)==0) strncpy(header->field_name,value,SIZE_SOURCE_NAME);
         if (strncmp(key,"N_SCANS",MAX_LINE)==0) header->n_scans = atoi(value);
         if (strncmp(key,"N_INPUTS",MAX_LINE)==0) header->n_inputs = atoi(value);
         if (strncmp(key,"N_CHANS",MAX_LINE)==0) header->n_chans = atoi(value);
@@ -1193,7 +1193,8 @@ int applyHeader(Header *header, uvdata *data) {
   data->date[0] = jdtime_base+0.5*(header->integration_time/86400.0);
   if (debug) fprintf(fpd,"JD time is %.2lf\n",jdtime_base);
 
-  strncpy(data->source->name,header->field_name,SIZE_SOURCE_NAME-1);
+  memset(data->source->name,0,SIZE_SOURCE_NAME+1);
+  strncpy(data->source->name,header->field_name,SIZE_SOURCE_NAME);
 
   /* extract RA, DEC from header. Beware negative dec and negative zero bugs. */
   data->source->ra  = header->ra_hrs;
