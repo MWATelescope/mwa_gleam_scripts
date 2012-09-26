@@ -20,7 +20,6 @@ $Date: 2011-10-18 22:53:40 +0800 (Tue, 18 Oct 2011) $:    Date of last commit
 #include "uvfits.h"
 
 #define MAX_ANT 128
-#define MAX_BASELINES (MAX_ANT*(MAX_ANT+1)/2) // including autocorrelations 
 #define MAX_LINE 1024
 #define MWA_LAT -26.703319        // Array latitude. degrees North
 #define MWA_LON 116.67081         // Array longitude. degrees East
@@ -296,28 +295,38 @@ int autoFlag(uvdata *uvdata, float sigma, int n_neighbours) {
         /* clear existing flags */
         memset(flags,'\0',uvdata->n_vis*uvdata->n_freq);
         for(chan=0; chan < uvdata->n_freq; chan++) {
-            int lower,upper,n_points,in_flag;
+            int cpc=0;  // channels per coarse channel
+            int lower,upper,n_points,in_flag,n_rej=0;
             float local_median,local_stdev,val;
+
             // set bounds for lower and upper chans for neighbor comparisions
             lower = chan-n_neighbours;
             if (lower < 0) lower=0;
             upper = chan+n_neighbours;
             if (upper >= uvdata->n_freq) upper = uvdata->n_freq-1;
             switch(do_flag) {
+
                 case 1:
                     // generic case - don't do anything special
                     break;
-                case 2: {
-                    int n_rej = 6;
+                case 2: 
                     // MWA 40kHz channels. do not use the n_rej edge channels to compare to neighbours
                     // there are 32 fine 40kHz channels per coarse 1.28MHz channel. So we ignore the edge
                     // channels within a coarse chan
-                    if (chan%32 <= n_rej || chan%32 > 32-n_rej) lower = upper = chan;
-                    if (chan%32 > n_rej && lower%32 < n_rej) lower += n_rej-lower%32;
-                    if (chan%32 < 32-n_rej && upper%32 >= 32-n_rej) upper -= (upper%32)-(31-n_rej);
+                    n_rej = 5;
+                    cpc=32;
+                    if (chan%cpc <= n_rej || chan%cpc > cpc-n_rej) lower = upper = chan;
+                    if (chan%cpc > n_rej && lower%cpc < n_rej) lower += n_rej-lower%cpc;
+                    if (chan%cpc < cpc-n_rej && upper%cpc >= cpc-n_rej) upper -= (upper%cpc)-(cpc-1-n_rej);
                     break;
-                    }
                 case 3:
+                    // MWA 10kHz channels. do not use the n_rej edge channels to compare to neighbours
+                    n_rej = 20;
+                    cpc=128;
+                    if (chan%cpc <= n_rej || chan%cpc > cpc-n_rej) lower = upper = chan;
+                    if (chan%cpc > n_rej && lower%cpc < n_rej) lower += n_rej-lower%cpc;
+                    if (chan%cpc < cpc-n_rej && upper%cpc >= cpc-n_rej) upper -= (upper%cpc)-(cpc-1-n_rej);
+                    break;
                 default:
                     fprintf(stderr,"Unsupported/unknown autoflag mode %d. Not flagging\n",do_flag);
                     goto EXIT;
@@ -508,7 +517,7 @@ int readScan(FILE *fp_ac, FILE *fp_cc,int scan, Header *header, InpConfig *inps,
   double lmst2000, ha2000, newarrlat, ant_u_ep, ant_v_ep, ant_w_ep;
   double ra_aber, dec_aber;
   int i,inp1,inp2,ant1,ant2,pol1,pol2,bl_index=0,visindex,pol_ind,chan_ind,n_read;
-  int bl_ind_lookup[MAX_ANT][MAX_ANT],temp,baseline_reverse,total_ants;
+  int bl_ind_lookup[MAX_ANT][MAX_ANT],temp,baseline_reverse,total_ants,max_baselines;
   float *visdata=NULL,vis_weight=1.0;
 
   /* allocate space to read binary correlation data. Size is complex float * n_channels */
@@ -520,6 +529,7 @@ int readScan(FILE *fp_ac, FILE *fp_cc,int scan, Header *header, InpConfig *inps,
 
   /* count the total number of antennas actually present in the data */
   total_ants = countPresentAntennas(inps);
+  max_baselines=total_ants*(total_ants+1)/2;
 
   /* make a lookup table for which baseline corresponds to a correlation product */
   if(header->corr_type=='A') {
@@ -565,13 +575,13 @@ int readScan(FILE *fp_ac, FILE *fp_cc,int scan, Header *header, InpConfig *inps,
   uvdata->baseline = realloc(uvdata->baseline,(scan+1)*sizeof(float *));
 
   /* make space for the actual visibilities and weights */
-  if (debug) fprintf(fpd,"callocing array of %d floats for scan %d\n",MAX_BASELINES*uvdata->n_freq*uvdata->n_pol*2,scan);
-  uvdata->visdata[scan]    = calloc(MAX_BASELINES*uvdata->n_freq*uvdata->n_pol*2,sizeof(float));
-  uvdata->weightdata[scan] = calloc(MAX_BASELINES*uvdata->n_freq*uvdata->n_pol  ,sizeof(float));
-  uvdata->u[scan] = calloc(MAX_BASELINES,sizeof(double));
-  uvdata->v[scan] = calloc(MAX_BASELINES,sizeof(double));
-  uvdata->w[scan] = calloc(MAX_BASELINES,sizeof(double));
-  uvdata->baseline[scan] = calloc(MAX_BASELINES,sizeof(float));
+  if (debug) fprintf(fpd,"callocing array of %d floats for scan %d\n",max_baselines*uvdata->n_freq*uvdata->n_pol*2,scan);
+  uvdata->visdata[scan]    = calloc(max_baselines*uvdata->n_freq*uvdata->n_pol*2,sizeof(float));
+  uvdata->weightdata[scan] = calloc(max_baselines*uvdata->n_freq*uvdata->n_pol  ,sizeof(float));
+  uvdata->u[scan] = calloc(max_baselines,sizeof(double));
+  uvdata->v[scan] = calloc(max_baselines,sizeof(double));
+  uvdata->w[scan] = calloc(max_baselines,sizeof(double));
+  uvdata->baseline[scan] = calloc(max_baselines,sizeof(float));
   if(uvdata->visdata[scan]==NULL || uvdata->weightdata[scan]==NULL || uvdata->visdata[scan]==NULL
      || uvdata->visdata[scan]==NULL || uvdata->visdata[scan]==NULL || uvdata->baseline[scan]==NULL) {
     fprintf(stderr,"readScan: no malloc for BIG arrays\n");
@@ -1149,7 +1159,7 @@ int readHeader(char *header_filename, Header *header) {
 /*******************************
 *********************************/
 void initData(uvdata *data) {
-  data->date = calloc(1,sizeof(double));
+  data->date = malloc(sizeof(double));
   data->n_pol=0;
   data->n_baselines=NULL;
   data->n_freq=0;
