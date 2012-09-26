@@ -184,20 +184,25 @@ int main(const int argc, char * const argv[]) {
   }
 
   /* assign XYZ positions of the array for the site. */
-  /* NOTE: this is correct only for geocentric lat/lon. Should use the 
-  arraydat.xyz_pos[0] = (EARTH_RAD+height)*cos(arr_lat_rad)*cos(arr_lon_rad);
-  arraydat.xyz_pos[1] = (EARTH_RAD+height)*cos(arr_lat_rad)*sin(arr_lon_rad);
-  arraydat.xyz_pos[2] = (EARTH_RAD+height)*sin(arr_lat_rad);
-  SLA_GEOC function to calculate proper geodetic to geocentric conversion otherwise */
   Geodetic2XYZ(arr_lat_rad,arr_lon_rad,height,&(arraydat.xyz_pos[0]),&(arraydat.xyz_pos[1]),&(arraydat.xyz_pos[2]));
 
   /* read each scan, populating the data structure. */
-  for (scan=0; scan < header.n_scans; scan++) {
-    res = readScan(fpin_ac,fpin_cc,scan, &header, &inputs, &data);
-    if(res!=0) {
+  scan=0;
+  while ((res = readScan(fpin_ac,fpin_cc,scan, &header, &inputs, &data))==0) {
+    scan++;
+    if (scan ==header.n_scans) break;   // don't read more than is specified
+  }
+  if(res < 0) {
       fprintf(stderr,"Problems in readScan(). exiting\n");
       exit(1);
-    }
+  }
+
+  if (debug) fprintf(fpd,"Read %d time steps\n",scan);
+  if (abs(header.n_scans-scan) > 4) {
+    fprintf(stderr,"WARNING: expected to read %d scans, but actually read %d. Are you sure you have the correct number of freqs, inputs and timesteps? Carrying on and hoping for the best...\n",header.n_scans,scan);
+  }
+  else if (res > 0) {
+      fprintf(stderr,"WARNING: Wanted to read %d time steps, but actually read %d. Carrying on...\n",header.n_scans, scan);
   }
 
   if (do_flag) {
@@ -210,6 +215,7 @@ int main(const int argc, char * const argv[]) {
   }
 
   if (flagfilename != NULL) {
+    if (debug) fprintf(fpd,"Applying flags file...\n");
     res = applyFlagsFile(flagfilename,&data);
     if(res!=0) {
       fprintf(stderr,"Problems in applyFlagsFile. exiting\n");
@@ -531,7 +537,7 @@ int readScan(FILE *fp_ac, FILE *fp_cc,int scan, Header *header, InpConfig *inps,
           for(ant2=ant1+1; ant2 < uvdata->array->n_ant; ant2++) {
             if (checkAntennaPresent(inps,ant2) == 0) continue;
             if(debug) fprintf(fpd,"CROSS: bl %d is for ants %d-%d\n",bl_index,ant1,ant2);
-              bl_ind_lookup[ant1][ant2] = bl_index++;
+            bl_ind_lookup[ant1][ant2] = bl_index++;
           }
       }
   }
@@ -542,13 +548,12 @@ int readScan(FILE *fp_ac, FILE *fp_cc,int scan, Header *header, InpConfig *inps,
           for(ant2=ant1; ant2 < uvdata->array->n_ant; ant2++) {
             if (checkAntennaPresent(inps,ant2) == 0) continue;
             if(debug) fprintf(fpd,"BOTH: bl %d is for ants %d-%d\n",bl_index,ant1,ant2);
-              bl_ind_lookup[ant1][ant2] = bl_index++;
+            bl_ind_lookup[ant1][ant2] = bl_index++;
           }
       }
   }
 
   /* increase size of arrays for the new scan */
-  uvdata->n_vis++;
   uvdata->date=realloc(uvdata->date,(scan+1)*sizeof(double));
   uvdata->visdata=realloc(uvdata->visdata,(scan+1)*sizeof(double *));
   uvdata->weightdata=realloc(uvdata->weightdata,(scan+1)*sizeof(double *));
@@ -708,8 +713,8 @@ int readScan(FILE *fp_ac, FILE *fp_cc,int scan, Header *header, InpConfig *inps,
             n_read = fread(visdata,sizeof(float),uvdata->n_freq,fp_ac);
         }
         if (n_read != uvdata->n_freq) {
-            fprintf(stderr,"ERROR: inps %d,%d. expected to read %d channels, only got %d\n",inp1, inp2,uvdata->n_freq,n_read);
-            exit(1);
+            fprintf(stderr,"EOF: inps %d,%d. expected to read %d channels, only got %d\n",inp1, inp2,uvdata->n_freq,n_read);
+            return 1;
         }
  
          /* throw away cross correlations from different pols on the same antenna if we only want cross products */
@@ -780,6 +785,8 @@ int readScan(FILE *fp_ac, FILE *fp_cc,int scan, Header *header, InpConfig *inps,
     }
 
   }
+  /* successfully read a time chunk. increase vis counter in data */
+  uvdata->n_vis++;
   if (visdata != NULL) free(visdata);
   return 0;
 }
