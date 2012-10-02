@@ -19,8 +19,7 @@ $Date: 2011-10-18 22:53:40 +0800 (Tue, 18 Oct 2011) $:    Date of last commit
 #include "slalib.h"
 #include "uvfits.h"
 
-#define MAX_ANT 32
-#define MAX_BASELINES (MAX_ANT*(MAX_ANT+1)/2) // including autocorrelations 
+#define MAX_ANT 128
 #define MAX_LINE 1024
 #define MWA_LAT -26.703319        // Array latitude. degrees North
 #define MWA_LON 116.67081         // Array longitude. degrees East
@@ -184,20 +183,25 @@ int main(const int argc, char * const argv[]) {
   }
 
   /* assign XYZ positions of the array for the site. */
-  /* NOTE: this is correct only for geocentric lat/lon. Should use the 
-  arraydat.xyz_pos[0] = (EARTH_RAD+height)*cos(arr_lat_rad)*cos(arr_lon_rad);
-  arraydat.xyz_pos[1] = (EARTH_RAD+height)*cos(arr_lat_rad)*sin(arr_lon_rad);
-  arraydat.xyz_pos[2] = (EARTH_RAD+height)*sin(arr_lat_rad);
-  SLA_GEOC function to calculate proper geodetic to geocentric conversion otherwise */
   Geodetic2XYZ(arr_lat_rad,arr_lon_rad,height,&(arraydat.xyz_pos[0]),&(arraydat.xyz_pos[1]),&(arraydat.xyz_pos[2]));
 
   /* read each scan, populating the data structure. */
-  for (scan=0; scan < header.n_scans; scan++) {
-    res = readScan(fpin_ac,fpin_cc,scan, &header, &inputs, &data);
-    if(res!=0) {
+  scan=0;
+  while ((res = readScan(fpin_ac,fpin_cc,scan, &header, &inputs, &data))==0) {
+    scan++;
+    if (scan ==header.n_scans) break;   // don't read more than is specified
+  }
+  if(res < 0) {
       fprintf(stderr,"Problems in readScan(). exiting\n");
       exit(1);
-    }
+  }
+
+  if (debug) fprintf(fpd,"Read %d time steps\n",scan);
+  if (abs(header.n_scans-scan) > 4) {
+    fprintf(stderr,"WARNING: expected to read %d scans, but actually read %d. Are you sure you have the correct number of freqs, inputs and timesteps? Carrying on and hoping for the best...\n",header.n_scans,scan);
+  }
+  else if (res > 0) {
+      fprintf(stderr,"WARNING: Wanted to read %d time steps, but actually read %d. Carrying on...\n",header.n_scans, scan);
   }
 
   if (do_flag) {
@@ -210,6 +214,7 @@ int main(const int argc, char * const argv[]) {
   }
 
   if (flagfilename != NULL) {
+    if (debug) fprintf(fpd,"Applying flags file...\n");
     res = applyFlagsFile(flagfilename,&data);
     if(res!=0) {
       fprintf(stderr,"Problems in applyFlagsFile. exiting\n");
@@ -290,28 +295,38 @@ int autoFlag(uvdata *uvdata, float sigma, int n_neighbours) {
         /* clear existing flags */
         memset(flags,'\0',uvdata->n_vis*uvdata->n_freq);
         for(chan=0; chan < uvdata->n_freq; chan++) {
-            int lower,upper,n_points,in_flag;
+            int cpc=0;  // channels per coarse channel
+            int lower,upper,n_points,in_flag,n_rej=0;
             float local_median,local_stdev,val;
+
             // set bounds for lower and upper chans for neighbor comparisions
             lower = chan-n_neighbours;
             if (lower < 0) lower=0;
             upper = chan+n_neighbours;
             if (upper >= uvdata->n_freq) upper = uvdata->n_freq-1;
             switch(do_flag) {
+
                 case 1:
                     // generic case - don't do anything special
                     break;
-                case 2: {
-                    int n_rej = 6;
+                case 2: 
                     // MWA 40kHz channels. do not use the n_rej edge channels to compare to neighbours
                     // there are 32 fine 40kHz channels per coarse 1.28MHz channel. So we ignore the edge
                     // channels within a coarse chan
-                    if (chan%32 <= n_rej || chan%32 > 32-n_rej) lower = upper = chan;
-                    if (chan%32 > n_rej && lower%32 < n_rej) lower += n_rej-lower%32;
-                    if (chan%32 < 32-n_rej && upper%32 >= 32-n_rej) upper -= (upper%32)-(31-n_rej);
+                    n_rej = 5;
+                    cpc=32;
+                    if (chan%cpc <= n_rej || chan%cpc > cpc-n_rej) lower = upper = chan;
+                    if (chan%cpc > n_rej && lower%cpc < n_rej) lower += n_rej-lower%cpc;
+                    if (chan%cpc < cpc-n_rej && upper%cpc >= cpc-n_rej) upper -= (upper%cpc)-(cpc-1-n_rej);
                     break;
-                    }
                 case 3:
+                    // MWA 10kHz channels. do not use the n_rej edge channels to compare to neighbours
+                    n_rej = 20;
+                    cpc=128;
+                    if (chan%cpc <= n_rej || chan%cpc > cpc-n_rej) lower = upper = chan;
+                    if (chan%cpc > n_rej && lower%cpc < n_rej) lower += n_rej-lower%cpc;
+                    if (chan%cpc < cpc-n_rej && upper%cpc >= cpc-n_rej) upper -= (upper%cpc)-(cpc-1-n_rej);
+                    break;
                 default:
                     fprintf(stderr,"Unsupported/unknown autoflag mode %d. Not flagging\n",do_flag);
                     goto EXIT;
@@ -502,11 +517,11 @@ int readScan(FILE *fp_ac, FILE *fp_cc,int scan, Header *header, InpConfig *inps,
   double lmst2000, ha2000, newarrlat, ant_u_ep, ant_v_ep, ant_w_ep;
   double ra_aber, dec_aber;
   int i,inp1,inp2,ant1,ant2,pol1,pol2,bl_index=0,visindex,pol_ind,chan_ind,n_read;
-  int bl_ind_lookup[MAX_ANT][MAX_ANT],temp,baseline_reverse,total_ants;
+  int bl_ind_lookup[MAX_ANT][MAX_ANT],temp,baseline_reverse,total_ants,max_baselines;
   float *visdata=NULL,vis_weight=1.0;
 
   /* allocate space to read binary correlation data. Size is complex float * n_channels */
-  visdata = malloc(2*sizeof(float)*uvdata->n_freq);
+  visdata = calloc(2*uvdata->n_freq,sizeof(float));
   if (visdata==NULL) {
       fprintf(stderr,"ERROR: no malloc for visdata array in readScan\n");
       exit(1);
@@ -514,6 +529,7 @@ int readScan(FILE *fp_ac, FILE *fp_cc,int scan, Header *header, InpConfig *inps,
 
   /* count the total number of antennas actually present in the data */
   total_ants = countPresentAntennas(inps);
+  max_baselines=total_ants*(total_ants+1)/2;
 
   /* make a lookup table for which baseline corresponds to a correlation product */
   if(header->corr_type=='A') {
@@ -531,7 +547,7 @@ int readScan(FILE *fp_ac, FILE *fp_cc,int scan, Header *header, InpConfig *inps,
           for(ant2=ant1+1; ant2 < uvdata->array->n_ant; ant2++) {
             if (checkAntennaPresent(inps,ant2) == 0) continue;
             if(debug) fprintf(fpd,"CROSS: bl %d is for ants %d-%d\n",bl_index,ant1,ant2);
-              bl_ind_lookup[ant1][ant2] = bl_index++;
+            bl_ind_lookup[ant1][ant2] = bl_index++;
           }
       }
   }
@@ -542,13 +558,12 @@ int readScan(FILE *fp_ac, FILE *fp_cc,int scan, Header *header, InpConfig *inps,
           for(ant2=ant1; ant2 < uvdata->array->n_ant; ant2++) {
             if (checkAntennaPresent(inps,ant2) == 0) continue;
             if(debug) fprintf(fpd,"BOTH: bl %d is for ants %d-%d\n",bl_index,ant1,ant2);
-              bl_ind_lookup[ant1][ant2] = bl_index++;
+            bl_ind_lookup[ant1][ant2] = bl_index++;
           }
       }
   }
 
   /* increase size of arrays for the new scan */
-  uvdata->n_vis++;
   uvdata->date=realloc(uvdata->date,(scan+1)*sizeof(double));
   uvdata->visdata=realloc(uvdata->visdata,(scan+1)*sizeof(double *));
   uvdata->weightdata=realloc(uvdata->weightdata,(scan+1)*sizeof(double *));
@@ -560,13 +575,13 @@ int readScan(FILE *fp_ac, FILE *fp_cc,int scan, Header *header, InpConfig *inps,
   uvdata->baseline = realloc(uvdata->baseline,(scan+1)*sizeof(float *));
 
   /* make space for the actual visibilities and weights */
-  if (debug) fprintf(fpd,"callocing array of %d floats for scan %d\n",MAX_BASELINES*uvdata->n_freq*uvdata->n_pol*2,scan);
-  uvdata->visdata[scan]    = calloc(MAX_BASELINES*uvdata->n_freq*uvdata->n_pol*2,sizeof(float));
-  uvdata->weightdata[scan] = calloc(MAX_BASELINES*uvdata->n_freq*uvdata->n_pol  ,sizeof(float));
-  uvdata->u[scan] = calloc(MAX_BASELINES,sizeof(double));
-  uvdata->v[scan] = calloc(MAX_BASELINES,sizeof(double));
-  uvdata->w[scan] = calloc(MAX_BASELINES,sizeof(double));
-  uvdata->baseline[scan] = calloc(MAX_BASELINES,sizeof(float));
+  if (debug) fprintf(fpd,"callocing array of %d floats for scan %d\n",max_baselines*uvdata->n_freq*uvdata->n_pol*2,scan);
+  uvdata->visdata[scan]    = calloc(max_baselines*uvdata->n_freq*uvdata->n_pol*2,sizeof(float));
+  uvdata->weightdata[scan] = calloc(max_baselines*uvdata->n_freq*uvdata->n_pol  ,sizeof(float));
+  uvdata->u[scan] = calloc(max_baselines,sizeof(double));
+  uvdata->v[scan] = calloc(max_baselines,sizeof(double));
+  uvdata->w[scan] = calloc(max_baselines,sizeof(double));
+  uvdata->baseline[scan] = calloc(max_baselines,sizeof(float));
   if(uvdata->visdata[scan]==NULL || uvdata->weightdata[scan]==NULL || uvdata->visdata[scan]==NULL
      || uvdata->visdata[scan]==NULL || uvdata->visdata[scan]==NULL || uvdata->baseline[scan]==NULL) {
     fprintf(stderr,"readScan: no malloc for BIG arrays\n");
@@ -708,8 +723,8 @@ int readScan(FILE *fp_ac, FILE *fp_cc,int scan, Header *header, InpConfig *inps,
             n_read = fread(visdata,sizeof(float),uvdata->n_freq,fp_ac);
         }
         if (n_read != uvdata->n_freq) {
-            fprintf(stderr,"ERROR: inps %d,%d. expected to read %d channels, only got %d\n",inp1, inp2,uvdata->n_freq,n_read);
-            exit(1);
+            fprintf(stderr,"EOF: inps %d,%d. expected to read %d channels, only got %d\n",inp1, inp2,uvdata->n_freq,n_read);
+            return 1;
         }
  
          /* throw away cross correlations from different pols on the same antenna if we only want cross products */
@@ -780,6 +795,8 @@ int readScan(FILE *fp_ac, FILE *fp_cc,int scan, Header *header, InpConfig *inps,
     }
 
   }
+  /* successfully read a time chunk. increase vis counter in data */
+  uvdata->n_vis++;
   if (visdata != NULL) free(visdata);
   return 0;
 }
@@ -1044,7 +1061,7 @@ int readHeader(char *header_filename, Header *header) {
     header->ref_hour=0;
     header->ref_minute=0;
     header->ref_second=0;
-    header->field_name[0] = '\0';
+    memset(header->field_name,0,SIZE_SOURCE_NAME+1);
     header->invert_freq = 0;    // correlators have now been fixed
     header->conjugate = 0;      // just in case.
     header->geom_correct = 1;   // default, stop the fringes
@@ -1053,7 +1070,7 @@ int readHeader(char *header_filename, Header *header) {
         if(line[0]=='\n' || line[0]=='#' || line[0]=='\0') continue; // skip blank/comment lines
 
         nscan = sscanf(line,"%s %s",key,value);
-        if (strncmp(key,"FIELDNAME",MAX_LINE)==0) strcpy(header->field_name,value);
+        if (strncmp(key,"FIELDNAME",MAX_LINE)==0) strncpy(header->field_name,value,SIZE_SOURCE_NAME);
         if (strncmp(key,"N_SCANS",MAX_LINE)==0) header->n_scans = atoi(value);
         if (strncmp(key,"N_INPUTS",MAX_LINE)==0) header->n_inputs = atoi(value);
         if (strncmp(key,"N_CHANS",MAX_LINE)==0) header->n_chans = atoi(value);
@@ -1142,7 +1159,7 @@ int readHeader(char *header_filename, Header *header) {
 /*******************************
 *********************************/
 void initData(uvdata *data) {
-  data->date = calloc(1,sizeof(double));
+  data->date = malloc(sizeof(double));
   data->n_pol=0;
   data->n_baselines=NULL;
   data->n_freq=0;
@@ -1193,7 +1210,8 @@ int applyHeader(Header *header, uvdata *data) {
   data->date[0] = jdtime_base+0.5*(header->integration_time/86400.0);
   if (debug) fprintf(fpd,"JD time is %.2lf\n",jdtime_base);
 
-  strncpy(data->source->name,header->field_name,SIZE_SOURCE_NAME-1);
+  memset(data->source->name,0,SIZE_SOURCE_NAME+1);
+  strncpy(data->source->name,header->field_name,SIZE_SOURCE_NAME);
 
   /* extract RA, DEC from header. Beware negative dec and negative zero bugs. */
   data->source->ra  = header->ra_hrs;
