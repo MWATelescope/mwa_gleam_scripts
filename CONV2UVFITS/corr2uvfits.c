@@ -313,9 +313,9 @@ int autoFlag(uvdata *uvdata, float sigma, int n_neighbours) {
                     // MWA 40kHz channels. do not use the n_rej edge channels to compare to neighbours
                     // there are 32 fine 40kHz channels per coarse 1.28MHz channel. So we ignore the edge
                     // channels within a coarse chan
-                    n_rej = 5;
+                    n_rej = 6;
                     cpc=32;
-                    if (chan%cpc <= n_rej || chan%cpc > cpc-n_rej) lower = upper = chan;
+                    if (chan%cpc < n_rej || chan%cpc >= cpc-n_rej) lower = upper = chan;
                     if (chan%cpc > n_rej && lower%cpc < n_rej) lower += n_rej-lower%cpc;
                     if (chan%cpc < cpc-n_rej && upper%cpc >= cpc-n_rej) upper -= (upper%cpc)-(cpc-1-n_rej);
                     break;
@@ -323,7 +323,7 @@ int autoFlag(uvdata *uvdata, float sigma, int n_neighbours) {
                     // MWA 10kHz channels. do not use the n_rej edge channels to compare to neighbours
                     n_rej = 20;
                     cpc=128;
-                    if (chan%cpc <= n_rej || chan%cpc > cpc-n_rej) lower = upper = chan;
+                    if (chan%cpc < n_rej || chan%cpc >= cpc-n_rej) lower = upper = chan;
                     if (chan%cpc > n_rej && lower%cpc < n_rej) lower += n_rej-lower%cpc;
                     if (chan%cpc < cpc-n_rej && upper%cpc >= cpc-n_rej) upper -= (upper%cpc)-(cpc-1-n_rej);
                     break;
