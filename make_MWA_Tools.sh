@@ -34,13 +34,13 @@ export CFITSLIB=${CFITSIO}/lib/
 export CFITSINC=${CFITSIO}/include/
 fi
 
-echo "building LFILE converter"
+echo "building LFILE & read_mwac utilities"
 cd build_lfiles
 make
 if [ "$?" -ne 0 ];
     then
     echo "!!!!!!!!!!!!!!!!!!!!!!"
-    echo 'build_lfiles make failed !'
+    echo 'build_lfiles/read_mwac make failed !'
     cd ..
     exit
 fi
