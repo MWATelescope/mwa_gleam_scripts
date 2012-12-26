@@ -8,39 +8,45 @@
 #if you have /usr/local/lib/libcfitsio.a
 #then do 
 #export CFITSIO=/usr/local/
+# alternatively, most linux/Unix distros (including macports) set up the package
+# manager so that pkg-config tells you both whether the package exists AND
+# how to compile against it. Use a package manager unless you really,
+# absolutely, have to install by hand.
 
 
 
 echo "This is make_MWA_Tools.sh"
 
-if [ -z $CFITSIO ]
+pkg-config --exists cfitsio
+cfitsio_pkg_result=$?
+if [ $cfitsio_pkg_result -ne 0 ] && [ -z $CFITSIO ]
 then
-echo '$CFITSIO is not set, using internal CFITSIO'
-export CFITSLIB=../cfitsio/
-export CFITSINC=../cfitsio/
-cd cfitsio
-./configure
-make
+  echo '$CFITSIO is not set, using internal CFITSIO'
+  export CFITSLIB=../cfitsio/
+  export CFITSINC=../cfitsio/
+  cd cfitsio
+  ./configure
+  make
     if [ "$?" -ne 0 ];
         then
         echo 'internal cfitsio install failed'
         cd ..
         exit
     fi
-cd ..
-else
-echo 'using $CFITSIO = '${CFITSIO}
-export CFITSLIB=${CFITSIO}/lib/
-export CFITSINC=${CFITSIO}/include/
+  cd ..
+  else
+  echo 'using $CFITSIO = '${CFITSIO}
+  export CFITSLIB=${CFITSIO}/lib/
+  export CFITSINC=${CFITSIO}/include/
 fi
 
-echo "building LFILE converter"
+echo "building LFILE & read_mwac utilities"
 cd build_lfiles
 make
 if [ "$?" -ne 0 ];
     then
     echo "!!!!!!!!!!!!!!!!!!!!!!"
-    echo 'build_lfiles make failed !'
+    echo 'build_lfiles/read_mwac make failed !'
     cd ..
     exit
 fi
