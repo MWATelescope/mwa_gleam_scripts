@@ -1,2 +1,3 @@
+#!/bin/bash
 ec_sq 4
 ec_sq 6

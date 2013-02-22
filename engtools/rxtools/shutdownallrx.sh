@@ -1,3 +1,4 @@
+#!/bin/bash
 for i in {1..9}; do
  echo powering off and shutting down rec0$i
  ssh mwa@rec0$i bin/receiver_power off
