@@ -16,5 +16,5 @@ for i in "$@"; do
  ssh mwa@rec$i bin/load_dr_bin 1 /home/MWA/digrec/fpgabin/$adfb1bin
  echo "loading $adfb2bin to ADFB2 board"
  ssh mwa@rec$i bin/load_dr_bin 2 /home/MWA/digrec/fpgabin/$adfb2bin
-# ssh mwa@rec$i bin/init_dr.sh
+ ssh mwa@rec$i bin/init_dr.sh
 done
