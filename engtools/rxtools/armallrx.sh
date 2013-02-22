@@ -1,3 +1,4 @@
+#!/bin/bash
 for i in {1..9}; do
  echo testing rec0$i
  ssh mwa@rec0$i bin/arm_clock
