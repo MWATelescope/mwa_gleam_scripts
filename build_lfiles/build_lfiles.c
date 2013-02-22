@@ -12,6 +12,7 @@
 #include <string.h>
 #include <complex.h>
 #include <unistd.h>
+#include "mwac_utils.h"
 #include "antenna_mapping.h"
 
 #include "fitsio.h"
@@ -98,6 +99,15 @@ void getNumHDUsInFiles(int nfiles, char *infilename[MAX_FILES], int num_hdus_in_
             exit(1);
         }
     }
+
+	/* sanity checks */
+	for (i=1; i< nfiles; i++) {
+		if ( abs(num_hdus_in_file[i]-num_hdus_in_file[i-1]) > 1) {
+			fprintf(stderr,"ERROR: serious mismatch between number of HDUs in files (%d vs %d). Exiting.\n",
+							num_hdus_in_file[i],num_hdus_in_file[i-1]);
+			exit(EXIT_FAILURE);
+		}
+	}
 }
 
 int main(int argc, char **argv) {
