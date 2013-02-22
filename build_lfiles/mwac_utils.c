@@ -89,26 +89,25 @@ void get_baseline(int st1, int st2, int pol1, int pol2, float complex *data,
 void get_baseline_lu(int st1, int st2, int pol1, int pol2, float complex *data,
 		float complex *baseline) {
 
-	int i=0;
-	float complex *in, *out;	
+    int i=0;
+    float complex *in, *out;	
         
-        extern int npol;
-	extern int nstation;
-	extern int nfrequency;
+    extern int npol;
+    extern int nstation;
+    extern int nfrequency;
 
-	size_t in_index=0;
+    off_t in_index=0,offset,stride;
 
-	in = data;
-	out = baseline;
+    in = data;
+    out = baseline;
 
 	/* direct lookup */
-
-	for (i=0;i<nfrequency;i++) {
-		in_index = i*(nstation*nstation*npol*npol) + (st1*nstation*npol*npol) + (st2*npol*npol) + (pol1*npol) + pol2;
-		*out = in[in_index];
-		out++;
-	}
-
+    offset = (st1*nstation*npol*npol) + (st2*npol*npol) + (pol1*npol) + pol2;
+    stride = (nstation*nstation*npol*npol);
+    for (i=0;i<nfrequency;i++) {
+        in_index = i*stride + offset;
+        out[i] = in[in_index];
+    }
 }
 
 void get_baseline_r(int st1, int st2, int pol1, int pol2, float complex *data,

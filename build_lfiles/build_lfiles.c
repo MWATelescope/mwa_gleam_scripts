@@ -76,7 +76,7 @@ void usage() {
 }
 
 
-void getNumHDUsInFiles(int nfiles, char *infilename[MAX_FILES], int num_hdus_in_file[MAX_FILES], int file_type[MAX_FILES]) {
+int getNumHDUsInFiles(int nfiles, char *infilename[MAX_FILES], int num_hdus_in_file[MAX_FILES], int file_type[MAX_FILES]) {
     fitsfile *fptr;
     int status=0,i;
 
@@ -100,14 +100,15 @@ void getNumHDUsInFiles(int nfiles, char *infilename[MAX_FILES], int num_hdus_in_
         }
     }
 
-	/* sanity checks */
-	for (i=1; i< nfiles; i++) {
-		if ( abs(num_hdus_in_file[i]-num_hdus_in_file[i-1]) > 1) {
-			fprintf(stderr,"ERROR: serious mismatch between number of HDUs in files (%d vs %d). Exiting.\n",
-							num_hdus_in_file[i],num_hdus_in_file[i-1]);
-			exit(EXIT_FAILURE);
-		}
-	}
+    /* sanity checks */
+    for (i=1; i< nfiles; i++) {
+        if ( abs(num_hdus_in_file[i]-num_hdus_in_file[i-1]) > 1) {
+            fprintf(stderr,"ERROR: serious mismatch between number of HDUs in files (%d vs %d). Exiting.\n",
+                            num_hdus_in_file[i],num_hdus_in_file[i-1]);
+            return EXIT_FAILURE;
+        }
+    }
+    return EXIT_SUCCESS;
 }
 
 int main(int argc, char **argv) {
@@ -231,7 +232,7 @@ int main(int argc, char **argv) {
     size_t lacspcLength = nfrequency * ninput; //Lfile autos length
     size_t fullLength = nfrequency * ninput*ninput;
 
-    int ifile;
+    int ifile,status=0;
     int ihdu = 1+start_sec;
     int stophdu;
 
@@ -248,7 +249,8 @@ int main(int argc, char **argv) {
     ihdu += primary;    // the data starts in header ihdu.
     stophdu = ihdu + nseconds-1;
     /* find out how many HDUs are in each file */
-    getNumHDUsInFiles(nfiles,input_file,num_hdus_in_file,last_hdu_type);
+    status = getNumHDUsInFiles(nfiles,input_file,num_hdus_in_file,last_hdu_type);
+    if (status) exit(EXIT_FAILURE);
 
     /* check that there are the same number of HDUs in each file and only extract the amount of time
         that there is actually data for */
@@ -284,14 +286,14 @@ int main(int argc, char **argv) {
                 cross = fopen(tmp_lccfilename,"w");
         }
         else {
-	  if (!appendtofile) {
-	    autos = fopen(lacfilename,"w");
-	    cross = fopen(lccfilename,"w");
-	  }
-	  else {
-	    autos = fopen(lacfilename,"a");
-	    cross = fopen(lccfilename,"a");
-	  }
+          if (!appendtofile) {
+            autos = fopen(lacfilename,"w");
+            cross = fopen(lccfilename,"w");
+          }
+          else {
+            autos = fopen(lacfilename,"a");
+            cross = fopen(lccfilename,"a");
+          }
         }
 
         if (autos == NULL || cross == NULL) {
@@ -300,6 +302,8 @@ int main(int argc, char **argv) {
         }
 
         fill_mapping_matrix();
+
+        printf("Extracting");
 
         while (ihdu <= stophdu) {
 
@@ -397,7 +401,8 @@ int main(int argc, char **argv) {
                 fits_close_file(fptr,&status);
             }
 
-            printf("Extracting matrix\n");        
+            printf("."); fflush(stdout);
+
             extractMatrix(full_matrix_h, cuda_matrix_h);
             /* now build lfile data */        
             int input1=0,input2=0;
@@ -431,6 +436,7 @@ int main(int argc, char **argv) {
 
             ihdu++;
         }
+        printf(" Done.\n");
 SHUTDOWN:
         fclose(autos);
         fclose(cross);
