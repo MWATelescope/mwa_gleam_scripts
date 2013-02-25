@@ -1,0 +1,9 @@
+#!/bin/bash
+# script to start up the pfb
+
+fan.sh $DEFAULT_FAN_SPEED
+
+init_pfb 4
+
+init_pfb 6
+
