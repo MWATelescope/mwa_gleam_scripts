@@ -1,14 +1,15 @@
 #include <stdlib.h>
 #include <stdio.h>
-// #include <plot.h>
+#include <plot.h>
 #include "mwac_utils.h"
 #include "antenna_mapping.h"
 
 
 void fill_mapping_matrix() {
 
-	extern map_t corr_mapping[64][64];
-	extern int pfb_output_to_input[64];
+	extern map_t corr_mapping[NINPUT][NINPUT];
+	extern int pfb_output_to_input[NINPUT];
+	extern int single_pfb_mapping[64];
 	extern int npol;
 	extern int nstation;
 
@@ -16,10 +17,20 @@ void fill_mapping_matrix() {
 	int pol1 = 0, pol2 = 0;
 	int index1 = 0, index2 = 0;
 	int num_entries = 0;
+	int p=0,npfb = 4;
+	
 
+	
 	//	 Output matrix has ordering
 	//	 [channel][station][station][polarization][polarization][complexity]
 
+	for (p=0;p<npfb;p++) {
+		for (inp1=0;inp1<64;inp1++) {
+			pfb_output_to_input[(p*64) + inp1] = single_pfb_mapping[inp1] + (p*64);
+		}
+	}
+
+			 
 	for (inp1 = 0; inp1 < nstation; inp1++) {
 		for (inp2 = 0; inp2 < nstation; inp2++) {
 			for (pol1 = 0; pol1 < npol; pol1++) {
@@ -149,7 +160,7 @@ void full_reorder(float complex *full_matrix_h, float complex *reordered)
 	extern int npol;
 	extern int nstation;
 	extern int nfrequency;
-	extern map_t corr_mapping[64][64];
+	extern map_t corr_mapping[NINPUT][NINPUT];
 	
 	int t1=0;
 	int t2=0;

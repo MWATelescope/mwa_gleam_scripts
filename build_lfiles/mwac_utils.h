@@ -19,8 +19,8 @@ extern "C" {
 
 void fill_mapping_matrix();
 
-void get_baseline( int st1, int st2,int pol1, int pol2, float complex * data,
-		float complex * baseline);
+void get_baseline( int st1, int st2,int pol1, int pol2, complex float * data,
+		complex float * baseline);
 
 void get_baseline_lu( int st1, int st2,int pol1, int pol2, float complex * data,
 		float complex * baseline);

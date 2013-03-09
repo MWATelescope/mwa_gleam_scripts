@@ -25,8 +25,7 @@ int input_to_slot[16] = {
 		5,
 		5
 };
-
-int pfb_output_to_input[64] = {
+int single_pfb_mapping[64] = {
 		0,
 		16,
 		32,

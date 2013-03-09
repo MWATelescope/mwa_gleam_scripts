@@ -8,7 +8,8 @@
 #ifndef ANTENNA_MAPPING_H_
 #define ANTENNA_MAPPING_H_
 
-/* the pfb maps antennas in the following way:
+#define NINPUT 256
+/* Each pfb maps antennas in the following way:
  *
  *   antenna number is found as index
 	 0 = 0
@@ -69,5 +70,7 @@ typedef struct mapping {
 
 } map_t;
 
-map_t corr_mapping[64][64];
+map_t corr_mapping[NINPUT][NINPUT];
+int pfb_output_to_input[NINPUT];
+
 #endif /* ANTENNA_MAPPING_H_ */
