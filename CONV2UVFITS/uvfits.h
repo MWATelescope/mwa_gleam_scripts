@@ -70,6 +70,9 @@ typedef struct _uvdata {
 
 /* public function prototypes */
 int writeUVFITS(char *fname, uvdata *data);
+int writeUVinstant(void *fptr, uvdata *data, double jd_frac, int i);
+int writeUVFITSfinalise(void *vfptr, uvdata *data);
+int writeUVFITSiterator(char *filename, uvdata *data, void **vfptr, double *jd_day_trunc);
 int readUVFITS(char *fname, uvdata **data);
 void printUVData(uvdata *data, FILE *fp);
 void JD_to_Cal(double jd, int *year, int *month, int *day);

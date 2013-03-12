@@ -296,7 +296,7 @@ int autoFlag(uvdata *uvdata, float sigma, int n_neighbours) {
         memset(flags,'\0',uvdata->n_vis*uvdata->n_freq);
         for(chan=0; chan < uvdata->n_freq; chan++) {
             int cpc=0;  // channels per coarse channel
-            int lower,upper,n_points,in_flag,n_rej=0;
+            int lower,upper,n_points,n_rej=0;
             float local_median,local_stdev,val;
 
             // set bounds for lower and upper chans for neighbor comparisions
@@ -344,7 +344,6 @@ int autoFlag(uvdata *uvdata, float sigma, int n_neighbours) {
             local_stdev  = local_stdevs[n_points/2];
             if(debug_flag) fprintf(fpd,"ant: %d, pol: %d, chan: %d. lower: %d, upper: %d, Local median: %g, local stdev: %g\n",ant,pol,chan,lower,upper,local_median,local_stdev);
             // now scan data to find outliers and flag them
-            in_flag=0;
             for(t=0; t<uvdata->n_vis; t++) {
                 val = chan_data[chan*uvdata->n_vis + t];
                 if ( fabs(val - local_median) > sigma*local_stdev) {
@@ -1037,7 +1036,6 @@ void printusage(const char *progname) {
 int readHeader(char *header_filename, Header *header) {
     FILE *fp=NULL;
     char line[MAX_LINE],key[MAX_LINE],value[MAX_LINE];
-    int nscan;
     
     if((fp=fopen(header_filename,"r"))==NULL) {
         fprintf(stderr,"ERROR: failed to open obs metadata file <%s>\n",header_filename);
@@ -1069,7 +1067,9 @@ int readHeader(char *header_filename, Header *header) {
     while((fgets(line,MAX_LINE-1,fp)) !=NULL) {
         if(line[0]=='\n' || line[0]=='#' || line[0]=='\0') continue; // skip blank/comment lines
 
-        nscan = sscanf(line,"%s %s",key,value);
+        if (sscanf(line,"%s %s",key,value) < 2) {
+            fprintf(stderr,"WARNING: failed to make 2 conversions on line: %s\n",line);
+        }
         if (strncmp(key,"FIELDNAME",MAX_LINE)==0) strncpy(header->field_name,value,SIZE_SOURCE_NAME);
         if (strncmp(key,"N_SCANS",MAX_LINE)==0) header->n_scans = atoi(value);
         if (strncmp(key,"N_INPUTS",MAX_LINE)==0) header->n_inputs = atoi(value);
