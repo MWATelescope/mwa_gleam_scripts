@@ -1,6 +1,6 @@
 #include <stdlib.h>
 #include <stdio.h>
-#include <plot.h>
+//#include <plot.h>
 #include "mwac_utils.h"
 #include "antenna_mapping.h"
 
@@ -16,10 +16,7 @@ void fill_mapping_matrix() {
 	int inp1 = 0, inp2 = 0;
 	int pol1 = 0, pol2 = 0;
 	int index1 = 0, index2 = 0;
-	int num_entries = 0;
 	int p=0,npfb = 4;
-	
-
 	
 	//	 Output matrix has ordering
 	//	 [channel][station][station][polarization][polarization][complexity]
@@ -166,10 +163,8 @@ void full_reorder(float complex *full_matrix_h, float complex *reordered)
 	int t2=0;
 	int p1=0;
 	int p2=0;
-	int  f=0;
 
 	long long baseline_count = 0;
-
 
 	for (t1 = 0; t1 < nstation; t1++) {
 		for (t2 = t1; t2 < nstation; t2++) {
