@@ -100,19 +100,11 @@ int main(int argc, char **argv) {
 		fprintf(stderr,"Raw mode %d visibilites and %d channels\n",nbaselines,nchan);
 
 		/* just stream data through usualy used for averaging */
-		size_t numchan=0;
 		size_t nbuffer=0;
 		size_t fpixel=0;
 		int ii=0,f=0;
 		float *buffer = NULL;
 		int index = 0;
-
-		if (startchan != 0 || endchan != 0) {
-			numchan = endchan - startchan + 1;
-		}
-		else {
-			numchan = nchan;
-		}
 
 		nbuffer = nbaselines*nchan*2; // num floats per channel;
 
@@ -120,11 +112,7 @@ int main(int argc, char **argv) {
 
 		buffer = calloc (nbuffer,sizeof(float));
 
-		while (1) {
-			fread(buffer,nbuffer,sizeof(float),stdin);
-
-			if (feof(stdin))
-				break;
+		while (fread(buffer,nbuffer*sizeof(float),1,stdin) != 0) {
 
 			if (fscrunch > 1) {
 
@@ -178,7 +166,6 @@ int main(int argc, char **argv) {
 			while(!status)  /* Main loop through each extension */
 			{
 				long naxes[2], fpixel=0, nbuffer=0, ii=0;
-				size_t buffsize;
 				int index=0,f=0;	
 				float nullval  = 0;                /* don't check for null values in the image */
 				int numchan=0;
@@ -259,5 +246,5 @@ int main(int argc, char **argv) {
 
 		}
 	}
-
+    return 0;
 }

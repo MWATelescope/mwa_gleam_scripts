@@ -112,7 +112,6 @@ void processCmdLineOptions(int argc, char **argv, CommandLineOptions * opts) {
                 // skip to the next argument
                 i++;
                 opts->calcServer = argv[i];
-                if (debug) fprintf(fpd,"server: %s\n", opts->calcServer);
             } else if (argv[i][0] == '-') {
                 fprintf(stderr,"Error: Illegal option : %s\n", argv[i]);
                 exit(0);
@@ -140,6 +139,7 @@ void processCmdLineOptions(int argc, char **argv, CommandLineOptions * opts) {
     if (opts->calcServer == NULL || strcmp(opts->calcServer, "") == 0) {
         opts->calcServer = DEFAULT_CALC_SERVER;
     }
+    if (debug) fprintf(fpd,"CALC server: %s\n", opts->calcServer);
 }
 
 
@@ -164,8 +164,7 @@ CalcParams *newCalcParams(const CommandLineOptions * opts) {
         clnt_pcreateerror(p->calcServer);
         printf("ERROR: rpc clnt_create fails for host : %-s\n", p->calcServer);
         deleteCalcParams(p);
-        abort();
-        return 0;
+        exit(1);
     }
     if (debug) fprintf(fpd,"RPC client created\n");
 
@@ -185,9 +184,10 @@ int getAntennas(const char *filename, antenna ants[MAX_ANT]) {
     file1 = fopen(filename, "r");
     assert(file1 != NULL);
     nant = 0;
-    while (fgets(buffer,100,file1)!=NULL) {
+    while (fgets(buffer,100,file1) != NULL) {
         if (buffer[0]=='\n' || buffer[0]=='#') continue;    // skip blank/comment lines
-        sscanf(buffer,"%15s %lf %lf %lf",ants[nant].name, &(ants[nant].xyz[0]),&(ants[nant].xyz[1]),&(ants[nant].xyz[2]));
+        //if (debug) fprintf(fpd,"line: %s",buffer);
+        sscanf(buffer,"%s %lf %lf %lf",ants[nant].name, &(ants[nant].xyz[0]),&(ants[nant].xyz[1]),&(ants[nant].xyz[2]));
         nant++;
     }
 
@@ -246,7 +246,7 @@ int CalcInit(CalcParams * p, const CommandLineOptions * opts, antenna ants[MAX_A
     // can interpolate
     for (i = 0; i < 5; i++) {
         request->EOP_time[i] = opts->MJD + i - 2.0;
-        request->tai_utc[i] = 34.0;         // TAI-UTC. Increases by 1 every leap second.
+        request->tai_utc[i] = 35.0;         // TAI-UTC. Increases by 1 every leap second.
         request->ut1_utc[i] = 0.0;          // difference betwen ut1 and UTC, always < 1 sec.
         request->xpole[i] = 0.0;            // hard-code to zero for now.
         request->ypole[i] = 0.0;
@@ -267,6 +267,7 @@ int CalcInit(CalcParams * p, const CommandLineOptions * opts, antenna ants[MAX_A
 int run(const CommandLineOptions * opts) {
     CalcParams *p;
     antenna antpos[MAX_ANT];
+    double uvw[MAX_ANT][3];
     int ant, nant, v;
     FILE *fout=stdout;
     enum clnt_stat clnt_stat;
@@ -283,6 +284,7 @@ int run(const CommandLineOptions * opts) {
     }
     // This loads in the antenna file
     nant = getAntennas(opts->antFileName,antpos);
+    if (debug) fprintf(fpd,"Loaded %d antennas\n",nant);
 
     // For each antenna, run the CalcServer
     for (ant = 0; ant < nant; ant++) {
@@ -291,6 +293,7 @@ int run(const CommandLineOptions * opts) {
                             antpos[ant].xyz[0],antpos[ant].xyz[1],antpos[ant].xyz[2]);
 
         v = CalcInit(p, opts, antpos, ant);
+        assert(v==0);
 
         memset(&res, 0, sizeof(struct getCALC_res));
 
@@ -311,11 +314,15 @@ int run(const CommandLineOptions * opts) {
 //          abort();
             return -2;
         }
+        memcpy(uvw[ant],res.getCALC_res_u.record.UV,sizeof(double)*3);
         // Print the results
         fprintf(fout, "Antenna %03d ('%s'): [%lf, %lf, %lf]\n", ant,antpos[ant].name,
                     res.getCALC_res_u.record.UV[0], res.getCALC_res_u.record.UV[1],
                     res.getCALC_res_u.record.UV[2]);
 
+    }
+    for (ant=1; ant<nant; ant++) {
+        fprintf(fout,"Baseline 0-%d: [ %f,%f,%f ]\n",ant,uvw[0][0]-uvw[ant][0],uvw[0][1]-uvw[ant][1],uvw[0][2]-uvw[ant][2]);
     }
     deleteCalcParams(p);
     return 0;
@@ -333,3 +340,4 @@ int main(int argc, char **argv) {
 
     return 0;
 }
+
