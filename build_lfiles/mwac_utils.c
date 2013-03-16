@@ -1,6 +1,6 @@
 #include <stdlib.h>
 #include <stdio.h>
-#include <plot.h>
+//#include <plot.h>
 #include "mwac_utils.h"
 #include "antenna_mapping.h"
 
@@ -16,10 +16,7 @@ void fill_mapping_matrix() {
 	int inp1 = 0, inp2 = 0;
 	int pol1 = 0, pol2 = 0;
 	int index1 = 0, index2 = 0;
-	int num_entries = 0;
 	int p=0,npfb = 4;
-	
-
 	
 	//	 Output matrix has ordering
 	//	 [channel][station][station][polarization][polarization][complexity]
@@ -100,26 +97,25 @@ void get_baseline(int st1, int st2, int pol1, int pol2, float complex *data,
 void get_baseline_lu(int st1, int st2, int pol1, int pol2, float complex *data,
 		float complex *baseline) {
 
-	int i=0;
-	float complex *in, *out;	
+    int i=0;
+    float complex *in, *out;	
         
-        extern int npol;
-	extern int nstation;
-	extern int nfrequency;
+    extern int npol;
+    extern int nstation;
+    extern int nfrequency;
 
-	size_t in_index=0;
+    off_t in_index=0,offset,stride;
 
-	in = data;
-	out = baseline;
+    in = data;
+    out = baseline;
 
 	/* direct lookup */
-
-	for (i=0;i<nfrequency;i++) {
-		in_index = i*(nstation*nstation*npol*npol) + (st1*nstation*npol*npol) + (st2*npol*npol) + (pol1*npol) + pol2;
-		*out = in[in_index];
-		out++;
-	}
-
+    offset = (st1*nstation*npol*npol) + (st2*npol*npol) + (pol1*npol) + pol2;
+    stride = (nstation*nstation*npol*npol);
+    for (i=0;i<nfrequency;i++) {
+        in_index = i*stride + offset;
+        out[i] = in[in_index];
+    }
 }
 
 void get_baseline_r(int st1, int st2, int pol1, int pol2, float complex *data,
@@ -167,10 +163,8 @@ void full_reorder(float complex *full_matrix_h, float complex *reordered)
 	int t2=0;
 	int p1=0;
 	int p2=0;
-	int  f=0;
 
 	long long baseline_count = 0;
-
 
 	for (t1 = 0; t1 < nstation; t1++) {
 		for (t2 = t1; t2 < nstation; t2++) {

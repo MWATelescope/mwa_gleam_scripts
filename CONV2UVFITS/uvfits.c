@@ -379,19 +379,51 @@ int readUVFITS(char *filename, uvdata **data) {
  ! RETURNS:   integer: 0 success, nonzero failure. returns CFITSIO errors in the case of a CFITSIO error.
 *********************************/
 int writeUVFITS(char *filename, uvdata *data) {
+  void *vfptr=NULL;
+  int status=0,i;
+  double jd_day_trunc;
+
+  /* set up the iterator */
+  status= writeUVFITSiterator(filename, data, &vfptr, &jd_day_trunc);
+  if (status) return status;
+
+  /* write the acutal UV data to the main array.
+     this is done in "random groups" with one group for each
+     instant of visibilities. Each instant contains all freqs,
+     pols and baselines */
+  for (i=0; i<data->n_vis; i++) {
+    /*    fprintf(stderr,"doing vis set %d of %d. There are %d baselines\n",i+1,data->n_vis,data->n_baselines);*/
+    status = writeUVinstant(vfptr, data, data->date[i]-jd_day_trunc,i);
+    if (status) {
+        fprintf(stderr,"ERROR: code %d when writing time instant %d\n",status,i);
+        exit(EXIT_FAILURE);
+    }
+  }
+
+  /* write other stuff at the end like antenna table etc and close the file */  
+  status = writeUVFITSfinalise(vfptr, data);
+  return status;
+}
+
+/**************************
+ ! NAME:      writeUVFITSiterator
+ ! PURPOSE:   create an output uvfits file and set it up for iterative writing of individual time steps.
+ ! ARGUMENTS: filename: an open fits file.
+ !            data: uvdata struct with existing data.
+ !            vfptr: resulting pointer to fitsfile in void format
+ ! RETURNS:   integer. 0 success.
+ **************************/
+int writeUVFITSiterator(char *filename, uvdata *data, void **vfptr, double *jd_day_trunc) {
 
   fitsfile *fptr;
   FILE *fp;
   int status=0;
-  long naxes[NAXIS],i,j,k,l;
-  float *array=NULL,temp;
-  long nelements=0;
+  long naxes[NAXIS],i;
+  float temp;
   char *ctypes[N_CTYPES] = {"STOKES","FREQ","RA","DEC"},tempstr[40];
   char *params[N_GRP_PARAMS] = {"UU","VV","WW","BASELINE","DATE"};
   int mon=0,day=0,year=0;
-  double jd_day,jd_day_trunc,dtemp=0;
-  double *u_ptr, *v_ptr, *w_ptr;
-  float  *vis_ptr, *wt_ptr;
+  double jd_day,dtemp=0;
 
   /* set up for cfitsio interface */
   naxes[0] = 0;
@@ -400,17 +432,10 @@ int writeUVFITS(char *filename, uvdata *data) {
   naxes[3] = data->n_freq;
   naxes[4] = 1;
   naxes[5] = 1;
-  nelements = naxes[1]*naxes[2]*naxes[3]*data->n_baselines[0];
 
   if (data->n_baselines[0] <1) {
     fprintf(stderr,"There are no baselines.\n");
     return 1;
-  }
-
-  array = calloc(nelements+N_GRP_PARAMS,sizeof(float));
-  if(array==NULL) {
-    fprintf(stderr,"writeUVFITS: no malloc\n");
-    exit(1);
   }
 
   /* open the file after checking to see if it already exists and clobbering */
@@ -423,7 +448,6 @@ int writeUVFITS(char *filename, uvdata *data) {
     fits_report_error(stderr, status);
     return 1;
   }
-
   /* set up for writing fits "random groups". There is one group for each baseline
      of visibilities per time sample including all pols and channels. The group consists of:
      1- the (N_GRP_PARAMS) preamble of: U,V,W (nanoseconds),baseline (see below), time offset (days)
@@ -450,7 +474,7 @@ int writeUVFITS(char *filename, uvdata *data) {
      this truncated start-of-jd time. JDs start at 12:00h on a day. */
   JD_to_Cal(data->date[0],&year,&mon,&day); /* get year, month, day for this JD */
   Cal_to_JD(year,mon,day,&jd_day);          /* gets the JD for the start of this day */
-  jd_day_trunc = ((int)jd_day)+0.5;         /* truncate */
+  *jd_day_trunc = ((int)jd_day)+0.5;         /* truncate */
   sprintf(tempstr,"%d-%02d-%02dT00:00:00.0",year,mon,day);
   fits_update_key(fptr,TSTRING, "DATE-OBS", tempstr , NULL, &status);
 
@@ -468,7 +492,7 @@ int writeUVFITS(char *filename, uvdata *data) {
   }
   /* except the PZERO for the date, which must match the OBS-DATE in Julian Days
      the following relies on the tempstr from previous loop. */
-  fits_update_key(fptr,TDOUBLE,tempstr,&jd_day_trunc, NULL, &status);
+  fits_update_key(fptr,TDOUBLE,tempstr,jd_day_trunc, NULL, &status);
 
   /* write the coord system keywords CRVAL, CRPIX, CDELT, CTYPE.*/
   temp=1.0;
@@ -515,15 +539,73 @@ int writeUVFITS(char *filename, uvdata *data) {
   fits_write_history(fptr,"AIPS WTSCAL =  1.0",&status);
   fits_write_comment(fptr,"written by the UV FITS writer of RBW.",&status);
 
+  // return fitsfile pointer;
+  *vfptr = (void *)fptr;
 
-  /* write the acutal UV data to the main array.
-     this is done in "random groups" with one group for each
-     instant of visibilities. Each instant contains all freqs,
-     pols and baselines */
-  
-  /* pack the array for writing to the file */
-  for (i=0; i<data->n_vis; i++) {
-    /*    fprintf(stderr,"doing vis set %d of %d. There are %d baselines\n",i+1,data->n_vis,data->n_baselines);*/
+  return EXIT_SUCCESS;
+}
+
+
+/**************************
+ ! NAME:      writeUVFITSfinalise
+ ! PURPOSE:   write antenna tables etc at end of uvfits file and close up.
+ ! ARGUMENTS: vfptr: an open fits file (as a void pointer)
+ !            data: uvdata struct with existing data.
+ ! RETURNS:   integer. 0 success.
+ **************************/
+int writeUVFITSfinalise(void *vfptr, uvdata *data) {
+  int status=0;
+  fitsfile *fptr;
+
+  fptr = (fitsfile *)vfptr;
+  /* create and write the antenna table */
+  status = writeAntennaData(fptr, data);
+  if (status !=0) {
+    fprintf(stderr,"ERROR: writeAntennaData failed with status %d\n",status);
+  }
+
+  /* tidy up */
+  fits_close_file(fptr, &status);            /* close the file */
+  fits_report_error(stderr, status);  /* print out any error messages */
+
+  return status;
+}
+
+
+/**************************
+ ! NAME:      writeUVinstant
+ ! PURPOSE:   write one time instant of uv data into the UVFITS file.
+ ! ARGUMENTS: fptr: an open fits file.
+ !            data: uvdata struct with existing data.
+ !            n_elements: number of items in a group for a time instant
+ !            i: time index of data
+ ! RETURNS:   integer. 0 success.
+ **************************/
+int writeUVinstant(void *vfptr, uvdata *data, double jd_frac, int i) {
+    fitsfile *fptr;
+    static long ngroups=1;
+    double *u_ptr, *v_ptr, *w_ptr;
+    float  *vis_ptr, *wt_ptr;
+    float *array=NULL;
+    int nelements,status=0;
+    int l,j,k;
+
+    fptr = vfptr;   // this is basically to avoid having to include fitsio.h in uvfits.h 
+
+    /* sanity checks */
+    if (data->n_pol <1 || data->n_freq < 1 || data->n_baselines[i] < 1) {
+        fprintf(stderr,"ERROR: npols %d, nfreqs %d and n_baselines %d all must be > 0 at time index %d\n",data->n_pol, data->n_freq, data->n_baselines[i],i);
+        return EXIT_FAILURE;
+    }   
+
+    /* magic number 3 here matches naxes[1] from above. */
+    nelements = 3*data->n_pol*data->n_freq*data->n_baselines[i];
+    array = malloc((nelements+N_GRP_PARAMS)*sizeof(float));
+    if(array==NULL) {
+        fprintf(stderr,"writeUVFITS: no malloc\n");
+        exit(EXIT_FAILURE);
+    }
+
     u_ptr = data->u[i];
     v_ptr = data->v[i];
     w_ptr = data->w[i];
@@ -536,33 +618,24 @@ int writeUVFITS(char *filename, uvdata *data) {
       /*      EncodeBaseline(data->array->baseline_ant1[l],data->array->baseline_ant2[l],array+3); */
       array[3] = data->baseline[i][l];
       /* last, the time offset */
-      array[4] = data->date[i]-jd_day_trunc;
+      array[4] = jd_frac;
 
       for (j=0; j<data->n_freq; j++){
-	for (k=0; k<data->n_pol; k++) {
-	  array[(j*data->n_pol*3)+(k*3)  +N_GRP_PARAMS] = vis_ptr[(l*data->n_freq*data->n_pol+j*data->n_pol+k)*2  ];   /* real part */
-	  array[(j*data->n_pol*3)+(k*3)+1+N_GRP_PARAMS] = vis_ptr[(l*data->n_freq*data->n_pol+j*data->n_pol+k)*2+1]; /* imag part */
-	  array[(j*data->n_pol*3)+(k*3)+2+N_GRP_PARAMS] = wt_ptr[l*data->n_freq*data->n_pol+j*data->n_pol+k];  /* weight */
-	}
+        for (k=0; k<data->n_pol; k++) {
+            array[(j*data->n_pol*3)+(k*3)  +N_GRP_PARAMS] = vis_ptr[(l*data->n_freq*data->n_pol+j*data->n_pol+k)*2  ];   /* real part */
+            array[(j*data->n_pol*3)+(k*3)+1+N_GRP_PARAMS] = vis_ptr[(l*data->n_freq*data->n_pol+j*data->n_pol+k)*2+1]; /* imag part */
+            array[(j*data->n_pol*3)+(k*3)+2+N_GRP_PARAMS] = wt_ptr[l*data->n_freq*data->n_pol+j*data->n_pol+k];  /* weight */
+        }
       }
       /* Write each vis batch as a "random group" including 5 extra params at the front */
       /* the starting index must be 1, not 0.  fortran style. also for the vis index */
-      fits_write_grppar_flt(fptr,i*data->n_baselines[i]+l+1,1,naxes[1]*naxes[2]*naxes[3]+N_GRP_PARAMS, array, &status);
+      fits_write_grppar_flt(fptr,ngroups,1,3*data->n_pol*data->n_freq+N_GRP_PARAMS, array, &status);
       /*      fprintf(stderr,"write group number: %d\n",i*data->n_baselines+l+1);*/
+      if (status) return status;
+      ngroups++;
     }
-  }
-
-  /* create and write the antenna table */
-  status = writeAntennaData(fptr, data);
-  if (status !=0) {
-    fprintf(stderr,"ERROR: writeAntennaData failed with status %d\n",status);
-  }
-
-  /* tidy up */
-  fits_close_file(fptr, &status);            /* close the file */
-  fits_report_error(stderr, status);  /* print out any error messages */
-  free(array);
-  return 0;
+    free(array);
+    return 0;
 }
 
 /**************************
