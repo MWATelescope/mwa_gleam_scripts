@@ -1131,8 +1131,8 @@ int readHeader(char *header_filename, Header *header) {
         fprintf(stderr,"ERROR: FREQCENT unspecified. There is no default.\n");
         return 1;
     }
-    if (header->ra_hrs==-99) {
-        fprintf(stderr,"ERROR: RA_HRS unspecified. There is no default.\n");
+    if (header->ra_hrs==-99 && header->ha_hrs_start == -99.0) {
+        fprintf(stderr,"ERROR: RA_HRS and HA unspecified. There is no default.\n");
         return 1;
     }
     if (header->dec_degs==-99) {

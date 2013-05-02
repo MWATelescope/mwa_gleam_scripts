@@ -76,28 +76,15 @@ void usage() {
 }
 
 
-int getNumHDUsInFiles(int nfiles, char *infilename[MAX_FILES], int num_hdus_in_file[MAX_FILES], int file_type[MAX_FILES]) {
-    fitsfile *fptr;
+int getNumHDUsInFiles(int nfiles, fitsfile *fptr[MAX_FILES], int num_hdus_in_file[MAX_FILES]) {
     int status=0,i;
 
     for (i=0; i< nfiles; i++) {
-        if (!fits_open_file(&fptr, infilename[i], READONLY, &status)) {
-            if (fits_get_num_hdus(fptr,num_hdus_in_file+i,&status)) {
-                printerror(status);
-            }
-            if (debug) fprintf(fpd,"There are %d HDUs in file %s\n",num_hdus_in_file[i],infilename[i]);
-            /* move to the last one and see what it is */
-            if (fits_movabs_hdu(fptr, num_hdus_in_file[i], file_type+i, &status)){
-                fprintf(stderr,"Error moving to HDU %d\n",num_hdus_in_file[i]);
-                printerror(status);
-            }
-            if (debug) fprintf(fpd,"The last HDU is type %d\n",file_type[i]);
-            fits_close_file(fptr,&status);
+        if (fits_get_num_hdus(fptr[i],num_hdus_in_file+i,&status)) {
+            printerror(status);
+            return EXIT_FAILURE;
         }
-        else {
-            fprintf(stderr,"Cannot open file %s\n",infilename[i]);
-            exit(1);
-        }
+        if (debug) fprintf(fpd,"There are %d HDUs in file %d\n",num_hdus_in_file[i],i);
     }
 
     /* sanity checks */
@@ -120,7 +107,6 @@ int main(int argc, char **argv) {
     char *input_file[MAX_FILES];
     char *output_file = NULL;
     int num_hdus_in_file[MAX_FILES];
-    int last_hdu_type[MAX_FILES];
     int ninput = 64;
     int nfiles = 0;
     int start_sec = 0;
@@ -128,6 +114,7 @@ int main(int argc, char **argv) {
     int fscrunch_factor=1;
     int tscrunch_factor=1;
     int primary = 1; //image NOT in primary header?: see NGAS (1==true)
+    int done_extracting=0;
     extern int nfrequency;
     extern char *optarg;
 
@@ -232,7 +219,7 @@ int main(int argc, char **argv) {
     size_t lacspcLength = nfrequency * ninput; //Lfile autos length
     size_t fullLength = nfrequency * ninput*ninput;
 
-    int ifile,status=0;
+    int ifile;
     int ihdu = 1+start_sec;
     int stophdu;
 
@@ -244,28 +231,37 @@ int main(int argc, char **argv) {
     lcc_base = lccspc_h;
     lac_base = lacspc_h;
 
-    if (mode == 0)
-        primary = 0;
-    ihdu += primary;    // the data starts in header ihdu.
-    stophdu = ihdu + nseconds-1;
-    /* find out how many HDUs are in each file */
-    status = getNumHDUsInFiles(nfiles,input_file,num_hdus_in_file,last_hdu_type);
-    if (status) exit(EXIT_FAILURE);
-
-    /* check that there are the same number of HDUs in each file and only extract the amount of time
-        that there is actually data for */
-    for (ifile=0; ifile < nfiles; ifile++) {
-        if (stophdu > num_hdus_in_file[ifile]) {
-            stophdu = num_hdus_in_file[ifile];
-        }
-    }
-
     if (mode == 1 || mode == 0) {
+        
         /* new format vis file: vis are in image, not binary table */
-        fitsfile *fptr;      /* FITS file pointer, defined in fitsio.h */
+        fitsfile *fptr[MAX_FILES];      /* FITS file pointer, defined in fitsio.h */
         int status = 0;   /*  CFITSIO status value MUST be initialized to zero!  */
         int hdutype, ncols, typecode;
         long nrows,repeat,width_in_bytes;
+
+        /* open files */
+        for (ifile = 0; ifile < nfiles; ifile++) {
+            if (debug) fprintf(fpd,"Opening file %s \n",input_file[ifile]);
+            if (fits_open_file(&(fptr[ifile]), input_file[ifile], READONLY, &status)!=0){
+                fprintf(stderr,"Cannot open file %s\n", input_file[ifile]);
+                printerror(status);
+            }
+        }
+
+        if (mode == 0) primary = 0;
+        ihdu += primary;    // the data starts in header ihdu.
+        stophdu = ihdu + nseconds-1;
+        /* find out how many HDUs are in each file if we don't want them all */
+        status = getNumHDUsInFiles(nfiles,fptr,num_hdus_in_file);
+        if (status) exit(EXIT_FAILURE);
+
+        /* check that there are the same number of HDUs in each file and only extract the amount of time
+        that there is actually data for */
+        for (ifile=0; ifile < nfiles; ifile++) {
+            if (stophdu > num_hdus_in_file[ifile]) {
+                stophdu = num_hdus_in_file[ifile];
+            }
+        }
 
         if (debug) fprintf(fpd,"Start HDU: %d, stop HDU: %d\n",ihdu,stophdu);
 
@@ -281,9 +277,9 @@ int main(int argc, char **argv) {
 
         // if averaging later, then write to a temp file
         // otherwise write directly to output file
-            if (tscrunch_factor != 1 || fscrunch_factor != 1) {
-                autos = fopen(tmp_lacfilename,"w");
-                cross = fopen(tmp_lccfilename,"w");
+        if (tscrunch_factor != 1 || fscrunch_factor != 1) {
+            autos = fopen(tmp_lacfilename,"w");
+            cross = fopen(tmp_lccfilename,"w");
         }
         else {
           if (!appendtofile) {
@@ -305,101 +301,87 @@ int main(int argc, char **argv) {
 
         printf("Extracting");
 
-        while (ihdu <= stophdu) {
+        while (!done_extracting) { // (ihdu <= stophdu) 
 
             for (ifile = 0; ifile < nfiles; ifile++) {
-                if (debug) fprintf(fpd,"Opening file %s for time step %d\n",input_file[ifile],ihdu);
+                 status=0;
 
-                if (!fits_open_file(&fptr, input_file[ifile], READONLY, &status))
-                {
-                    status=0;
-
-                    /* Get the HDU type */
-                    if (last_hdu_type[ifile] == BINARY_TBL) {
-
-                        if (debug) fprintf(fpd,"Detected Binary Table HDU\n");
-
-                        fits_movabs_hdu(fptr, ihdu, &hdutype, &status);
-                        if (status != 0) {
-                                printf("Error - advance past last HDU");
-                                status = 0;
-                                fits_close_file(fptr,&status);
-                                goto SHUTDOWN;
-                        }
-
-                        fits_get_num_rows(fptr, &nrows, &status);
-                        fits_get_num_cols(fptr, &ncols, &status);
-
-                        status = 0;
-                        fits_get_coltype(fptr,1,&typecode,&repeat,&width_in_bytes,&status);
-                        if (debug) {
-                            fprintf(fpd,"table have %ld rows and %d cols\n",nrows,ncols);
-                            fprintf(fpd,"each col is type %d with %ld entries and %ld bytes long\n",typecode,repeat,width_in_bytes);
-                        }
-
-                        if (nfrequency != (nrows*nfiles)) {
-                            fprintf(stderr, "nfiles (%d) * nrows (%ld) not equal to nfrequency (%d) are the FITS files the dimension you expected them to be?\n",\
-                                    nfiles,nrows,nfrequency);
-                            exit(EXIT_FAILURE);
-                        }
-
-                        int anynull = 0x0;
-
-                        float complex *ptr = cuda_matrix_h + (ifile * nrows * nvis);
-
-                        status = 0;
-                        fits_read_col(fptr,typecode,1,1,1,(repeat*nrows),&null,ptr,&anynull,&status);
-                        if (status != 0 ) {
-                            printf("Error reading columns");
-                        }
+                /* Move to the next hdu and get the HDU type */
+                if (fits_movabs_hdu(fptr[ifile], ihdu, &hdutype, &status)) {
+                    if (status==107) {  /* end of file */
+                        done_extracting=1;
+                        break;
                     }
-                    else {
-                        if (debug) fprintf(fpd,"Not binary table: assuming image extension\n");
+                    printerror(status);
+                }
 
-                        if (fits_movabs_hdu(fptr, ihdu, &hdutype, &status)){
-                            printerror(status);
-                        }
+                if (hdutype == BINARY_TBL) {
 
-                        status=0;
-                        long fpixel = 1;
-                        float nullval = 0;
-                        int anynull = 0x0;
-                        int nfound = 0;
-                        long naxes[2];
-                        long npixels = 0;
+                    if (debug) fprintf(fpd,"Detected Binary Table HDU\n");
 
-                        if (fits_read_keys_lng(fptr,"NAXIS",1,2,naxes,&nfound,&status)) {
-                            printerror(status);
-                        }
+                    fits_get_num_rows(fptr[ifile], &nrows, &status);
+                    fits_get_num_cols(fptr[ifile], &ncols, &status);
 
-                        status = 0;
-                        npixels = naxes[0] * naxes[1];
+                    status = 0;
+                    fits_get_coltype(fptr[ifile],1,&typecode,&repeat,&width_in_bytes,&status);
+                    if (debug) {
+                        fprintf(fpd,"table have %ld rows and %d cols\n",nrows,ncols);
+                        fprintf(fpd,"each col is type %d with %ld entries and %ld bytes long\n",typecode,repeat,width_in_bytes);
+                    }
 
-                        if (nfrequency != (naxes[1]*nfiles)) {
-                            fprintf(stderr, "nfiles (%d) * nrows (%ld) not equal to nfrequency (%d) are the FITS files the dimension you expected them to be?\n",\
-                                    nfiles,naxes[1],nfrequency);
-                            exit(EXIT_FAILURE);
-                        }
+                    if (nfrequency != (nrows*nfiles)) {
+                        fprintf(stderr, "nfiles (%d) * nrows (%ld) not equal to nfrequency (%d) are the FITS files the dimension you expected them to be?\n",\
+                                nfiles,nrows,nfrequency);
+                        exit(EXIT_FAILURE);
+                    }
+
+                    int anynull = 0x0;
+
+                    float complex *ptr = cuda_matrix_h + (ifile * nrows * nvis);
+
+                    status = 0;
+                    fits_read_col(fptr[ifile],typecode,1,1,1,(repeat*nrows),&null,ptr,&anynull,&status);
+                    if (status != 0 ) {
+                        printf("Error reading columns");
+                    }
+                }
+                else {
+
+                    status=0;
+                    long fpixel = 1;
+                    float nullval = 0;
+                    int anynull = 0x0;
+                    int nfound = 0;
+                    long naxes[2];
+                    long npixels = 0;
+
+                    if (fits_read_keys_lng(fptr[ifile],"NAXIS",1,2,naxes,&nfound,&status)) {
+                        printerror(status);
+                    }
+
+                    status = 0;
+                    npixels = naxes[0] * naxes[1];
+
+                    if (nfrequency != (naxes[1]*nfiles)) {
+                        fprintf(stderr, "nfiles (%d) * nrows (%ld) not equal to nfrequency (%d) are the FITS files the dimension you expected them to be?\n",\
+                                nfiles,naxes[1],nfrequency);
+                        exit(EXIT_FAILURE);
+                    }
 
 
-                        float complex *ptr = cuda_matrix_h + (ifile * naxes[1] * nvis);
-                        if (fits_read_img(fptr,TFLOAT,fpixel,npixels,&nullval,(float *)ptr,&anynull,&status)) {
-                            printerror(status);
-                        }
+                    float complex *ptr = cuda_matrix_h + (ifile * naxes[1] * nvis);
+                    if (fits_read_img(fptr[ifile],TFLOAT,fpixel,npixels,&nullval,(float *)ptr,&anynull,&status)) {
+                        printerror(status);
+                    }
                         //
                         // now need to read in the relevant part of the image
                         //
                         //
 
-                    }
                 }
-                else {
-                    printf("Error failed to open %s\n",input_file[ifile]);
-                    exit(EXIT_FAILURE);
-                }
-                status = 0;
-                fits_close_file(fptr,&status);
             }
+
+            if (done_extracting) continue;      // break loop if we didn't read anything
 
             printf("."); fflush(stdout);
 
@@ -435,9 +417,15 @@ int main(int argc, char **argv) {
             lccspc_h = lcc_base;
 
             ihdu++;
+            if (ihdu > stophdu) done_extracting=1;
         }
+        status=0;
+        for (ifile = 0; ifile < nfiles; ifile++) {
+            fits_close_file(fptr[ifile], &status);
+        }
+
         printf(" Done.\n");
-SHUTDOWN:
+
         fclose(autos);
         fclose(cross);
 
