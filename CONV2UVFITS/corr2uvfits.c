@@ -609,20 +609,30 @@ int readScan(FILE *fp_ac, FILE *fp_cc,int scan, Header *header, InpConfig *inps,
   }
 
   lmst = slaRanorm(slaGmst(mjd) + arr_lon_rad);  // local mean sidereal time, given array location
-    /* convert mean RA/DEC of phase center to apparent for current observing time. This applies precession,
-       nutation, annual abberation. */
-    slaMap(header->ra_hrs*(M_PI/12.0), header->dec_degs*(M_PI/180.0), 0.0, 0.0, 0.0, 0.0, 2000.0,
-       mjd, &ra_app, &dec_app);
-    if (debug) fprintf(fpd,"Precessed apparent coords (radian): RA: %g, DEC: %g\n",ra_app,dec_app);
-    /* calc apparent HA of phase center, normalise to be between 0 and 2*pi */
-    ha = slaRanorm(lmst - ra_app);
+
+  /* if no RA was specified in the header,then calculate the RA based on lmst and array location
+     and update the ra */
+  if (header->ra_hrs == -99.0 ) {
+    header->ra_hrs = lmst*(12.0/M_PI) - header->ha_hrs_start;
+    uvdata->source->ra  = header->ra_hrs;
+    if (debug) fprintf(fpd,"Calculated RA_hrs: %g of field centre based on HA_hrs: %g and lmst_hrs: %g\n",
+                        header->ra_hrs,header->ha_hrs_start,lmst*(12.0/M_PI));
+  }
+
+  /* convert mean RA/DEC of phase center to apparent for current observing time. This applies precession,
+     nutation, annual abberation. */
+  slaMap(header->ra_hrs*(M_PI/12.0), header->dec_degs*(M_PI/180.0), 0.0, 0.0, 0.0, 0.0, 2000.0,
+     mjd, &ra_app, &dec_app);
+  if (debug) fprintf(fpd,"Precessed apparent coords (radian): RA: %g, DEC: %g\n",ra_app,dec_app);
+  /* calc apparent HA of phase center, normalise to be between 0 and 2*pi */
+  ha = slaRanorm(lmst - ra_app);
 
   /* I think this is correct - it does the calculations in the frame with current epoch 
   * and equinox, nutation, and aberrated star positions, i.e., the apparent geocentric
   * frame of epoch. (AML)
   */
 
-    if(debug) fprintf(fpd,"scan %d. lmst: %g (radian). HA (calculated): %g (radian)\n",scan, lmst,ha);
+  if(debug) fprintf(fpd,"scan %d. lmst: %g (radian). HA (calculated): %g (radian)\n",scan, lmst,ha);
 
   /* calc el,az of desired phase centre for debugging */
   if (debug) {
@@ -1131,8 +1141,8 @@ int readHeader(char *header_filename, Header *header) {
         fprintf(stderr,"ERROR: FREQCENT unspecified. There is no default.\n");
         return 1;
     }
-    if (header->ra_hrs==-99) {
-        fprintf(stderr,"ERROR: RA_HRS unspecified. There is no default.\n");
+    if (header->ra_hrs==-99 && header->ha_hrs_start == -99.0) {
+        fprintf(stderr,"ERROR: RA_HRS and HA unspecified. There is no default.\n");
         return 1;
     }
     if (header->dec_degs==-99) {
