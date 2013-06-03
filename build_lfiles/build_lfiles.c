@@ -12,13 +12,15 @@
 #include <string.h>
 #include <complex.h>
 #include <unistd.h>
+#include <assert.h>
+#include <math.h>
 #include "mwac_utils.h"
 #include "antenna_mapping.h"
 
 #include "fitsio.h"
 
 #define MAX_FILES   24
-
+#define MAX_CHAN    3072
 
 /* globals */
 FILE *fpd;        //file hand for debug messages. Set this in main()
@@ -61,8 +63,8 @@ void usage() {
     fprintf(stdout,"Options:\n");
     fprintf(stdout,"\t-m\t 0|1|2 [default == 0]: read a raw correlator dump\n\t\t 1: read an NGAS FITS FILE\n\t\t 2: Read an OLD format raw correlator dump\n");
     fprintf(stdout,"\t-v\t <visibility file name> -- this argument can appear multiple times. Each file is concatenated in frequency <NOT TIME>\n");
-    fprintf(stdout,"\t-f\t <nfrequency> [default == 1536]: Number of channels <must equal nfiles*nchan_per_file>\n");
-    fprintf(stdout,"\t-i\t <number of inputs> [default == 64] : number of input that have been correlated <nstation*npol>\n");
+    fprintf(stdout,"\t-f\t <nfrequency> [default: determine from file]: Number of channels <must equal nfiles*nchan_per_file>\n");
+    fprintf(stdout,"\t-i\t <number of inputs> [default: determine from file] : number of input that have been correlated <nstation*npol>\n");
     fprintf(stdout,"\t-o\t <output filename root> [default == \"last_dump\"] root filename of the output\n");
     fprintf(stdout,"\t-s\t <start> -- seconds from beginning of file to start. Default: 0\n");
     fprintf(stdout,"\t-n\t <nseconds> -- how many seconds to process. Default: all\n");
@@ -76,8 +78,10 @@ void usage() {
 }
 
 
-int getNumHDUsInFiles(int nfiles, fitsfile *fptr[MAX_FILES], int num_hdus_in_file[MAX_FILES]) {
-    int status=0,i;
+/* get info about the number of HDUs and data type in each input file */
+int getHDUsInfo(int nfiles, fitsfile *fptr[MAX_FILES], int num_hdus_in_file[MAX_FILES], long dims[2]) {
+    int status=0,i,hdutype=0, ncols=0;
+    long nrows=0;
 
     for (i=0; i< nfiles; i++) {
         if (fits_get_num_hdus(fptr[i],num_hdus_in_file+i,&status)) {
@@ -95,19 +99,63 @@ int getNumHDUsInFiles(int nfiles, fitsfile *fptr[MAX_FILES], int num_hdus_in_fil
             return EXIT_FAILURE;
         }
     }
+
+    /* from the first file, extract the data dimensions.
+        In raw output files, this is in the primary image.
+        In concatenated archive files, this is in the second and subsequent extensions
+        In the old style O-files, this is in a binary table extension */
+    if (num_hdus_in_file[0] ==1 ) {
+        fits_movabs_hdu(fptr[0], 1, &hdutype, &status);
+    }
+    else {
+        fits_movabs_hdu(fptr[0], 2, &hdutype, &status);
+    }
+    if (hdutype == BINARY_TBL) {
+        fits_get_num_rows(fptr[0], &nrows, &status);
+        fits_get_num_cols(fptr[0], &ncols, &status);
+        if (status) {
+            fits_report_error(stderr,status);
+            return status;
+        }
+        dims[0]=ncols;
+        dims[1]=nrows;
+        if (debug) fprintf(fpd,"Found %d cols and %ld rows in binary table\n",ncols,nrows);
+    }
+    else {
+        fits_get_img_size(fptr[0], 2, dims, &status);
+        if (status) {
+            fits_report_error(stderr,status);
+            return status;
+        }
+        if (debug) fprintf(fpd,"Found %ld x %ld image\n",dims[0],dims[1]);
+    }
+
     return EXIT_SUCCESS;
 }
 
+
+void allocate_arrays(size_t matLength, size_t lccspcLength, size_t lacspcLength, size_t fullLength,
+                    float complex **cuda_matrix_h, float complex **full_matrix_h,
+                    float complex **lccspc_h, float **lacspc_h){
+    *cuda_matrix_h = (float complex *) malloc(matLength * sizeof(float complex));
+    *full_matrix_h = (float complex *) malloc(fullLength * sizeof(float complex));
+    *lccspc_h = (float complex *) malloc(lccspcLength*sizeof(float complex));
+    *lacspc_h = (float *) malloc(lacspcLength*sizeof(float));
+    assert(*cuda_matrix_h!=NULL && *full_matrix_h!=NULL && *lccspc_h!=NULL && *lacspc_h!=NULL);
+}
+
+
 int main(int argc, char **argv) {
 
-    int arg = 0;
+    int arg = 0,mem_allocated=0;
     int mode = 0; // mode 0 is single timestep from a correlator dump
     // mode 1 is multiple timesteps from a FITS file
+    long datadims[2];
 
     char *input_file[MAX_FILES];
     char *output_file = NULL;
     int num_hdus_in_file[MAX_FILES];
-    int ninput = 64;
+    int ninput;
     int nfiles = 0;
     int start_sec = 0;
     int nseconds = 99999;
@@ -115,16 +163,16 @@ int main(int argc, char **argv) {
     int tscrunch_factor=1;
     int primary = 1; //image NOT in primary header?: see NGAS (1==true)
     int done_extracting=0;
-    extern int nfrequency;
-    extern char *optarg;
+// These are declared in this file and hence are not externals
+//    extern int nfrequency;
+//    extern int npol;
+//    extern int nstation;
 
-    extern int npol;
-    extern int nstation;
-
+//    extern char *optarg;  // This is in getopt.h
     fpd = stdout;
 
-    nstation = 32;
-    nfrequency = 1536;
+    nstation = 0;
+    nfrequency = 0;
     npol = 2;
     ninput = nstation*npol;
 
@@ -136,6 +184,16 @@ int main(int argc, char **argv) {
     char tmp_lccfilename[1024];        
     char tmp_lacfilename[1024];
 
+    float complex *cuda_matrix_h = NULL;
+    float complex *full_matrix_h = NULL;
+    float complex null = 0x0;
+    float complex * lccspc_h = NULL; 
+    float complex * lcc_base = NULL;
+    float * lacspc_h = NULL; 
+    float * lac_base = NULL ;
+
+    size_t nvis=0;
+    size_t matLength=0, lccspcLength=0, lacspcLength=0, fullLength=0;
 
     if (argc == 1) {
         usage();
@@ -204,35 +262,12 @@ int main(int argc, char **argv) {
     if (output_file == NULL) {
         output_file = "last_dump";
     }
-    float complex *cuda_matrix_h = NULL;
-    float complex *full_matrix_h = NULL;
-    float complex null = 0x0;
-    float complex * lccspc_h = NULL; 
-    float complex * lcc_base = NULL;
-    float * lacspc_h = NULL; 
-    float * lac_base = NULL ;
 
-    size_t nvis = (nstation + 1)*(nstation/2)*npol*npol;
-
-    size_t matLength = nfrequency * nvis; // cuda_matrix length (autos on the diagonal)
-    size_t lccspcLength = nfrequency * (ninput-1)*ninput/2; //Lfile matrix length (no autos)
-    size_t lacspcLength = nfrequency * ninput; //Lfile autos length
-    size_t fullLength = nfrequency * ninput*ninput;
-
-    int ifile;
+    int ifile,stophdu;
     int ihdu = 1+start_sec;
-    int stophdu;
-
-    cuda_matrix_h = (float complex *) malloc(matLength * sizeof(float complex));
-    full_matrix_h = (float complex *) malloc(fullLength * sizeof(float complex));
-    lccspc_h = (float complex *) malloc(lccspcLength*sizeof(float complex));
-    lacspc_h = (float *) malloc(lacspcLength*sizeof(float));
-
-    lcc_base = lccspc_h;
-    lac_base = lacspc_h;
 
     if (mode == 1 || mode == 0) {
-        
+ 
         /* new format vis file: vis are in image, not binary table */
         fitsfile *fptr[MAX_FILES];      /* FITS file pointer, defined in fitsio.h */
         int status = 0;   /*  CFITSIO status value MUST be initialized to zero!  */
@@ -252,7 +287,7 @@ int main(int argc, char **argv) {
         ihdu += primary;    // the data starts in header ihdu.
         stophdu = ihdu + nseconds-1;
         /* find out how many HDUs are in each file if we don't want them all */
-        status = getNumHDUsInFiles(nfiles,fptr,num_hdus_in_file);
+        status = getHDUsInfo(nfiles,fptr,num_hdus_in_file,datadims);
         if (status) exit(EXIT_FAILURE);
 
         /* check that there are the same number of HDUs in each file and only extract the amount of time
@@ -265,12 +300,41 @@ int main(int argc, char **argv) {
 
         if (debug) fprintf(fpd,"Start HDU: %d, stop HDU: %d\n",ihdu,stophdu);
 
+        /* update globals based on in-file metadata */
+        /* The number of correlation products is slightly different to the standard n(n+1)/2
+           formula since there is a small fraction of redundant info in the file. If n is the
+           number of stations (not stations*pols), and N is the dimension of the data in the file
+           then n = (-1 + sqrt(1+N))/2
+        */
+        nstation = (((int) round(sqrt(datadims[0]+1)))-1)/2;
+        ninput = nstation*npol;
+        nfrequency = datadims[1]*nfiles;
+        nvis = (nstation + 1)*(nstation/2)*npol*npol;
+        if (debug) {
+            fprintf(fpd,"Calculated there are %d stations in the data.",nstation);
+            fprintf(fpd,"\tnpol: %d. nfreq: %d, nvis: %ld\n",npol,nfrequency,(long)nvis);
+        }
+
+        matLength = nfrequency * nvis; // cuda_matrix length (autos on the diagonal)
+        lccspcLength = nfrequency * (ninput-1)*ninput/2; //Lfile matrix length (no autos)
+        lacspcLength = nfrequency * ninput; //Lfile autos length
+        fullLength = nfrequency * ninput*ninput;
+
+        /* now we know the dimensions of the data, allocate arrays */
+        if (!mem_allocated){
+            allocate_arrays(matLength, lccspcLength, lacspcLength, fullLength,
+                            &cuda_matrix_h, &full_matrix_h, &lccspc_h, &lacspc_h);
+            mem_allocated=1;
+        }
+
+        lcc_base = lccspc_h;
+        lac_base = lacspc_h;
+
         sprintf(lccfilename,"%s.LCCSPC",output_file);
         sprintf(lacfilename,"%s.LACSPC",output_file);
 
         sprintf(tmp_lccfilename,"%s.working.LCCSPC",output_file);
         sprintf(tmp_lacfilename,"%s.working.LACSPC",output_file);
-
 
         FILE *autos=NULL;
         FILE *cross=NULL;
@@ -345,7 +409,7 @@ int main(int argc, char **argv) {
                         printf("Error reading columns");
                     }
                 }
-                else {
+                else {  /* image extension */
 
                     status=0;
                     long fpixel = 1;
