@@ -63,13 +63,13 @@ void usage() {
     fprintf(stdout,"Options:\n");
     fprintf(stdout,"\t-m\t 0|1|2 [default == 0]: read a raw correlator dump\n\t\t 1: read an NGAS FITS FILE\n\t\t 2: Read an OLD format raw correlator dump\n");
     fprintf(stdout,"\t-v\t <visibility file name> -- this argument can appear multiple times. Each file is concatenated in frequency <NOT TIME>\n");
-    fprintf(stdout,"\t-f\t <nfrequency> [default: determine from file]: Number of channels <must equal nfiles*nchan_per_file>\n");
-    fprintf(stdout,"\t-i\t <number of inputs> [default: determine from file] : number of input that have been correlated <nstation*npol>\n");
+    fprintf(stdout,"\t-f\t <nfrequency> [default: determine from input filess]: Number of channels <must equal nfiles*nchan_per_file>\n");
+    fprintf(stdout,"\t-i\t <number of inputs> [default: determine from input files] : number of input that have been correlated <nstation*npol>\n");
     fprintf(stdout,"\t-o\t <output filename root> [default == \"last_dump\"] root filename of the output\n");
     fprintf(stdout,"\t-s\t <start> -- seconds from beginning of file to start. Default: 0\n");
     fprintf(stdout,"\t-n\t <nseconds> -- how many seconds to process. Default: all\n");
     fprintf(stdout,"\t-T\t <factor> [default == 1] -- by what factor to average in time\n");
-    fprintf(stdout,"\t-F\t <factor> [default == 1] -- by what factor to average in frequency\n");
+    fprintf(stdout,"\t-F\t <factor> [default == 1] -- by what factor to average in frequency (must be power of 2)\n");
     fprintf(stdout,"\t-p\t -- image in primary header -- NOW ASSUMED IF MODE == 0\n");
     fprintf(stdout,"\t-a\t append to output instead of clobber\n");
     fprintf(stdout,"\t-d\t enable debugging messages\n");
@@ -136,13 +136,17 @@ int getHDUsInfo(int nfiles, fitsfile *fptr[MAX_FILES], int num_hdus_in_file[MAX_
 
 void allocate_arrays(size_t matLength, size_t lccspcLength, size_t lacspcLength, size_t fullLength,
                     float complex **cuda_matrix_h, float complex **full_matrix_h,
-                    float complex **lccspc_h, float **lacspc_h){
+                    float complex **lccspc_h, float **lacspc_h, float complex **lcc_accum, float **lac_accum){
     *cuda_matrix_h = (float complex *) malloc(matLength * sizeof(float complex));
     *full_matrix_h = (float complex *) malloc(fullLength * sizeof(float complex));
     *lccspc_h = (float complex *) malloc(lccspcLength*sizeof(float complex));
     *lacspc_h = (float *) malloc(lacspcLength*sizeof(float));
+    *lcc_accum = (float complex *) calloc(lccspcLength,sizeof(float complex));
+    *lac_accum = (float *) calloc(lacspcLength,sizeof(float));
     assert(*cuda_matrix_h!=NULL && *full_matrix_h!=NULL && *lccspc_h!=NULL && *lacspc_h!=NULL);
 }
+
+
 
 
 int main(int argc, char **argv) {
@@ -181,15 +185,12 @@ int main(int argc, char **argv) {
     char lccfilename[1024];        
     char lacfilename[1024];
 
-    char tmp_lccfilename[1024];        
-    char tmp_lacfilename[1024];
-
     float complex *cuda_matrix_h = NULL;
     float complex *full_matrix_h = NULL;
     float complex null = 0x0;
-    float complex * lccspc_h = NULL; 
+    float complex * lccspc_h = NULL, *lcc_accum=NULL; 
     float complex * lcc_base = NULL;
-    float * lacspc_h = NULL; 
+    float * lacspc_h = NULL, *lac_accum=NULL; 
     float * lac_base = NULL ;
 
     size_t nvis=0;
@@ -249,8 +250,12 @@ int main(int argc, char **argv) {
                 usage();
                 break;
         }
+    }
 
-
+    /* sanity checks */
+    if (fscrunch_factor !=1 && fscrunch_factor !=2 && fscrunch_factor !=4 && fscrunch_factor !=8 && fscrunch_factor !=16) {
+        fprintf(stderr,"freq averaging must be power of 2\n");
+        exit(EXIT_FAILURE);
     }
 
     if (nfiles == 0) {
@@ -267,6 +272,7 @@ int main(int argc, char **argv) {
     int ihdu = 1+start_sec;
 
     if (mode == 1 || mode == 0) {
+        int n_averaged=0,iter=0,i;
  
         /* new format vis file: vis are in image, not binary table */
         fitsfile *fptr[MAX_FILES];      /* FITS file pointer, defined in fitsio.h */
@@ -300,6 +306,12 @@ int main(int argc, char **argv) {
 
         if (debug) fprintf(fpd,"Start HDU: %d, stop HDU: %d\n",ihdu,stophdu);
 
+        /* if we're time averaging, check that an integer number of averages will go into output */
+        if ((num_hdus_in_file[0]-1)%tscrunch_factor != 0) {
+            fprintf(stderr,"WARNING: There are %d time steps in file and time averaging of %d steps requested.\n",num_hdus_in_file[0]-1,tscrunch_factor);
+            fprintf(stderr,"\tThis will truncate data from the output\n");
+        }
+
         /* update globals based on in-file metadata */
         /* The number of correlation products is slightly different to the standard n(n+1)/2
            formula since there is a small fraction of redundant info in the file. If n is the
@@ -323,7 +335,7 @@ int main(int argc, char **argv) {
         /* now we know the dimensions of the data, allocate arrays */
         if (!mem_allocated){
             allocate_arrays(matLength, lccspcLength, lacspcLength, fullLength,
-                            &cuda_matrix_h, &full_matrix_h, &lccspc_h, &lacspc_h);
+                            &cuda_matrix_h, &full_matrix_h, &lccspc_h, &lacspc_h, &lcc_accum, &lac_accum);
             mem_allocated=1;
         }
 
@@ -333,27 +345,16 @@ int main(int argc, char **argv) {
         sprintf(lccfilename,"%s.LCCSPC",output_file);
         sprintf(lacfilename,"%s.LACSPC",output_file);
 
-        sprintf(tmp_lccfilename,"%s.working.LCCSPC",output_file);
-        sprintf(tmp_lacfilename,"%s.working.LACSPC",output_file);
-
         FILE *autos=NULL;
         FILE *cross=NULL;
 
-        // if averaging later, then write to a temp file
-        // otherwise write directly to output file
-        if (tscrunch_factor != 1 || fscrunch_factor != 1) {
-            autos = fopen(tmp_lacfilename,"w");
-            cross = fopen(tmp_lccfilename,"w");
-        }
-        else {
-          if (!appendtofile) {
+        if (!appendtofile) {
             autos = fopen(lacfilename,"w");
             cross = fopen(lccfilename,"w");
-          }
-          else {
+        }
+        else {
             autos = fopen(lacfilename,"a");
             cross = fopen(lccfilename,"a");
-          }
         }
 
         if (autos == NULL || cross == NULL) {
@@ -365,7 +366,7 @@ int main(int argc, char **argv) {
 
         printf("Extracting");
 
-        while (!done_extracting) { // (ihdu <= stophdu) 
+        while (!done_extracting) { // (ihdu <= stophdu)
 
             for (ifile = 0; ifile < nfiles; ifile++) {
                  status=0;
@@ -471,16 +472,46 @@ int main(int argc, char **argv) {
                         lccspc_h += nfrequency;
                     }
                 }
-
             }
+            /* add into average */
+            for (i=0; i<lccspcLength; i++) lcc_accum[i] += lcc_base[i]/tscrunch_factor;
+            for (i=0; i<lacspcLength; i++) lac_accum[i] += lac_base[i]/tscrunch_factor;
+            n_averaged++;
 
+            /* if we have accumulated enough into a time average, write it out */
+            if ((n_averaged % tscrunch_factor) == 0) {
 
-            fwrite(lac_base,sizeof(float),lacspcLength,autos);
-            fwrite(lcc_base,sizeof(float complex),lccspcLength,cross);
+                /* average over frequency, if necessary */
+                if (fscrunch_factor > 1) {
+                    float ac_av;
+                    float complex cc_av;
+                    long i,j;
+                    for (i=0; i<lacspcLength/fscrunch_factor; i++) {
+                        ac_av=0.0;
+                        for (j=0; j<fscrunch_factor; j++) ac_av += lac_accum[i*fscrunch_factor+j];
+                        lac_accum[i] = ac_av/fscrunch_factor;
+                    }
+                    for (i=0; i<lccspcLength/fscrunch_factor; i++) {
+                        cc_av=0.0;
+                        for (j=0; j<fscrunch_factor; j++) cc_av += lcc_accum[i*fscrunch_factor+j];
+                        lcc_accum[i] = cc_av/fscrunch_factor;
+                    }
+                }
+
+                fwrite(lac_accum,sizeof(float),lacspcLength/fscrunch_factor,autos);
+                fwrite(lcc_accum,sizeof(float complex),lccspcLength/fscrunch_factor,cross);
+                memset(lcc_accum,0,lccspcLength*sizeof(float complex));
+                memset(lac_accum,0,lacspcLength*sizeof(float));
+                if (debug) {
+                    fprintf(fpd,"iter %d. Writing average\n",iter);
+                }
+                n_averaged=0;
+            }
             lacspc_h = lac_base;
             lccspc_h = lcc_base;
 
             ihdu++;
+            iter++;
             if (ihdu > stophdu) done_extracting=1;
         }
         status=0;
@@ -585,95 +616,6 @@ int main(int argc, char **argv) {
 
         fclose(matrix);
         exit(EXIT_SUCCESS);
-
-    }
-
-    if (tscrunch_factor != 1 || fscrunch_factor != 1) {
-
-        fprintf(stdout,"Averaging %d time samples\n",tscrunch_factor);
-        fprintf(stdout,"Averaging %d frequency samples\n",fscrunch_factor);
-
-        FILE *tmp_autos = NULL;
-        FILE *tmp_cross = NULL;
-        FILE *autos=NULL;
-        FILE *cross=NULL;
-        
-               tmp_autos = fopen(tmp_lacfilename,"r");
-        tmp_cross = fopen(tmp_lccfilename,"r");
-        autos = fopen(lacfilename,"w");
-        cross = fopen(lccfilename,"w");
-
-
-        float complex * lccspc_tmp;
-        float * lacspc_tmp;
-
-        lccspc_tmp = (float complex *) malloc(lccspcLength*sizeof(float complex)/fscrunch_factor);
-        lacspc_tmp = (float *) malloc(lacspcLength*sizeof(float)/fscrunch_factor);
-
-        int i=0,j=0,t=0;
-        size_t rtn = 0;
-
-        while (!feof(tmp_autos) ) {
-
-            bzero(lacspc_tmp,lacspcLength*sizeof(float)/fscrunch_factor);
-            for (t=0;t<=tscrunch_factor;t++) {
-                rtn = fread(lac_base,sizeof(float),lacspcLength,tmp_autos);
-                if (rtn == lacspcLength) {
-                    float *lac_ptr = lac_base;
-                    for (i=0;i<(lacspcLength/fscrunch_factor);i++) {
-                        for (j=0;j<fscrunch_factor;j++) {
-                            lacspc_tmp[i] += *lac_ptr;
-                            lac_ptr++;
-                        }
-                    }
-
-                }
-                else {
-                    break; // out of this for loop - t == normalisation factor
-                }
-            }
-            if (t != 0) {        
-                for (i=0;i<lacspcLength/fscrunch_factor;i++) {
-                    lacspc_tmp[i] /= (t*fscrunch_factor);
-                }
-                fwrite(lacspc_tmp,sizeof(float),lacspcLength/fscrunch_factor,autos);
-            }
-        }
-
-        fclose(autos);
-        fclose(tmp_autos);
-
-        while (!feof(tmp_cross) ) {
-
-            bzero(lccspc_tmp,lccspcLength*sizeof(float complex)/fscrunch_factor);
-            for (t=0;t<=tscrunch_factor;t++) {
-                rtn = fread(lcc_base,sizeof(float complex),lccspcLength,tmp_cross);
-                if (rtn == lccspcLength) {
-                    float complex *lcc_ptr = lcc_base;
-                    for (i=0;i<lccspcLength/fscrunch_factor;i++) {
-                        for (j=0;j<fscrunch_factor;j++) {
-                            lccspc_tmp[i] += *lcc_ptr;
-                            lcc_ptr++;
-                        }
-                    }
-                }
-                else {
-                    break; // out of this for loop - t == normalisation factor
-                }
-            }
-            if (t != 0) {        
-                for (i=0;i<lccspcLength/fscrunch_factor;i++) {
-                    lccspc_tmp[i] /= (t*fscrunch_factor);
-                }
-                fwrite(lccspc_tmp,sizeof(float),lacspcLength/fscrunch_factor,cross);
-            }
-        }
-
-        fclose(cross);
-        fclose(tmp_cross);
-
-        free(lccspc_tmp);
-        free(lacspc_tmp);
 
     }
 
