@@ -158,7 +158,7 @@ int main(int argc, char **argv) {
 			if (rval) {
 				printerror(status);
 			} 
-			int nfound=0, anynull=0, hdupos=0;
+			int anynull=0, hdupos=0;
 
 			fits_get_hdu_num(fptr, &hdupos);  /* Get the current HDU position */
 			status = 0;
@@ -175,12 +175,14 @@ int main(int argc, char **argv) {
 				fits_get_hdu_type(fptr, &hdutype, &status);
 
 				/* read the NAXIS1 and NAXIS2 keyword to get image size */
-				if ( fits_read_keys_lng(fptr, "NAXIS", 1, 2, naxes, &nfound, &status) )
+				//if ( fits_read_keys_lng(fptr, "NAXIS", 1, 2, naxes, &nfound, &status) )
+                naxes[0] = naxes[1] = 0;
+                if (fits_get_img_size(fptr,2,naxes,&status))                 
 					printerror( status );
 
 				fits_get_hdu_num(fptr, &hdupos);  /* Get the current HDU position */
 
-				if (nfound == 2) {
+				if (naxes[0] != 0) {
 
 					if (startchan != 0 || endchan != 0) {
 						numchan = endchan - startchan + 1;

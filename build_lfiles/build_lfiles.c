@@ -416,11 +416,10 @@ int main(int argc, char **argv) {
                     long fpixel = 1;
                     float nullval = 0;
                     int anynull = 0x0;
-                    int nfound = 0;
                     long naxes[2];
                     long npixels = 0;
 
-                    if (fits_read_keys_lng(fptr[ifile],"NAXIS",1,2,naxes,&nfound,&status)) {
+                    if (fits_get_img_size(fptr[ifile],2,naxes,&status)) {
                         printerror(status);
                     }
 
