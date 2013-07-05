@@ -216,15 +216,12 @@ void extractMatrix(float complex *matrix, float complex *packed) {
 	for (f = 0; f < nfrequency; f++) {
 		for (i = 0; i < nstation; i++) {
 			for (j = 0; j <= i; j++) {
-				int k = f * (nstation + 1) * (nstation / 2) + i * (i + 1) / 2
-					+ j;
+				int k = f * (nstation + 1) * (nstation / 2) + i * (i + 1) / 2 + j;
 				for (pol1 = 0; pol1 < npol; pol1++) {
 					for (pol2 = 0; pol2 < npol; pol2++) {
 						int index = (k * npol + pol1) * npol + pol2;
-						matrix[(((f * nstation + i) * nstation + j) * npol
-								+ pol1) * npol + pol2] = packed[index];
-						matrix[(((f * nstation + j) * nstation + i) * npol
-								+ pol2) * npol + pol1] = conjf(packed[index]);
+						matrix[(((f * nstation + i) * nstation + j) * npol + pol1) * npol + pol2] = packed[index];
+						matrix[(((f * nstation + j) * nstation + i) * npol + pol2) * npol + pol1] = conjf(packed[index]);
 					//	printf("f:%d s1:%d s2:%d %d p1:%d p2:%d %d\n",f,i,j,k,pol1,pol2,index);
 					}
 				}
