@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html>
+<head>
+<script src="http://code.jquery.com/jquery-latest.js"></script>
+<script type="text/javascript">
+var xmlhttp0;
+var xmlhttp1;
+
+function loadXMLDoc0(url,cfunc)
+{
+if(window.XMLHttpRequest)
+{
+xmlhttp0=new XMLHttpRequest();
+}
+else
+{
+xmlhttp0=new ActiveXObject("Microsoft.XMLHTTP");
+}
+xmlhttp0.onreadystatechange=cfunc;
+xmlhttp0.open("GET",url,true);
+xmlhttp0.send();
+}
+
+function loadXMLDoc1(url,cfunc)
+{
+if(window.XMLHttpRequest)
+{
+xmlhttp1=new XMLHttpRequest();
+}
+else
+{
+xmlhttp0=new ActiveXObject("Microsoft.XMLHTTP");
+}
+xmlhttp1.onreadystatechange=cfunc;
+xmlhttp1.open("GET",url,true);
+xmlhttp1.send();
+}
+
+
+function showC104()
+{
+loadXMLDoc1("C104Total.php",function()
+{
+if(xmlhttp1.status==200 && xmlhttp1.readyState==4)
+{
+document.getElementById("C104Div").innerHTML=xmlhttp1.responseText;
+}
+}
+,xmlhttp1);
+}
+
+function getTime()
+{
+loadXMLDoc0("ServerTime.php",function()
+{
+if(xmlhttp0.status==200 && xmlhttp0.readyState==4)
+{
+document.getElementById("myDiv").innerHTML=xmlhttp0.responseText;
+}
+}
+,xmlhttp0);
+}
+window.onload=showC104()
+var refreshId0 = window.setInterval("getTime()",1000);
+var refreshId1 = window.setInterval("showC104()",10000);
+</script>
+
+</head>
+
+<body>
+The Time is
+<div id="myDiv"></div>
+<!--<button type="button" onclick="getTime()"> Time </button>-->
+The Total Number of C104 Hours is
+<div id="C104Div"></div>
+<!--<button type="button" onclick="showC104()">Total Seconds of C104 Observations </button>-->
+</body>
+</html>
