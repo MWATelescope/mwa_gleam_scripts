@@ -1,78 +1,167 @@
 <!DOCTYPE html>
 <html>
 <head>
-<script src="http://code.jquery.com/jquery-latest.js"></script>
+<script src="jquery-latest.js"></script>
 <script type="text/javascript">
-var xmlhttp0;
-var xmlhttp1;
 
-function loadXMLDoc0(url,cfunc)
-{
-if(window.XMLHttpRequest)
-{
-xmlhttp0=new XMLHttpRequest();
+function createXHR(){
+try{
+return new XMLHttpRequest();
 }
-else
-{
-xmlhttp0=new ActiveXObject("Microsoft.XMLHTTP");
+catch(e) {
+try {
+return new ActiveXObject("Microsoft.XMLHTTP");
 }
-xmlhttp0.onreadystatechange=cfunc;
-xmlhttp0.open("GET",url,true);
-xmlhttp0.send();
+catch(e) {
+return new ActiveXObject("Msxml2.XMLHTTP");
+}
+}
 }
 
-function loadXMLDoc1(url,cfunc)
+function recentData()
 {
-if(window.XMLHttpRequest)
+var xhr = createXHR();
+xhr.onreadystatechange=function()
 {
-xmlhttp1=new XMLHttpRequest();
+if(xhr.status==200 && xhr.readyState==4)
+{
+document.getElementById("LastData").innerHTML=xhr.responseText;
 }
-else
-{
-xmlhttp0=new ActiveXObject("Microsoft.XMLHTTP");
-}
-xmlhttp1.onreadystatechange=cfunc;
-xmlhttp1.open("GET",url,true);
-xmlhttp1.send();
+};
+xhr.open("GET","LastData.php",true);
+xhr.send();
 }
 
 
 function showC104()
 {
-loadXMLDoc1("C104Total.php",function()
+var xhr = createXHR();
+xhr.onreadystatechange=function()
 {
-if(xmlhttp1.status==200 && xmlhttp1.readyState==4)
+if(xhr.status==200 && xhr.readyState==4)
 {
-document.getElementById("C104Div").innerHTML=xmlhttp1.responseText;
+document.getElementById("C104Div").innerHTML=xhr.responseText;
 }
-}
-,xmlhttp1);
+};
+xhr.open("GET","C104Total.php",true);
+xhr.send();
 }
 
 function getTime()
 {
-loadXMLDoc0("ServerTime.php",function()
+var xhr=createXHR();
+xhr.onreadystatechange=function()
 {
-if(xmlhttp0.status==200 && xmlhttp0.readyState==4)
+if(xhr.status==200 && xhr.readyState==4)
 {
-document.getElementById("myDiv").innerHTML=xmlhttp0.responseText;
+document.getElementById("myDiv").innerHTML=xhr.responseText;
+}
+};
+xhr.open("GET","ServerTime.php",true);
+xhr.send();
+}
+
+function commandCount()
+{
+var xhr=createXHR();
+xhr.onreadystatechange=function()
+{
+if(xhr.status==200 && xhr.readyState==4)
+{
+document.getElementById("commandCount").innerHTML=xhr.responseText;
+}
+};
+xhr.open("GET","CommandCount.php",true);
+xhr.send();
+}
+
+function goodCount(rx_id)
+{
+rx_id=rx_id.toString();
+var xhr=createXHR();
+xhr.onreadystatechange=function()
+{
+if(xhr.status==200 && xhr.readyState==4)
+{
+document.getElementById("goodCount"+rx_id).innerHTML=xhr.responseText;
+}
+};
+xhr.open("GET","GoodCount.php?rx_id="+rx_id,true);
+xhr.send();
+}
+
+
+function diskSpace()
+{
+var xhr=createXHR();
+xhr.onreadystatechange=function()
+{
+if(xhr.status==200 && xhr.readyState==4)
+{
+document.getElementById("diskSpace").innerHTML=xhr.responseText;
+}
+};
+xhr.open("GET","DiskSpace.php");
+xhr.send();
+}
+
+
+function goodCounts()
+{
+for(var i = 1; i<=16; i++)
+{
+goodCount(i);
 }
 }
-,xmlhttp0);
+
+
+function init()
+{
+getTime();
+showC104();
+recentData();
+commandCount();
+goodCounts();
+diskSpace();
 }
-window.onload=showC104()
+window.onload=init();
 var refreshId0 = window.setInterval("getTime()",1000);
 var refreshId1 = window.setInterval("showC104()",10000);
+var refreshId2 = window.setInterval("recentData()",1000);
+var refreshId3 = window.setInterval("commandCount()",10000);
+var refreshId4 = window.setInterval("goodCounts()",120000);
+var refreshId5 = window.setInterval("diskSpace()",10000);
 </script>
 
 </head>
 
 <body>
-The Time is
-<div id="myDiv"></div>
-<!--<button type="button" onclick="getTime()"> Time </button>-->
+The Time at MIT is 
+<div id="myDiv">Loading...</div>
 The Total Number of C104 Hours is
-<div id="C104Div"></div>
-<!--<button type="button" onclick="showC104()">Total Seconds of C104 Observations </button>-->
+<div id="C104Div">Loading...</div>
+Last NGAS Download
+<div id="LastData">Loading...</div>
+Number of Commanded Observations
+<div id="commandCount">Loading...</div>
+Disk Space
+<div id="diskSpace">Loading...</div>
+Number of Commanded Observations that Receiver Indicated "Good" on
+<div id="goodCount1">Loading...</div>
+<div id="goodCount2">Loading...</div>
+<div id="goodCount3">Loading...</div>
+<div id="goodCount4">Loading...</div>
+<div id="goodCount5">Loading...</div>
+<div id="goodCount6">Loading...</div>
+<div id="goodCount7">Loading...</div>
+<div id="goodCount8">Loading...</div>
+<div id="goodCount9">Loading...</div>
+<div id="goodCount10">Loading...</div>
+<div id="goodCount11">Loading...</div>
+<div id="goodCount12">Loading...</div>
+<div id="goodCount13">Loading...</div>
+<div id="goodCount14">Loading...</div>
+<div id="goodCount15">Loading...</div>
+<div id="goodCount16">Loading...</div>
 </body>
 </html>

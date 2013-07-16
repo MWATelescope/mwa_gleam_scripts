@@ -14,7 +14,5 @@ while ($row=pg_fetch_row($result)){
   $totsecs = $totsecs + $row[1]-$row[0];
 }
 $tothours=$totsecs/3600;
-echo "$tothours"
-
-
+echo "$tothours";
 ?>
