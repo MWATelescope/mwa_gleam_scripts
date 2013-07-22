@@ -1,0 +1,7 @@
+<?php
+
+$freespace = disk_free_space("/eor-02/r2");
+echo "$freespace"
+
+
+?>
