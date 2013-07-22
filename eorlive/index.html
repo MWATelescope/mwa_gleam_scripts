@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html>
+<head>
+<script src="jquery-latest.js"></script>
+<script type="text/javascript">
+
+function createXHR(){
+try{
+return new XMLHttpRequest();
+}
+catch(e) {
+try {
+return new ActiveXObject("Microsoft.XMLHTTP");
+}
+catch(e) {
+return new ActiveXObject("Msxml2.XMLHTTP");
+}
+}
+}
+
+function recentData()
+{
+var xhr = createXHR();
+xhr.onreadystatechange=function()
+{
+if(xhr.status==200 && xhr.readyState==4)
+{
+document.getElementById("LastData").innerHTML=xhr.responseText;
+}
+};
+xhr.open("GET","LastData.php",true);
+xhr.send();
+}
+
+
+function showG9()
+{
+var xhr = createXHR();
+xhr.onreadystatechange=function()
+{
+if(xhr.status==200 && xhr.readyState==4)
+{
+document.getElementById("G9Div").innerHTML=xhr.responseText;
+}
+};
+xhr.open("GET","G9Total.php",true);
+xhr.send();
+}
+
+function getTime()
+{
+var xhr=createXHR();
+xhr.onreadystatechange=function()
+{
+if(xhr.status==200 && xhr.readyState==4)
+{
+document.getElementById("myDiv").innerHTML=xhr.responseText;
+}
+};
+xhr.open("GET","ServerTime.php",true);
+xhr.send();
+}
+
+function commandCount()
+{
+var xhr=createXHR();
+xhr.onreadystatechange=function()
+{
+if(xhr.status==200 && xhr.readyState==4)
+{
+document.getElementById("commandCount").innerHTML=xhr.responseText;
+}
+};
+xhr.open("GET","CommandCount.php",true);
+xhr.send();
+}
+
+function goodCount(rx_id)
+{
+rx_id=rx_id.toString();
+var xhr=createXHR();
+xhr.onreadystatechange=function()
+{
+if(xhr.status==200 && xhr.readyState==4)
+{
+document.getElementById("goodCount"+rx_id).innerHTML=xhr.responseText;
+}
+};
+xhr.open("GET","GoodCount.php?rx_id="+rx_id,true);
+xhr.send();
+}
+
+
+function diskSpace()
+{
+var xhr=createXHR();
+xhr.onreadystatechange=function()
+{
+if(xhr.status==200 && xhr.readyState==4)
+{
+document.getElementById("diskSpace").innerHTML=xhr.responseText;
+}
+};
+xhr.open("GET","DiskSpace.php");
+xhr.send();
+}
+
+
+function goodCounts()
+{
+for(var i = 1; i<=16; i++)
+{
+goodCount(i);
+}
+}
+
+
+function init()
+{
+getTime();
+showG9();
+recentData();
+commandCount();
+goodCounts();
+diskSpace();
+}
+window.onload=init();
+var refreshId0 = window.setInterval("getTime()",1000);
+var refreshId1 = window.setInterval("showG9()",10000);
+var refreshId2 = window.setInterval("recentData()",1000);
+var refreshId3 = window.setInterval("commandCount()",10000);
+var refreshId4 = window.setInterval("goodCounts()",120000);
+var refreshId5 = window.setInterval("diskSpace()",10000);
+</script>
+
+</head>
+
+<body>
+The Time at MIT is 
+<div id="myDiv">Loading...</div>
+The Total Number of G0009 Hours is
+<div id="G9Div">Loading...</div>
+Last NGAS Download
+<div id="LastData">Loading...</div>
+Number of Commanded Observations in Last 12 Hours
+<div id="commandCount">Loading...</div>
+Disk Space
+<div id="diskSpace">Loading...</div>
+Number of Commanded Observations that Receiver Indicated "Good" on
+<div id="goodCount1">Loading...</div>
+<div id="goodCount2">Loading...</div>
+<div id="goodCount3">Loading...</div>
+<div id="goodCount4">Loading...</div>
+<div id="goodCount5">Loading...</div>
+<div id="goodCount6">Loading...</div>
+<div id="goodCount7">Loading...</div>
+<div id="goodCount8">Loading...</div>
+<div id="goodCount9">Loading...</div>
+<div id="goodCount10">Loading...</div>
+<div id="goodCount11">Loading...</div>
+<div id="goodCount12">Loading...</div>
+<div id="goodCount13">Loading...</div>
+<div id="goodCount14">Loading...</div>
+<div id="goodCount15">Loading...</div>
+<div id="goodCount16">Loading...</div>
+</body>
+</html>

@@ -1,0 +1,8 @@
+<?php
+$host = "eor-db.mit.edu";
+$dbname="mwa";
+$user="mwa";
+$password="BowTie";
+$dbconn = pg_connect("host=$host dbname=$dbname user=$user password=$password") or die ("could not connect to server\n");
+
+?>
