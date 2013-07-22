@@ -33,17 +33,17 @@ xhr.send();
 }
 
 
-function showC104()
+function showG9()
 {
 var xhr = createXHR();
 xhr.onreadystatechange=function()
 {
 if(xhr.status==200 && xhr.readyState==4)
 {
-document.getElementById("C104Div").innerHTML=xhr.responseText;
+document.getElementById("G9Div").innerHTML=xhr.responseText;
 }
 };
-xhr.open("GET","C104Total.php",true);
+xhr.open("GET","G9Total.php",true);
 xhr.send();
 }
 
@@ -118,7 +118,7 @@ goodCount(i);
 function init()
 {
 getTime();
-showC104();
+showG9();
 recentData();
 commandCount();
 goodCounts();
@@ -126,7 +126,7 @@ diskSpace();
 }
 window.onload=init();
 var refreshId0 = window.setInterval("getTime()",1000);
-var refreshId1 = window.setInterval("showC104()",10000);
+var refreshId1 = window.setInterval("showG9()",10000);
 var refreshId2 = window.setInterval("recentData()",1000);
 var refreshId3 = window.setInterval("commandCount()",10000);
 var refreshId4 = window.setInterval("goodCounts()",120000);
@@ -138,11 +138,11 @@ var refreshId5 = window.setInterval("diskSpace()",10000);
 <body>
 The Time at MIT is 
 <div id="myDiv">Loading...</div>
-The Total Number of C104 Hours is
-<div id="C104Div">Loading...</div>
+The Total Number of G0009 Hours is
+<div id="G9Div">Loading...</div>
 Last NGAS Download
 <div id="LastData">Loading...</div>
-Number of Commanded Observations
+Number of Commanded Observations in Last 12 Hours
 <div id="commandCount">Loading...</div>
 Disk Space
 <div id="diskSpace">Loading...</div>

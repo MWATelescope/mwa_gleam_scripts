@@ -28,7 +28,7 @@ $obstime = strtotime($obstimestr);
 date_default_timezone_set("America/New_York");
 $dltime = strtotime("$date[0] $time[0]");
 date_default_timezone_set("UTC");
-$dldateutc=date("Y-d-m H:i:s",$dltime);
+$dldateutc=date("Y-m-d H:i:s",$dltime);
 date_default_timezone_set("America/New_York");
 $deltatime = ($dltime-$obstime)/86400;
 preg_match($obsidpattern,$data[0],$obsid);
