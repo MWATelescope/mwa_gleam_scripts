@@ -19,6 +19,7 @@
 
 
 #include "compress.h"
+#include <fitsio.h>
 
 static void show_usage(string name)
 {
@@ -45,8 +46,6 @@ int main(int argc, const char * argv[])
     int comp = RICE_1;  // compression type
     bool c = true;      // compress/decompress flag
     const char *InputFileName, *OutputFileName;
-    char errmsg[80];
-    bool mt = true;
     
     if (argc < 3) { // We expect at least 3 arguments: the program name, the source path and the destination path
         show_usage(argv[0]);
@@ -79,28 +78,21 @@ int main(int argc, const char * argv[])
     InputFileName = argv[argc-2];
     OutputFileName = argv[argc-1];
     
-    if(!fits_is_reentrant()){
-        cout << "FITS compiled without –enable-reentrant flag. Only single thread is supported";
-        mt = false;
-    }
-    
     //read FITS
     // Open specified file for read only access.
 	fits_open_diskfile(&in, InputFileName, READONLY, &status);
     
     //create new FITS file
-//    fits_create_file(&out, OutputFileName, &status);
-    
-    
+    remove(OutputFileName);
+    fits_create_file(&out, OutputFileName, &status);
+ 
+/*
     size_t blockSize = 20000000;
     char *memblock = (char*) malloc(blockSize);
     fits_create_memfile(&out,(void**) &memblock, &blockSize, 2880, &realloc, &status);
+*/
  	PRINTERRMSG(status);
 
-    
-    
- 	PRINTERRMSG(status);
-    
     //copy and skip the first HDU
     fits_copy_header(in, out, &status);
     PRINTERRMSG(status);
@@ -123,9 +115,11 @@ int main(int argc, const char * argv[])
     fits_close_file(out, &status);
     PRINTERRMSG(status);
     
-    FILE *fd = fopen("/Users/slava/Projects/workspace/smdp/Test_files/dump.fits", "wb");
+/*
+    FILE *fd = fopen(OutputFileName, "wb");
     fwrite(memblock, sizeof(char), blockSize, fd);
     fclose(fd);
+*/
+    return 0;
 }
-
 
