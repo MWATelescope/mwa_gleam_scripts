@@ -7,10 +7,11 @@
 //
 
 #include "compress.h"
+#include <stdlib.h>
 
-char errmsg[80];
-
+/* there is already a built-in round function in math.h type "man round"
 #define round(r) (r>0.0)?floor(r+0.5):ceil(r-0.5)
+*/
 
 //
 // fits_write_compressed()
@@ -32,7 +33,7 @@ int fits_write_compressed(fitsfile *out, float *buff_in, LONGLONG nelements, int
     int *buff_out = (int*) malloc(sizeof(int) * nelements);
     if( buff_in == NULL ){
         cerr << "Err: Could not allocate memory.";
-        return 1;
+        exit(EXIT_FAILURE);
     }
 
     // round, decimate and convert
@@ -78,10 +79,12 @@ int Compress(fitsfile *in, fitsfile *out, double bscale, int comp)
     long naxes[]={1,1,1,1,1,1,1,1,1};
     int naxis;
     int status = 0;    // returned status of FITS functions
-    int bitpix;
+    int bitpix,count=0;
     
     // loop through till the end of file
     while(status != END_OF_FILE){
+
+        cout << "Reading HDU "<<count++ << endl;
         
         // get image dimensions and total number of pixels in image
         fits_get_img_param(in, 9, &bitpix, &naxis, naxes, &status);
@@ -93,7 +96,7 @@ int Compress(fitsfile *in, fitsfile *out, double bscale, int comp)
         float *buff_in = (float*) malloc(sizeof(float) * nelements);
         if( buff_in == NULL ){
             cerr << "Err: Could not allocate memory.";
-            return 1;
+            exit(EXIT_FAILURE);
         }
         
         float nulval = 0.0;
@@ -107,6 +110,8 @@ int Compress(fitsfile *in, fitsfile *out, double bscale, int comp)
         // try next HDU
         fits_movrel_hdu(in, 1, NULL, &status);
     }
+    // clear the error from trying to move past the last HDU from errror stack
+    fits_clear_errmsg();
     
     return 0;
 }
@@ -170,3 +175,4 @@ int Decompress(fitsfile *in, fitsfile *out)
     
     return 0;
 }
+
