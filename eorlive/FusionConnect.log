@@ -1,0 +1,353 @@
+2013-07-28T16:02:17.020308 : Error executing db query: select starttime, stoptime from mwa_setting where projectid='G0009'
+2013-07-28T16:04:16.669166 : Successfully Connected to eor-db
+2013-07-28T16:04:16.671215 : Error executing db query: select starttime, stoptime from mwa_setting where projectid='G0009'
+2013-07-28T16:05:55.222682 : Successfully Connected to eor-db
+2013-07-28T16:05:55.224935 : Error executing db query: select starttime, stoptime from mwa_setting where projectid='G0009\ and stoptime<1059077171.0
+2013-07-28T16:08:42.344996 : Successfully Connected to eor-db
+2013-07-28T16:08:42.347084 : Error executing db query: select starttime, stoptime from mwa_setting where projectid='G0009\ and stoptime<1059077338.0
+2013-07-28T16:09:19.857273 : Successfully Connected to eor-db
+2013-07-28T16:09:47.599256 : Successfully Connected to eor-db
+2013-07-28T16:10:27.275350 : Successfully Connected to eor-db
+2013-07-28T16:12:19.426685 : Successfully Connected to eor-db
+2013-07-28T16:12:19.429308 : Error executing db query: select starttime, stoptime from mwa_setting where projectid='G0009\ and stoptime<1059077555.0
+2013-07-28T16:13:41.524117 : Successfully Connected to eor-db
+2013-07-28T16:14:56.397009 : Successfully Connected to eor-db
+2013-07-28T16:15:52.176259 : Successfully Connected to eor-db
+2013-07-28T16:15:52.178396 : Error executing db query: select starttime, stoptime from mwa_setting where projectid='G0009\ and stoptime<1059077768.0 Exception: 'builtin_function_or_method' object has no attribute 'execute'
+2013-07-28T16:17:02.633626 : Successfully Connected to eor-db
+2013-07-28T16:17:02.637617 : Error executing db query: select starttime, stoptime from mwa_setting where projectid='G0009\ and stoptime<1059077838.0 Exception: unterminated quoted string at or near "'G0009\ and stoptime<1059077838.0"
+LINE 1: ...rttime, stoptime from mwa_setting where projectid='G0009\ an...
+                                                             ^
+
+2013-07-28T16:18:06.404991 : Successfully Connected to eor-db
+2013-07-28T16:18:06.433192 : Sucessfully Executed Query: select starttime, stoptime from mwa_setting where projectid='G0009' and stoptime<1059077902.0
+2013-07-28T16:18:51.253923 : Successfully Connected to eor-db
+2013-07-28T16:18:51.279826 : Sucessfully Executed Query: select starttime, stoptime from mwa_setting where projectid='G0009' and stoptime<1059077947.0
+2013-07-28T16:19:21.995376 : Successfully Connected to eor-db
+2013-07-28T16:19:22.020995 : Sucessfully Executed Query: select starttime, stoptime from mwa_setting where projectid='G0009' and stoptime<1059077977.0
+2013-07-28T16:19:22.129767 : Current Token Expires in 2154 sec
+2013-07-28T16:20:48.513953 : Successfully Connected to eor-db
+2013-07-28T16:20:48.539453 : Sucessfully Executed Query: select starttime, stoptime from mwa_setting where projectid='G0009' and stoptime<1059078064.0
+2013-07-28T16:21:02.018990 : Successfully Connected to eor-db
+2013-07-28T16:21:02.044937 : Sucessfully Executed Query: select starttime, stoptime from mwa_setting where projectid='G0009' and stoptime<1059078077.0
+2013-07-28T16:21:19.438948 : Successfully Connected to eor-db
+2013-07-28T16:21:19.466245 : Sucessfully Executed Query: select starttime, stoptime from mwa_setting where projectid='G0009' and stoptime<1059078095.0
+2013-07-28T16:21:19.468151 : Checking Access Token
+2013-07-28T16:21:19.619380 : Current Token Expires in 2037 sec
+2013-07-28T16:22:45.104619 : Successfully Connected to eor-db
+2013-07-28T16:22:45.131754 : Sucessfully Executed Query: select starttime, stoptime from mwa_setting where projectid='G0009' and stoptime<1059078181.0
+2013-07-28T16:22:45.133507 : Checking Access Token
+2013-07-28T16:22:45.301019 : Current Token Expires in 1951 sec
+2013-07-28T16:22:58.722830 : Successfully Connected to eor-db
+2013-07-28T16:22:58.749106 : Sucessfully Executed Query: select starttime, stoptime from mwa_setting where projectid='G0009' and stoptime<1059078194.0
+2013-07-28T16:22:58.750929 : Checking Access Token
+2013-07-28T16:22:58.857885 : Current Token Expires in 1938 sec
+2013-07-28T16:23:17.223586 : Successfully Connected to eor-db
+2013-07-28T16:23:17.250318 : Sucessfully Executed Query: select starttime, stoptime from mwa_setting where projectid='G0009' and stoptime<1059078213.0
+2013-07-28T16:23:17.252140 : Checking Access Token
+2013-07-28T16:23:17.383331 : Current Token Expires in 1919 sec
+2013-07-28T16:23:17.507516 : 400 Bad Request
+2013-07-28T16:25:28.707050 : Successfully Connected to eor-db
+2013-07-28T16:25:28.732751 : Sucessfully Executed Query: select starttime, stoptime from mwa_setting where projectid='G0009' and stoptime<1059078344.0
+2013-07-28T16:25:28.734575 : Checking Access Token
+2013-07-28T16:25:28.846911 : Current Token Expires in 1788 sec
+2013-07-28T16:25:28.848449 : Sending Fusion Command : /fusiontables/v1/query?access_token=ya29.AHES6ZRt2johwQbnJQZDM1KVoYOXcYCuay6_ZEGObjXATz0pKtRG5A&sql=INSERT+INTO+1UspWE7G7ccKncYTUbEkpSaSitomsN-7vLkNdx-I+%28Date%2CTotObsTime%29+VALUES+%282013-07-28T20%3A25%3A28.734556%2C1%29
+2013-07-28T16:25:28.963231 : 400 Bad Request
+2013-07-28T16:31:33.705737 : Successfully Connected to eor-db
+2013-07-28T16:31:33.731194 : Sucessfully Executed Query: select starttime, stoptime from mwa_setting where projectid='G0009' and stoptime<1059078709.0
+2013-07-28T16:31:33.733060 : Checking Access Token
+2013-07-28T16:31:33.837240 : Current Token Expires in 1423 sec
+2013-07-28T16:31:33.839026 : Sending Fusion Command : /fusiontables/v1/query?access_token=ya29.AHES6ZRt2johwQbnJQZDM1KVoYOXcYCuay6_ZEGObjXATz0pKtRG5A&sql=INSERT+INTO+1UspWE7G7ccKncYTUbEkpSaSitomsN-7vLkNdx-I+%28Date%2CTotObsTime%29+VALUES+%28%272013-07-28T20%3A31%3A33.733039%27%2C1%29
+2013-07-28T16:31:36.053896 : 200 OK
+2013-07-28T16:32:50.918438 : Successfully Connected to eor-db
+2013-07-28T16:32:50.944796 : Sucessfully Executed Query: select starttime, stoptime from mwa_setting where projectid='G0009' and stoptime<1059078786.0
+2013-07-28T16:32:50.946660 : Checking Access Token
+2013-07-28T16:32:51.047079 : Current Token Expires in 1345 sec
+2013-07-28T16:32:51.048816 : Sending Fusion Command : /fusiontables/v1/query?access_token=ya29.AHES6ZRt2johwQbnJQZDM1KVoYOXcYCuay6_ZEGObjXATz0pKtRG5A&sql=INSERT+INTO+1UspWE7G7ccKncYTUbEkpSaSitomsN-7vLkNdx-I+%28Date%2CTotObsTime%29+VALUES+%28%272013-07-28T20%3A32%3A50.946641%27%2C1%29
+2013-07-28T16:32:51.818605 : 200 OK
+2013-07-28T16:33:35.433665 : Successfully Connected to eor-db
+2013-07-28T16:33:35.461249 : Sucessfully Executed Query: select starttime, stoptime from mwa_setting where projectid='G0009' and stoptime<1059078831.0
+2013-07-28T16:33:35.463115 : Checking Access Token
+2013-07-28T16:33:35.603676 : Current Token Expires in 1301 sec
+2013-07-28T16:33:35.605494 : Sending Fusion Command : /fusiontables/v1/query?access_token=ya29.AHES6ZRt2johwQbnJQZDM1KVoYOXcYCuay6_ZEGObjXATz0pKtRG5A&sql=INSERT+INTO+1UspWE7G7ccKncYTUbEkpSaSitomsN-7vLkNdx-I+%28Date%2CTotObsTime%29+VALUES+%28%272013-07-28T20%3A33%3A35.463094%27%2C5936%29
+2013-07-28T16:33:36.482683 : 200 OK
+2013-07-28T16:34:23.356644 : Successfully Connected to eor-db
+2013-07-28T16:34:23.386442 : Sucessfully Executed Query: select starttime, stoptime from mwa_setting where projectid='G0009' and stoptime<1059078879.0
+2013-07-28T16:34:23.388352 : Checking Access Token
+2013-07-28T16:34:23.491170 : Current Token Expires in 1253 sec
+2013-07-28T16:34:23.492966 : Sending Fusion Command : /fusiontables/v1/query?access_token=ya29.AHES6ZRt2johwQbnJQZDM1KVoYOXcYCuay6_ZEGObjXATz0pKtRG5A&sql=INSERT+INTO+1UspWE7G7ccKncYTUbEkpSaSitomsN-7vLkNdx-I+%28Date%2CTotObsTime%29+VALUES+%28%272013-07-28T20%3A34%3A23.388331%27%2C1.64888888889%29
+2013-07-28T16:34:24.534554 : 200 OK
+2013-07-28T16:52:00.120074 : Successfully Connected to eor-db
+2013-07-28T16:52:00.147946 : Sucessfully Executed Query: select starttime, stoptime from mwa_setting where projectid='G0009' and stoptime<1059079936.0
+2013-07-28T16:52:00.150151 : Checking Access Token
+2013-07-28T16:52:00.282185 : Current Token Expires in 196 sec
+2013-07-28T16:52:00.284217 : Sending Fusion Command : /fusiontables/v1/query?access_token=ya29.AHES6ZRt2johwQbnJQZDM1KVoYOXcYCuay6_ZEGObjXATz0pKtRG5A&sql=INSERT+INTO+1UspWE7G7ccKncYTUbEkpSaSitomsN-7vLkNdx-I+%28Date%2CTotObsTime%29+VALUES+%28%272013-07-28T20%3A52%3A00.150127%27%2C1.64888888889%29
+2013-07-28T16:52:01.438441 : 200 OK
+2013-07-28T16:52:50.271638 : Successfully Connected to eor-db
+2013-07-28T16:52:50.297749 : Sucessfully Executed Query: select starttime, stoptime from mwa_setting where projectid='G0009' and stoptime<1059079986.0
+2013-07-28T16:52:50.299620 : Checking Access Token
+2013-07-28T16:52:50.432133 : Current Token Expires in 146 sec
+2013-07-28T16:52:50.433888 : Sending Fusion Command : /fusiontables/v1/query?access_token=ya29.AHES6ZRt2johwQbnJQZDM1KVoYOXcYCuay6_ZEGObjXATz0pKtRG5A&sql=INSERT+INTO+1UspWE7G7ccKncYTUbEkpSaSitomsN-7vLkNdx-I+%28Date%2CTotObsTime%29+VALUES+%28%272013-07-28T20%3A52%3A50.299598%27%2C1.64888888889%29
+2013-07-28T16:52:52.615200 : 200 OK
+2013-07-28T17:27:07.773597 : Successfully Connected to eor-db
+2013-07-28T17:27:07.838472 : Sucessfully Executed Query: select starttime, stoptime from mwa_setting where projectid='G0009' and stoptime<1059082043.0
+2013-07-28T17:27:07.840549 : Checking Access Token
+2013-07-28T17:28:29.506970 : Successfully Connected to eor-db
+2013-07-28T17:28:29.532672 : Sucessfully Executed Query: select starttime, stoptime from mwa_setting where projectid='G0009' and stoptime<1059082125.0
+2013-07-28T17:28:29.534500 : Checking Access Token
+2013-07-28T17:31:52.438778 : Successfully Connected to eor-db
+2013-07-28T17:31:52.466486 : Sucessfully Executed Query: select starttime, stoptime from mwa_setting where projectid='G0009' and stoptime<1059082328.0
+2013-07-28T17:31:52.468235 : Checking Access Token
+2013-07-28T17:35:03.179610 : Successfully Connected to eor-db
+2013-07-28T17:35:03.206007 : Sucessfully Executed Query: select starttime, stoptime from mwa_setting where projectid='G0009' and stoptime<1059082519.0
+2013-07-28T17:35:03.208250 : Checking Access Token
+2013-07-28T17:37:09.995231 : Successfully Connected to eor-db
+2013-07-28T17:37:10.034419 : Sucessfully Executed Query: select starttime, stoptime from mwa_setting where projectid='G0009' and stoptime<1059082645.0
+2013-07-28T17:37:10.036497 : Checking Access Token: ya29.AHES6ZRt2johwQbnJQZDM1KVoYOXcYCuay6_ZEGObjXATz0pKtRG5A
+2013-07-28T17:43:59.593287 : Successfully Connected to eor-db
+2013-07-28T17:43:59.621854 : Sucessfully Executed Query: select starttime, stoptime from mwa_setting where projectid='G0009' and stoptime<1059083055.0
+2013-07-28T17:43:59.623782 : Sending Fusion Command : /fusiontables/v1/query?access_token=ya29.AHES6ZRt2johwQbnJQZDM1KVoYOXcYCuay6_ZEGObjXATz0pKtRG5A&sql=INSERT+INTO+1UspWE7G7ccKncYTUbEkpSaSitomsN-7vLkNdx-I+%28Date%2CTotObsTime%29+VALUES+%28%272013-07-28T21%3A43%3A59.623624%27%2C1.64888888889%29
+2013-07-28T17:43:59.732562 : 401 Unauthorized
+2013-07-28T17:46:26.677316 : Successfully Connected to eor-db
+2013-07-28T17:46:26.703878 : Sucessfully Executed Query: select starttime, stoptime from mwa_setting where projectid='G0009' and stoptime<1059083202.0
+2013-07-28T17:46:26.705661 : Checking Access Token: ya29.AHES6ZRt2johwQbnJQZDM1KVoYOXcYCuay6_ZEGObjXATz0pKtRG5A
+2013-07-28T17:49:34.998173 : Successfully Connected to eor-db
+2013-07-28T17:49:35.024037 : Sucessfully Executed Query: select starttime, stoptime from mwa_setting where projectid='G0009' and stoptime<1059083390.0
+2013-07-28T17:49:35.026166 : Checking Access Token: ya29.AHES6ZRt2johwQbnJQZDM1KVoYOXcYCuay6_ZEGObjXATz0pKtRG5A
+2013-07-28T17:50:43.807327 : Successfully Connected to eor-db
+2013-07-28T17:50:43.832864 : Sucessfully Executed Query: select starttime, stoptime from mwa_setting where projectid='G0009' and stoptime<1059083459.0
+2013-07-28T17:50:43.834617 : Checking Access Token: ya29.AHES6ZRt2johwQbnJQZDM1KVoYOXcYCuay6_ZEGObjXATz0pKtRG5A
+2013-07-28T18:07:16.848933 : Successfully Connected to eor-db
+2013-07-28T18:07:16.873851 : Sucessfully Executed Query: select starttime, stoptime from mwa_setting where projectid='G0009' and stoptime<1059084452.0
+2013-07-28T18:07:16.875756 : Checking Access Token: ya29.AHES6ZRt2johwQbnJQZDM1KVoYOXcYCuay6_ZEGObjXATz0pKtRG5A
+2013-07-28T18:09:36.029547 : Successfully Connected to eor-db
+2013-07-28T18:09:36.055454 : Sucessfully Executed Query: select starttime, stoptime from mwa_setting where projectid='G0009' and stoptime<1059084592.0
+2013-07-28T18:09:36.057195 : Checking Access Token: ya29.AHES6ZR8xOQ9Ok6vg-hduUtVIiiJ5uvcUleoOGeozm9wJUCzMrx05A
+2013-07-28T18:09:36.159651 : Current Token Expires in 3599 sec
+2013-07-28T18:09:36.161688 : Sending Fusion Command : /fusiontables/v1/query?access_token=ya29.AHES6ZR8xOQ9Ok6vg-hduUtVIiiJ5uvcUleoOGeozm9wJUCzMrx05A&sql=INSERT+INTO+1UspWE7G7ccKncYTUbEkpSaSitomsN-7vLkNdx-I+%28Date%2CTotObsTime%29+VALUES+%28%272013-07-28T22%3A09%3A36.057169%27%2C1.64888888889%29
+2013-07-28T18:09:37.427405 : 200 OK
+2013-07-28T18:09:42.943287 : Successfully Connected to eor-db
+2013-07-28T18:09:42.968497 : Sucessfully Executed Query: select starttime, stoptime from mwa_setting where projectid='G0009' and stoptime<1059084598.0
+2013-07-28T18:09:42.970295 : Checking Access Token: ya29.AHES6ZR8xOQ9Ok6vg-hduUtVIiiJ5uvcUleoOGeozm9wJUCzMrx05A
+2013-07-28T18:09:43.073528 : Current Token Expires in 3592 sec
+2013-07-28T18:09:43.075307 : Sending Fusion Command : /fusiontables/v1/query?access_token=ya29.AHES6ZR8xOQ9Ok6vg-hduUtVIiiJ5uvcUleoOGeozm9wJUCzMrx05A&sql=INSERT+INTO+1UspWE7G7ccKncYTUbEkpSaSitomsN-7vLkNdx-I+%28Date%2CTotObsTime%29+VALUES+%28%272013-07-28T22%3A09%3A42.970269%27%2C1.64888888889%29
+2013-07-28T18:09:44.600961 : 200 OK
+2013-07-28T18:10:25.436922 : Successfully Connected to eor-db
+2013-07-28T18:10:25.462094 : Sucessfully Executed Query: select starttime, stoptime from mwa_setting where projectid='G0009' and stoptime<1059084641.0
+2013-07-28T18:10:25.463935 : Checking Access Token: ya29.AHES6ZR8xOQ9Ok6vg-hduUtVIiiJ5uvcUleoOGeozm9wJUCzMrx05A
+2013-07-28T18:10:25.570421 : Current Token Expires in 3550 sec
+2013-07-28T18:10:25.572343 : Sending Fusion Command : /fusiontables/v1/query?access_token=ya29.AHES6ZR8xOQ9Ok6vg-hduUtVIiiJ5uvcUleoOGeozm9wJUCzMrx05A&sql=INSERT+INTO+1UspWE7G7ccKncYTUbEkpSaSitomsN-7vLkNdx-I+%28Date%2CTotObsTime%29+VALUES+%28%272013-07-28T22%3A10%3A25.463907%27%2C1.64888888889%29
+2013-07-28T18:10:26.274480 : 200 OK
+2013-07-28T18:14:30.687916 : Successfully Connected to eor-db
+2013-07-28T18:14:30.714149 : Sucessfully Executed Query: select starttime, stoptime from mwa_setting where projectid='G0009' and stoptime<1059084886.0
+2013-07-28T18:14:30.716377 : Checking Access Token: ya29.AHES6ZR8xOQ9Ok6vg-hduUtVIiiJ5uvcUleoOGeozm9wJUCzMrx05A
+2013-07-28T18:14:30.823753 : Current Token Expires in 3305 sec
+2013-07-28T18:14:30.825550 : Sending Fusion Command : /fusiontables/v1/query?access_token=ya29.AHES6ZR8xOQ9Ok6vg-hduUtVIiiJ5uvcUleoOGeozm9wJUCzMrx05A&sql=INSERT+INTO+1UspWE7G7ccKncYTUbEkpSaSitomsN-7vLkNdx-I+%28Date%2CTotObsTime%29+VALUES+%28%272013-07-28T22%3A14%3A30.716344%27%2C1.64888888889%29
+2013-07-28T18:14:32.131206 : 200 OK
+2013-07-28T18:17:32.948217 : Successfully Connected to eor-db
+2013-07-28T18:17:32.974737 : Sucessfully Executed Query: select starttime, stoptime from mwa_setting where projectid='G0009' and stoptime<1059085068.0
+2013-07-28T18:17:32.976773 : Checking Access Token: ya29.AHES6ZR8xOQ9Ok6vg-hduUtVIiiJ5uvcUleoOGeozm9wJUCzMrx05A
+2013-07-28T18:17:33.108144 : Current Token Expires in 3122 sec
+2013-07-28T18:17:33.110302 : Sending Fusion Command : /fusiontables/v1/query?access_token=ya29.AHES6ZR8xOQ9Ok6vg-hduUtVIiiJ5uvcUleoOGeozm9wJUCzMrx05A&sql=INSERT+INTO+1UspWE7G7ccKncYTUbEkpSaSitomsN-7vLkNdx-I+%28Date%2CTotObsTime%29+VALUES+%28%272013-07-28T22%3A17%3A32.976748%27%2C1.64888888889%29
+2013-07-28T18:17:34.629790 : 200 OK
+2013-07-28T18:23:30.750177 : Successfully Connected to eor-db
+2013-07-28T18:23:30.776821 : Sucessfully Executed Query: select starttime, stoptime from mwa_setting where projectid='G0009' and stoptime<1059085426.0
+2013-07-28T18:23:30.779309 : Checking Access Token: ya29.AHES6ZR8xOQ9Ok6vg-hduUtVIiiJ5uvcUleoOGeozm9wJUCzMrx05A
+2013-07-28T18:23:30.885649 : Current Token Expires in 2765 sec
+2013-07-28T18:23:30.887524 : Sending Fusion Command : /fusiontables/v1/query?access_token=ya29.AHES6ZR8xOQ9Ok6vg-hduUtVIiiJ5uvcUleoOGeozm9wJUCzMrx05A&sql=INSERT+INTO+1UspWE7G7ccKncYTUbEkpSaSitomsN-7vLkNdx-I+%28Date%2CTotObsTime%29+VALUES+%28%272013-07-28T22%3A23%3A30.779283%27%2C1.64888888889%29
+2013-07-28T18:23:32.033233 : 200 OK
+2013-07-28T18:26:11.204442 : Successfully Connected to eor-db
+2013-07-28T18:26:11.229817 : Sucessfully Executed Query: select starttime, stoptime from mwa_setting where projectid='G0009' and stoptime<1059085587.0
+2013-07-28T18:26:11.231688 : Checking Access Token: ya29.AHES6ZR8xOQ9Ok6vg-hduUtVIiiJ5uvcUleoOGeozm9wJUCzMrx05A
+2013-07-28T18:26:11.345748 : Current Token Expires in 2604 sec
+2013-07-28T18:26:11.347768 : Sending Fusion Command : /fusiontables/v1/query?access_token=ya29.AHES6ZR8xOQ9Ok6vg-hduUtVIiiJ5uvcUleoOGeozm9wJUCzMrx05A&sql=INSERT+INTO+1UspWE7G7ccKncYTUbEkpSaSitomsN-7vLkNdx-I+%28Date%2CTotObsTime%29+VALUES+%28%272013-07-28T22%3A26%3A11.231664%27%2C1.64888888889%29
+2013-07-28T18:26:12.373531 : 200 OK
+2013-07-28T18:28:43.278990 : Successfully Connected to eor-db
+2013-07-28T18:28:43.311451 : Sucessfully Executed Query: select starttime, stoptime from mwa_setting where projectid='G0009' and stoptime<1059085739.0
+2013-07-28T18:28:43.351874 : Checking Access Token: ya29.AHES6ZR8xOQ9Ok6vg-hduUtVIiiJ5uvcUleoOGeozm9wJUCzMrx05A
+2013-07-28T18:28:43.482867 : Current Token Expires in 2452 sec
+2013-07-28T18:28:43.484655 : Sending Fusion Command : /fusiontables/v1/query?access_token=ya29.AHES6ZR8xOQ9Ok6vg-hduUtVIiiJ5uvcUleoOGeozm9wJUCzMrx05A&sql=INSERT+INTO+1UspWE7G7ccKncYTUbEkpSaSitomsN-7vLkNdx-I+%28Date%2CTotObsTime%29+VALUES+%28%272013-07-28T22%3A28%3A43.351847%27%2C1.64888888889%29
+2013-07-28T18:28:45.190595 : 200 OK
+2013-07-28T18:30:26.731151 : Successfully Connected to eor-db
+2013-07-28T18:30:26.757546 : Sucessfully Executed Query: select starttime, stoptime from mwa_setting where projectid='G0009' and stoptime<1059085842.0
+2013-07-28T18:30:26.759424 : Checking Access Token: ya29.AHES6ZR8xOQ9Ok6vg-hduUtVIiiJ5uvcUleoOGeozm9wJUCzMrx05A
+2013-07-28T18:30:26.870699 : Current Token Expires in 2349 sec
+2013-07-28T18:30:26.872387 : Sending Fusion Command : /fusiontables/v1/query?access_token=ya29.AHES6ZR8xOQ9Ok6vg-hduUtVIiiJ5uvcUleoOGeozm9wJUCzMrx05A&sql=INSERT+INTO+1UspWE7G7ccKncYTUbEkpSaSitomsN-7vLkNdx-I+%28Date%2CTotObsTime%29+VALUES+%28%272013-07-28T22%3A30%3A26.759399%27%2C1.64888888889%29
+2013-07-28T18:30:27.871807 : 200 OK
+2013-07-28T18:32:53.422950 : Successfully Connected to eor-db
+2013-07-28T18:32:53.448363 : Sucessfully Executed Query: select starttime, stoptime from mwa_setting where projectid='G0009' and stoptime<1059085989.0
+2013-07-28T18:32:53.450432 : Checking Access Token: ya29.AHES6ZR8xOQ9Ok6vg-hduUtVIiiJ5uvcUleoOGeozm9wJUCzMrx05A
+2013-07-28T18:32:53.584113 : Current Token Expires in 2202 sec
+2013-07-28T18:32:53.585940 : Sending Fusion Command : /fusiontables/v1/query?access_token=ya29.AHES6ZR8xOQ9Ok6vg-hduUtVIiiJ5uvcUleoOGeozm9wJUCzMrx05A&sql=INSERT+INTO+1UspWE7G7ccKncYTUbEkpSaSitomsN-7vLkNdx-I+%28Date%2CTotObsTime%29+VALUES+%28%272013-07-28T22%3A32%3A53.450403%27%2C1.64888888889%29
+2013-07-28T18:32:54.746879 : 200 OK
+2013-07-28T18:50:02.210784 : Successfully Connected to eor-db
+2013-07-28T18:50:02.238818 : Sucessfully Executed Query: select starttime, stoptime from mwa_setting where projectid='G0009' and stoptime<1059087018.0
+2013-07-28T18:50:02.240913 : Checking Access Token: ya29.AHES6ZR8xOQ9Ok6vg-hduUtVIiiJ5uvcUleoOGeozm9wJUCzMrx05A
+2013-07-28T18:50:02.376766 : Current Token Expires in 1173 sec
+2013-07-28T18:50:02.378560 : Sending Fusion Command : /fusiontables/v1/query?access_token=ya29.AHES6ZR8xOQ9Ok6vg-hduUtVIiiJ5uvcUleoOGeozm9wJUCzMrx05A&sql=INSERT+INTO+1UspWE7G7ccKncYTUbEkpSaSitomsN-7vLkNdx-I+%28Date%2CTotObsTime%29+VALUES+%28%272013-07-28T22%3A50%3A02.240885%27%2C1.64888888889%29
+2013-07-28T18:50:03.503234 : 200 OK
+2013-07-28T18:51:02.307435 : Successfully Connected to eor-db
+2013-07-28T18:51:02.334164 : Sucessfully Executed Query: select starttime, stoptime from mwa_setting where projectid='G0009' and stoptime<1059087078.0
+2013-07-28T18:51:02.336241 : Checking Access Token: ya29.AHES6ZR8xOQ9Ok6vg-hduUtVIiiJ5uvcUleoOGeozm9wJUCzMrx05A
+2013-07-28T18:51:02.468372 : Current Token Expires in 1113 sec
+2013-07-28T18:51:02.469971 : Sending Fusion Command : /fusiontables/v1/query?access_token=ya29.AHES6ZR8xOQ9Ok6vg-hduUtVIiiJ5uvcUleoOGeozm9wJUCzMrx05A&sql=INSERT+INTO+1UspWE7G7ccKncYTUbEkpSaSitomsN-7vLkNdx-I+%28Date%2CTotObsTime%29+VALUES+%28%272013-07-28T22%3A51%3A02.336216%27%2C1.64888888889%29
+2013-07-28T18:51:03.102965 : 200 OK
+2013-07-28T18:52:01.963286 : Successfully Connected to eor-db
+2013-07-28T18:52:01.989763 : Sucessfully Executed Query: select starttime, stoptime from mwa_setting where projectid='G0009' and stoptime<1059087137.0
+2013-07-28T18:52:01.991452 : Checking Access Token: ya29.AHES6ZR8xOQ9Ok6vg-hduUtVIiiJ5uvcUleoOGeozm9wJUCzMrx05A
+2013-07-28T18:52:02.123938 : Current Token Expires in 1053 sec
+2013-07-28T18:52:02.125734 : Sending Fusion Command : /fusiontables/v1/query?access_token=ya29.AHES6ZR8xOQ9Ok6vg-hduUtVIiiJ5uvcUleoOGeozm9wJUCzMrx05A&sql=INSERT+INTO+1UspWE7G7ccKncYTUbEkpSaSitomsN-7vLkNdx-I+%28Date%2CTotObsTime%29+VALUES+%28%272013-07-28T22%3A52%3A01.991425%27%2C1.64888888889%29
+2013-07-28T18:52:02.739538 : 200 OK
+2013-07-28T18:53:02.531705 : Successfully Connected to eor-db
+2013-07-28T18:53:02.557452 : Sucessfully Executed Query: select starttime, stoptime from mwa_setting where projectid='G0009' and stoptime<1059087198.0
+2013-07-28T18:53:02.559330 : Checking Access Token: ya29.AHES6ZR8xOQ9Ok6vg-hduUtVIiiJ5uvcUleoOGeozm9wJUCzMrx05A
+2013-07-28T18:53:02.669112 : Current Token Expires in 993 sec
+2013-07-28T18:53:02.670893 : Sending Fusion Command : /fusiontables/v1/query?access_token=ya29.AHES6ZR8xOQ9Ok6vg-hduUtVIiiJ5uvcUleoOGeozm9wJUCzMrx05A&sql=INSERT+INTO+1UspWE7G7ccKncYTUbEkpSaSitomsN-7vLkNdx-I+%28Date%2CTotObsTime%29+VALUES+%28%272013-07-28T22%3A53%3A02.559305%27%2C1.64888888889%29
+2013-07-28T18:53:03.334617 : 200 OK
+2013-07-28T18:54:02.123707 : Successfully Connected to eor-db
+2013-07-28T18:54:02.149189 : Sucessfully Executed Query: select starttime, stoptime from mwa_setting where projectid='G0009' and stoptime<1059087258.0
+2013-07-28T18:54:02.151024 : Checking Access Token: ya29.AHES6ZR8xOQ9Ok6vg-hduUtVIiiJ5uvcUleoOGeozm9wJUCzMrx05A
+2013-07-28T18:54:05.597826 : Current Token Expires in 931 sec
+2013-07-28T18:54:05.599662 : Sending Fusion Command : /fusiontables/v1/query?access_token=ya29.AHES6ZR8xOQ9Ok6vg-hduUtVIiiJ5uvcUleoOGeozm9wJUCzMrx05A&sql=INSERT+INTO+1UspWE7G7ccKncYTUbEkpSaSitomsN-7vLkNdx-I+%28Date%2CTotObsTime%29+VALUES+%28%272013-07-28T22%3A54%3A02.150998%27%2C1.64888888889%29
+2013-07-28T18:54:06.463186 : 200 OK
+2013-07-28T18:55:02.250695 : Successfully Connected to eor-db
+2013-07-28T18:55:02.277012 : Sucessfully Executed Query: select starttime, stoptime from mwa_setting where projectid='G0009' and stoptime<1059087318.0
+2013-07-28T18:55:02.279097 : Checking Access Token: ya29.AHES6ZR8xOQ9Ok6vg-hduUtVIiiJ5uvcUleoOGeozm9wJUCzMrx05A
+2013-07-28T18:55:02.433481 : Current Token Expires in 873 sec
+2013-07-28T18:55:02.435346 : Sending Fusion Command : /fusiontables/v1/query?access_token=ya29.AHES6ZR8xOQ9Ok6vg-hduUtVIiiJ5uvcUleoOGeozm9wJUCzMrx05A&sql=INSERT+INTO+1UspWE7G7ccKncYTUbEkpSaSitomsN-7vLkNdx-I+%28Date%2CTotObsTime%29+VALUES+%28%272013-07-28T22%3A55%3A02.279072%27%2C1.64888888889%29
+2013-07-28T18:55:03.196754 : 200 OK
+2013-07-28T18:56:01.997221 : Successfully Connected to eor-db
+2013-07-28T18:56:02.024484 : Sucessfully Executed Query: select starttime, stoptime from mwa_setting where projectid='G0009' and stoptime<1059087377.0
+2013-07-28T18:56:02.026524 : Checking Access Token: ya29.AHES6ZR8xOQ9Ok6vg-hduUtVIiiJ5uvcUleoOGeozm9wJUCzMrx05A
+2013-07-28T18:56:02.132772 : Current Token Expires in 813 sec
+2013-07-28T18:56:02.134613 : Sending Fusion Command : /fusiontables/v1/query?access_token=ya29.AHES6ZR8xOQ9Ok6vg-hduUtVIiiJ5uvcUleoOGeozm9wJUCzMrx05A&sql=INSERT+INTO+1UspWE7G7ccKncYTUbEkpSaSitomsN-7vLkNdx-I+%28Date%2CTotObsTime%29+VALUES+%28%272013-07-28T22%3A56%3A02.026498%27%2C1.64888888889%29
+2013-07-28T18:56:02.895256 : 200 OK
+2013-07-28T18:57:03.008255 : Successfully Connected to eor-db
+2013-07-28T18:57:03.041136 : Sucessfully Executed Query: select starttime, stoptime from mwa_setting where projectid='G0009' and stoptime<1059087438.0
+2013-07-28T18:57:03.042813 : Checking Access Token: ya29.AHES6ZR8xOQ9Ok6vg-hduUtVIiiJ5uvcUleoOGeozm9wJUCzMrx05A
+2013-07-28T18:57:03.151383 : Current Token Expires in 752 sec
+2013-07-28T18:57:03.153175 : Sending Fusion Command : /fusiontables/v1/query?access_token=ya29.AHES6ZR8xOQ9Ok6vg-hduUtVIiiJ5uvcUleoOGeozm9wJUCzMrx05A&sql=INSERT+INTO+1UspWE7G7ccKncYTUbEkpSaSitomsN-7vLkNdx-I+%28Date%2CTotObsTime%29+VALUES+%28%272013-07-28T22%3A57%3A03.042786%27%2C1.64888888889%29
+2013-07-28T18:57:03.947840 : 200 OK
+2013-07-28T18:58:02.761293 : Successfully Connected to eor-db
+2013-07-28T18:58:02.786531 : Sucessfully Executed Query: select starttime, stoptime from mwa_setting where projectid='G0009' and stoptime<1059087498.0
+2013-07-28T18:58:02.788400 : Checking Access Token: ya29.AHES6ZR8xOQ9Ok6vg-hduUtVIiiJ5uvcUleoOGeozm9wJUCzMrx05A
+2013-07-28T18:58:02.895032 : Current Token Expires in 693 sec
+2013-07-28T18:58:02.897083 : Sending Fusion Command : /fusiontables/v1/query?access_token=ya29.AHES6ZR8xOQ9Ok6vg-hduUtVIiiJ5uvcUleoOGeozm9wJUCzMrx05A&sql=INSERT+INTO+1UspWE7G7ccKncYTUbEkpSaSitomsN-7vLkNdx-I+%28Date%2CTotObsTime%29+VALUES+%28%272013-07-28T22%3A58%3A02.788376%27%2C1.64888888889%29
+2013-07-28T18:58:03.532008 : 200 OK
+2013-07-28T18:59:02.334852 : Successfully Connected to eor-db
+2013-07-28T18:59:02.360758 : Sucessfully Executed Query: select starttime, stoptime from mwa_setting where projectid='G0009' and stoptime<1059087558.0
+2013-07-28T18:59:02.362560 : Checking Access Token: ya29.AHES6ZR8xOQ9Ok6vg-hduUtVIiiJ5uvcUleoOGeozm9wJUCzMrx05A
+2013-07-28T18:59:02.466932 : Current Token Expires in 633 sec
+2013-07-28T18:59:02.468876 : Sending Fusion Command : /fusiontables/v1/query?access_token=ya29.AHES6ZR8xOQ9Ok6vg-hduUtVIiiJ5uvcUleoOGeozm9wJUCzMrx05A&sql=INSERT+INTO+1UspWE7G7ccKncYTUbEkpSaSitomsN-7vLkNdx-I+%28Date%2CTotObsTime%29+VALUES+%28%272013-07-28T22%3A59%3A02.362532%27%2C1.64888888889%29
+2013-07-28T18:59:03.639982 : 200 OK
+2013-07-28T19:00:02.455915 : Successfully Connected to eor-db
+2013-07-28T19:00:02.482728 : Sucessfully Executed Query: select starttime, stoptime from mwa_setting where projectid='G0009' and stoptime<1059087618.0
+2013-07-28T19:00:02.484527 : Checking Access Token: ya29.AHES6ZR8xOQ9Ok6vg-hduUtVIiiJ5uvcUleoOGeozm9wJUCzMrx05A
+2013-07-28T19:00:02.608832 : Current Token Expires in 573 sec
+2013-07-28T19:00:02.610583 : Sending Fusion Command : /fusiontables/v1/query?access_token=ya29.AHES6ZR8xOQ9Ok6vg-hduUtVIiiJ5uvcUleoOGeozm9wJUCzMrx05A&sql=INSERT+INTO+1UspWE7G7ccKncYTUbEkpSaSitomsN-7vLkNdx-I+%28Date%2CTotObsTime%29+VALUES+%28%272013-07-28T23%3A00%3A02.484501%27%2C1.64888888889%29
+2013-07-28T19:00:03.441692 : 200 OK
+2013-07-28T20:22:33.498378 : Successfully Connected to eor-db
+2013-07-28T20:22:33.525963 : Sucessfully Executed Query: select starttime, stoptime from mwa_setting where projectid='G0009' and stoptime<1059092569.0
+2013-07-28T20:22:33.527839 : Checking Access Token
+2013-07-28T20:26:37.717485 : Successfully Connected to eor-db
+2013-07-28T20:26:37.744252 : Sucessfully Executed Query: select starttime, stoptime from mwa_setting where projectid='G0009' and stoptime<1059092813.0
+2013-07-28T20:26:37.746038 : Checking Access Token
+2013-07-28T20:27:39.280203 : Successfully Connected to eor-db
+2013-07-28T20:27:39.306069 : Sucessfully Executed Query: select starttime, stoptime from mwa_setting where projectid='G0009' and stoptime<1059092875.0
+2013-07-28T20:27:39.307855 : Checking Access Token
+2013-07-28T20:28:50.694444 : Successfully Connected to eor-db
+2013-07-28T20:28:50.720351 : Sucessfully Executed Query: select starttime, stoptime from mwa_setting where projectid='G0009' and stoptime<1059092946.0
+2013-07-28T20:28:50.722293 : Checking Access Token
+2013-07-28T20:43:06.656245 : Successfully Connected to eor-db
+2013-07-28T20:43:06.705864 : Sucessfully Executed Query: select starttime, stoptime from mwa_setting where projectid='G0009' and stoptime<1059093802.0
+2013-07-28T20:43:06.707765 : Checking Access Token
+2013-07-28T20:45:10.820043 : Successfully Connected to eor-db
+2013-07-28T20:45:10.864871 : Sucessfully Executed Query: select starttime, stoptime from mwa_setting where projectid='G0009' and stoptime<1059093926.0
+2013-07-28T20:45:10.866565 : Checking Access Token
+2013-07-28T20:45:10.994669 : Token Expired
+2013-07-28T20:45:10.996473 : Requesting New Access Token
+2013-07-28T20:45:11.163101 : Got New Access Token
+2013-07-28T20:45:11.167404 : Sending Fusion Command : /fusiontables/v1/query?access_token=ya29.AHES6ZRrvNICSCFqANxVXEed1FebopEhhbF2WqETIJ5g7s5NAFXRUQ&sql=INSERT+INTO+1UspWE7G7ccKncYTUbEkpSaSitomsN-7vLkNdx-I+%28Date%2CTotObsTime%29+VALUES+%28%272013-07-29T00%3A45%3A10.866522%27%2C1.64888888889%29
+2013-07-28T20:45:12.954271 : 200 OK
+2013-07-28 21:44:30.522980 : Successfully Connected to eor-db
+2013-07-28 21:44:30.554046 : Sucessfully Executed Query: select starttime, stoptime from mwa_setting where projectid='G0009' and stoptime<1059097486.0
+2013-07-28 21:44:30.555942 : Checking Access Token
+2013-07-28 21:44:30.684837 : Current Token Expires in 41 sec
+2013-07-28 21:44:30.686536 : Sending Fusion Command : /fusiontables/v1/query?access_token=ya29.AHES6ZRrvNICSCFqANxVXEed1FebopEhhbF2WqETIJ5g7s5NAFXRUQ&sql=INSERT+INTO+1UspWE7G7ccKncYTUbEkpSaSitomsN-7vLkNdx-I+%28Date%2CTotObsTime%29+VALUES+%28%272013-07-29+01%3A44%3A30.555898%27%2C1.64888888889%29
+2013-07-28 21:44:31.354105 : 200 OK
+2013-07-28 22:36:14.964553 : Successfully Connected to eor-db
+2013-07-28 22:36:14.993436 : Sucessfully Executed Query: select starttime, stoptime from mwa_setting where projectid='G0009' and stoptime<1059100590.0
+2013-07-28 22:36:14.995310 : Checking Access Token
+2013-07-28 22:36:15.147420 : Token Expired
+2013-07-28 22:36:15.149335 : Requesting New Access Token
+2013-07-28 22:36:15.606251 : Got New Access Token
+2013-07-28 22:36:15.610731 : Sending Fusion Command : /fusiontables/v1/query?access_token=ya29.AHES6ZRBAChmvPMS_wfoXWTsP0pU6MzT2u_W6jDBz6urZJekWqNrvds&sql=INSERT+INTO+1UspWE7G7ccKncYTUbEkpSaSitomsN-7vLkNdx-I+%28Date%2CTotObsTime%29+VALUES+%28%272013-07-29+02%3A36%3A14.995264%27%2C1.64888888889%29
+2013-07-28 22:36:16.451866 : 200 OK
+2013-07-29 00:00:02.977304 : Successfully Connected to eor-db
+2013-07-29 00:00:03.008337 : Sucessfully Executed Query: select starttime, stoptime from mwa_setting where projectid='G0009' and stoptime<1059105618.0
+2013-07-29 00:00:03.010346 : Checking Access Token
+2013-07-29 00:00:03.117243 : Token Expired
+2013-07-29 00:00:03.119053 : Requesting New Access Token
+2013-07-29 00:00:03.290643 : Got New Access Token
+2013-07-29 00:00:03.295441 : Sending Fusion Command : /fusiontables/v1/query?access_token=ya29.AHES6ZST0rHV4uZjWyEgxrRv4c0Cz50lD1NoHBCzlPHrYFYCo0ogjyA&sql=INSERT+INTO+1UspWE7G7ccKncYTUbEkpSaSitomsN-7vLkNdx-I+%28Date%2CTotObsTime%29+VALUES+%28%272013-07-29+04%3A00%3A03.010309%27%2C1.64888888889%29
+2013-07-29 00:00:04.438649 : 200 OK
+2013-07-29 15:01:22.830425 : Successfully Connected to eor-db
+2013-07-29 15:01:22.856127 : Sucessfully Executed Query: select starttime, stoptime from mwa_setting where projectid='G0009' and stoptime<1059159698.0
+2013-07-29 15:01:22.858027 : Checking Access Token
+2013-07-29 15:01:22.989389 : Token Expired
+2013-07-29 15:01:22.991198 : Requesting New Access Token
+2013-07-29 15:01:23.146094 : Got New Access Token
+2013-07-29 15:01:23.150405 : Sending Fusion Command : /fusiontables/v1/query?access_token=ya29.AHES6ZQY3Hexu7aDcdDLwHD8MGw7xIodFAbsVAyitoQeYdB8xxKbnpU&sql=INSERT+INTO+1UspWE7G7ccKncYTUbEkpSaSitomsN-7vLkNdx-I+%28Date%2CTotal+Hours+Observed%29+VALUES+%28%272013-07-29+19%3A01%3A22.857982%27%2C1.64888888889%29
+2013-07-29 15:01:23.297850 : 400 Bad Request
+2013-07-29 15:02:15.836773 : Successfully Connected to eor-db
+2013-07-29 15:02:15.863007 : Sucessfully Executed Query: select starttime, stoptime from mwa_setting where projectid='G0009' and stoptime<1059159751.0
+2013-07-29 15:02:15.864880 : Checking Access Token
+2013-07-29 15:02:15.974898 : Current Token Expires in 3548 sec
+2013-07-29 15:02:15.976704 : Sending Fusion Command : /fusiontables/v1/query?access_token=ya29.AHES6ZQY3Hexu7aDcdDLwHD8MGw7xIodFAbsVAyitoQeYdB8xxKbnpU&sql=INSERT+INTO+1UspWE7G7ccKncYTUbEkpSaSitomsN-7vLkNdx-I+%28Date%2CTotal+Hours+Observed%29+VALUES+%28%272013-07-29+19%3A02%3A15.864859%27%2C1.64888888889%29
+2013-07-29 15:02:16.103061 : 400 Bad Request
+2013-07-29 15:03:05.221515 : Successfully Connected to eor-db
+2013-07-29 15:03:05.250700 : Sucessfully Executed Query: select starttime, stoptime from mwa_setting where projectid='G0009' and stoptime<1059159801.0
+2013-07-29 15:03:05.252490 : Checking Access Token
+2013-07-29 15:03:05.383546 : Current Token Expires in 3498 sec
+2013-07-29 15:03:05.385323 : Sending Fusion Command : /fusiontables/v1/query?access_token=ya29.AHES6ZQY3Hexu7aDcdDLwHD8MGw7xIodFAbsVAyitoQeYdB8xxKbnpU&sql=INSERT+INTO+1UspWE7G7ccKncYTUbEkpSaSitomsN-7vLkNdx-I+%28Date%2CTotal%5C+Hours%5C+Observed%29+VALUES+%28%272013-07-29+19%3A03%3A05.252468%27%2C1.64888888889%29
+2013-07-29 15:03:05.500640 : 400 Bad Request
+2013-07-29 15:03:44.084228 : Successfully Connected to eor-db
+2013-07-29 15:03:44.111035 : Sucessfully Executed Query: select starttime, stoptime from mwa_setting where projectid='G0009' and stoptime<1059159840.0
+2013-07-29 15:03:44.112900 : Checking Access Token
+2013-07-29 15:03:44.215661 : Current Token Expires in 3459 sec
+2013-07-29 15:03:44.217395 : Sending Fusion Command : /fusiontables/v1/query?access_token=ya29.AHES6ZQY3Hexu7aDcdDLwHD8MGw7xIodFAbsVAyitoQeYdB8xxKbnpU&sql=INSERT+INTO+1UspWE7G7ccKncYTUbEkpSaSitomsN-7vLkNdx-I+%28Date%2CTotal_Hours_Observed%29+VALUES+%28%272013-07-29+19%3A03%3A44.112880%27%2C1.64888888889%29
+2013-07-29 15:03:45.828213 : 200 OK
+2013-07-29 15:10:48.877125 : Successfully Connected to eor-db
+2013-07-29 15:10:48.902456 : Sucessfully Executed Query: select starttime, stoptime from mwa_setting where projectid='G0009' and stoptime<1059160264.0
+2013-07-29 15:11:24.415146 : Successfully Connected to eor-db
+2013-07-29 15:11:24.440273 : Sucessfully Executed Query: select starttime, stoptime from mwa_setting where projectid='G0009' and stoptime<1059160300.0
+2013-07-29 15:11:41.465767 : Successfully Connected to eor-db
+2013-07-29 15:11:41.491589 : Sucessfully Executed Query: select starttime, stoptime from mwa_setting where projectid='G0009' and stoptime<1059160317.0
+2013-07-29 15:11:41.514416 : Successfully Connected to eor-db
+2013-07-29 15:11:41.539879 : Sucessfully Executed Query: select starttime,stoptime from mwa_setting where projectid='G0009'
+2013-07-29 15:12:06.952262 : Successfully Connected to eor-db
+2013-07-29 15:12:06.978291 : Sucessfully Executed Query: select starttime, stoptime from mwa_setting where projectid='G0009' and stoptime<1059160342.0
+2013-07-29 15:12:07.007997 : Successfully Connected to eor-db
+2013-07-29 15:12:07.033748 : Sucessfully Executed Query: select starttime,stoptime from mwa_setting where projectid='G0009'
+2013-07-29 15:12:07.035527 : Checking Access Token
+2013-07-29 15:12:07.170055 : Current Token Expires in 2956 sec
+2013-07-29 15:12:07.171777 : Sending Fusion Command : /fusiontables/v1/query?access_token=ya29.AHES6ZQY3Hexu7aDcdDLwHD8MGw7xIodFAbsVAyitoQeYdB8xxKbnpU&sql=INSERT+INTO+1UspWE7G7ccKncYTUbEkpSaSitomsN-7vLkNdx-I+%28Date%2CTotal_Hours_Observed%2CTotal_Hours_Scheduled%29+VALUES+%28%272013-07-29+19%3A12%3A07.035502%27%2C1.64888888889%2C1.64888888889%29
+2013-07-29 15:12:09.276946 : 200 OK
+2013-07-29 15:14:50.678671 : Successfully Connected to eor-db
+2013-07-29 15:14:50.705608 : Sucessfully Executed Query: select starttime, stoptime from mwa_setting where projectid='G0009' and stoptime<1059160506.0
+2013-07-29 15:14:50.729660 : Successfully Connected to eor-db
+2013-07-29 15:14:50.756110 : Sucessfully Executed Query: select starttime, stoptime from mwa_setting where projectid='G0009'
+2013-07-29 15:14:50.758067 : Checking Access Token
+2013-07-29 15:14:50.867873 : Current Token Expires in 2793 sec
+2013-07-29 15:14:50.869730 : Sending Fusion Command : /fusiontables/v1/query?access_token=ya29.AHES6ZQY3Hexu7aDcdDLwHD8MGw7xIodFAbsVAyitoQeYdB8xxKbnpU&sql=INSERT+INTO+1UspWE7G7ccKncYTUbEkpSaSitomsN-7vLkNdx-I+%28Date%2CTotal_Hours_Observed%2CTotal_Hours_Scheduled%29+VALUES+%28%272013-07-29+19%3A14%3A50.758043%27%2C1.64888888889%2C1.64888888889%29
+2013-07-29 15:14:52.161750 : 200 OK
+2013-07-29 18:00:02.430530 : Successfully Connected to eor-db
+2013-07-29 18:00:02.469379 : Sucessfully Executed Query: select starttime, stoptime from mwa_setting where projectid='G0009' and stoptime<1059170418.0
+2013-07-29 18:00:02.493816 : Successfully Connected to eor-db
+2013-07-29 18:00:02.518614 : Sucessfully Executed Query: select starttime, stoptime from mwa_setting where projectid='G0009'
+2013-07-29 18:00:02.520106 : Checking Access Token
+2013-07-29 18:00:02.709025 : Token Expired
+2013-07-29 18:00:02.710775 : Requesting New Access Token
+2013-07-29 18:00:02.894219 : Got New Access Token
+2013-07-29 18:00:02.898297 : Sending Fusion Command : /fusiontables/v1/query?access_token=ya29.AHES6ZQU1HFYEtlTTpLCo6O9W7lz0WpJbM5yUNilb02VQbBF4vbCqRg&sql=INSERT+INTO+1UspWE7G7ccKncYTUbEkpSaSitomsN-7vLkNdx-I+%28Date%2CTotal_Hours_Observed%2CTotal_Hours_Scheduled%29+VALUES+%28%272013-07-29+22%3A00%3A02.520083%27%2C1.64888888889%2C1.64888888889%29
+2013-07-29 18:00:03.899756 : 200 OK

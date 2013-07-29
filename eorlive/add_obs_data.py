@@ -58,7 +58,7 @@ class FusionConnector():
     def write_log(self,message):
         nowtime = datetime.now()
         logfile=open(self.log_file,'a')
-        logfile.write(nowtime.isoformat()+' : '+message+'\n')
+        logfile.write(nowtime.isoformat(' ')+' : '+message+'\n')
         logfile.close()
         
 
@@ -78,21 +78,24 @@ class FusionConnector():
         nowtime=datetime.now()
         self.write_log('Got New Access Token')
         self.access_token=access_token
-        
+        pickle.dump(self,open(fusionname,'wb'))
+
     def is_expired(self):
         self.write_log('Checking Access Token')
-        data=urllib.urlencode({'access_token':self.access_token})
-        request=urllib2.Request(url="https://www.googleapis.com/oauth2/v1/tokeninfo",data=data)
-        request_open=urllib2.urlopen(request)
-        response=request_open.read()
-        request_open.close()
-        expire_info=json.loads(response)
-        expire_info=expire_info['expires_in']
+        access_token=self.access_token
+        data=urllib.urlencode({'access_token':access_token})
+        request=urllib2.Request(url='https://www.googleapis.com/oauth2/v1/tokeninfo',data=data)
+        try:
+            request_open=urllib2.urlopen(request)
+            response=request_open.read()
+            request_open.close()
+            expire_info=json.loads(response)
+            expire_info=expire_info['expires_in']
         #if token is not expired return true
-        self.write_log('Current Token Expires in '+str(expire_info)+' sec')
-        if(expire_info>0):
+            self.write_log('Current Token Expires in '+str(expire_info)+' sec')
             return False
-        else:
+        except: 
+            self.write_log('Token Expired')
             return True
 
 
@@ -128,18 +131,25 @@ class FusionConnector():
         
 
 
-    def insert_times(self):
-     
+    def insert_data(self):     
    #first add up all observation times
         nowtime=GPSseconds_now()
         rows=self.send_eor_query('select starttime, stoptime from mwa_setting where projectid=\'G0009\' and stoptime<'+str(nowtime))
-        totsecs=0.
+        totobssecs=0.
         for row in rows:
-            totsecs=totsecs+row[1]-row[0]
-        tothours=totsecs/3600.
+            totobssecs=totobssecs+row[1]-row[0]
+        totobshours=totobssecs/3600.
         nowtime=datetime.utcnow()
-        query='INSERT INTO %s (Date,TotObsTime) VALUES (\'%s\',%s)'%(self.tableid,nowtime.isoformat(),str(tothours))
+        #next add up total scheduled times
+        rows=self.send_eor_query('select starttime, stoptime from mwa_setting where projectid=\'G0009\'')
+        totschsecs=0.
+        for row in rows:
+            totschsecs=totschsecs+row[1]-row[0]
+        totschhours=totschsecs/3600.
+        nowtime=datetime.utcnow()
+        query='INSERT INTO %s (Date,Total_Hours_Observed,Total_Hours_Scheduled) VALUES (\'%s\',%s,%s)'%(self.tableid,nowtime.isoformat(' '),str(totobshours),str(totschhours))
         self.send_fusion_query('POST',query,{'Content-Length':0})
+
         
         
 if __name__=='__main__':
@@ -148,7 +158,6 @@ if __name__=='__main__':
         pickle.dump(fuser,open(fusionname,'wb'))
     else:
         fuser=pickle.load(open(fusionname,'rb'))
-    fuser.insert_times()
+    fuser.insert_data()
     pickle.dump(fuser,open(fusionname,'wb'))
-
         

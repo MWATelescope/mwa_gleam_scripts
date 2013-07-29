@@ -1,145 +1,151 @@
-<!DOCTYPE html>
-<html>
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
 <head>
-<script src="jquery-latest.js"></script>
-<script type="text/javascript">
+  <script type="text/javascript" src="https://www.google.com/jsapi"></script>
+  <script src="jquery-latest.js"></script>
+  <script type="text/javascript">
 
-function createXHR(){
-try{
-return new XMLHttpRequest();
-}
-catch(e) {
-try {
-return new ActiveXObject("Microsoft.XMLHTTP");
-}
-catch(e) {
-return new ActiveXObject("Msxml2.XMLHTTP");
-}
-}
-}
+    function createXHR()
+    {
+    try{
+    return new XMLHttpRequest();
+    }
+    catch(e) {
+    try {
+    return new ActiveXObject("Microsoft.XMLHTTP");
+    }
+    catch(e) {
+    return new ActiveXObject("Msxml2.XMLHTTP");
+    }
+    }
+    }
 
-function recentData()
-{
-var xhr = createXHR();
-xhr.onreadystatechange=function()
-{
-if(xhr.status==200 && xhr.readyState==4)
-{
-document.getElementById("LastData").innerHTML=xhr.responseText;
-}
-};
-xhr.open("GET","LastData.php",true);
-xhr.send();
-}
-
-
-function showG9()
-{
-var xhr = createXHR();
-xhr.onreadystatechange=function()
-{
-if(xhr.status==200 && xhr.readyState==4)
-{
-document.getElementById("G9Div").innerHTML=xhr.responseText;
-}
-};
-xhr.open("GET","G9Total.php",true);
-xhr.send();
-}
-
-function getTime()
-{
-var xhr=createXHR();
-xhr.onreadystatechange=function()
-{
-if(xhr.status==200 && xhr.readyState==4)
-{
-document.getElementById("myDiv").innerHTML=xhr.responseText;
-}
-};
-xhr.open("GET","ServerTime.php",true);
-xhr.send();
-}
-
-function commandCount()
-{
-var xhr=createXHR();
-xhr.onreadystatechange=function()
-{
-if(xhr.status==200 && xhr.readyState==4)
-{
-document.getElementById("commandCount").innerHTML=xhr.responseText;
-}
-};
-xhr.open("GET","CommandCount.php",true);
-xhr.send();
-}
-
-function goodCount(rx_id)
-{
-rx_id=rx_id.toString();
-var xhr=createXHR();
-xhr.onreadystatechange=function()
-{
-if(xhr.status==200 && xhr.readyState==4)
-{
-document.getElementById("goodCount"+rx_id).innerHTML=xhr.responseText;
-}
-};
-xhr.open("GET","GoodCount.php?rx_id="+rx_id,true);
-xhr.send();
-}
+    function recentData()
+    {
+    var xhr = createXHR();
+    xhr.onreadystatechange=function()
+    {
+    if(xhr.status==200 && xhr.readyState==4)
+    {
+    document.getElementById("LastData").innerHTML=xhr.responseText;
+    }
+    };
+    xhr.open("GET","LastData.php",true);
+    xhr.send();
+    }
 
 
-function diskSpace()
-{
-var xhr=createXHR();
-xhr.onreadystatechange=function()
-{
-if(xhr.status==200 && xhr.readyState==4)
-{
-document.getElementById("diskSpace").innerHTML=xhr.responseText;
-}
-};
-xhr.open("GET","DiskSpace.php");
-xhr.send();
-}
+    function showG9()
+    {
+    var xhr = createXHR();
+    xhr.onreadystatechange=function()
+    {
+    if(xhr.status==200 && xhr.readyState==4)
+    {
+    document.getElementById("G9Div").innerHTML=xhr.responseText;
+    }
+    };
+    xhr.open("GET","G9Total.php",true);
+    xhr.send();
+    }
+    
+    function getTime()
+    {
+    var xhr=createXHR();
+    xhr.onreadystatechange=function()
+    {
+    if(xhr.status==200 && xhr.readyState==4)
+    {
+    document.getElementById("myDiv").innerHTML=xhr.responseText;
+    }
+    };
+    xhr.open("GET","ServerTime.php",true);
+    xhr.send();
+    }
+    
+    function commandCount()
+    {
+    var xhr=createXHR();
+    xhr.onreadystatechange=function()
+    {
+    if(xhr.status==200 && xhr.readyState==4)
+    {
+    document.getElementById("commandCount").innerHTML=xhr.responseText;
+    }
+    };
+    xhr.open("GET","CommandCount.php",true);
+    xhr.send();
+    }
+    
+    function goodCount(rx_id)
+    {
+    rx_id=rx_id.toString();
+    var xhr=createXHR();
+    xhr.onreadystatechange=function()
+    {
+    if(xhr.status==200 && xhr.readyState==4)
+    {
+    document.getElementById("goodCount"+rx_id).innerHTML=xhr.responseText;
+    }
+    };
+    xhr.open("GET","GoodCount.php?rx_id="+rx_id,true);
+    xhr.send();
+    }
 
 
-function goodCounts()
-{
-for(var i = 1; i<=16; i++)
-{
-goodCount(i);
-}
-}
+    function diskSpace()
+    {
+    var xhr=createXHR();
+    xhr.onreadystatechange=function()
+    {
+    if(xhr.status==200 && xhr.readyState==4)
+    {
+    document.getElementById("diskSpace").innerHTML=xhr.responseText;
+    }
+    };
+    xhr.open("GET","DiskSpace.php");
+    xhr.send();
+    }
 
 
-function init()
-{
-getTime();
-showG9();
-recentData();
-commandCount();
-goodCounts();
-diskSpace();
-}
-window.onload=init();
-var refreshId0 = window.setInterval("getTime()",1000);
-var refreshId1 = window.setInterval("showG9()",10000);
-var refreshId2 = window.setInterval("recentData()",1000);
-var refreshId3 = window.setInterval("commandCount()",10000);
-var refreshId4 = window.setInterval("goodCounts()",120000);
-var refreshId5 = window.setInterval("diskSpace()",10000);
-</script>
-
+    function goodCounts()
+    {
+    for(var i = 1; i<=16; i++)
+			  {
+			  goodCount(i);
+			  }
+			  }
+			  
+			  function init()
+			  {
+			  getTime();
+			  showG9();
+			  recentData();
+			  commandCount();
+			  goodCounts();
+			  diskSpace();
+			  }
+			  window.onload=init();
+			  var refreshId0 = window.setInterval("getTime()",1000);
+			  var refreshId1 = window.setInterval("showG9()",10000);
+			  var refreshId2 = window.setInterval("recentData()",1000);
+			  var refreshId3 = window.setInterval("commandCount()",10000);
+			  var refreshId4 = window.setInterval("goodCounts()",120000);
+			  var refreshId5 = window.setInterval("diskSpace()",10000);
+  </script>
 </head>
 
 <body>
+<div id="divqText"></div>
 The Time at MIT is 
 <div id="myDiv">Loading...</div>
+<iframe width="800" height="600" scrolling="no" frameborder="no" src="https://www.google.com/fusiontables/embedviz?containerId=gviz_canvas&amp;q=select+col0%2C+col1%2C+col4+from+1UspWE7G7ccKncYTUbEkpSaSitomsN-7vLkNdx-I+order+by+col0+asc&amp;viz=GVIZ&amp;t=SCATTER&amp;rmax=250&amp;uiversion=2&amp;gco_forceIFrame=true&amp;gco_hasLabelsColumn=true&amp;width=800&amp;height=600"></iframe>
+
+<iframe width="800" height="200" src="http://cerberus.mwa128t.org/cgi-bin/nagios3/status.cgi?hostgroup=tiles&style=summary&noheader"></iframe>
 The Total Number of G0009 Hours is
 <div id="G9Div">Loading...</div>
+<div id="visualization_div" style="width: 900px; height: 500px;"></div>
 Last NGAS Download
 <div id="LastData">Loading...</div>
 Number of Commanded Observations in Last 12 Hours

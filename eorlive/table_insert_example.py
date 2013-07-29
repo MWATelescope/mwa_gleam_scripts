@@ -52,6 +52,7 @@ if __name__=='__main__':
     print response
                          
     '''
+    '''
     params = "?key=%s&access_token=%s" % (api_key, access_token)
     request = httplib.HTTPSConnection("www.googleapis.com")
     query='INSERT INTO %s (Text,Number,Location,Date) VALUES (\'\',500,\'\',\'2013-07-25 23:35:00\')'%(tableid)
@@ -61,22 +62,22 @@ if __name__=='__main__':
     request.request("POST", sqlcmd,headers={'Content-Length':0})
     response = request.getresponse()
     print response.status, response.reason
-    if(response.status==401):
-        data = urllib.urlencode({
-                'client_id': client_id,
-                'client_secret': client_secret,
-                'refresh_token': refresh_token,
-                'grant_type': 'refresh_token'})
-        request = urllib2.Request(url='https://accounts.google.com/o/oauth2/token',data=data)
-        request_open = urllib2.urlopen(request)
-        response = request_open.read()
-        request_open.close()
-        tokens = json.loads(response)
-        access_token = tokens['access_token']
-        print access_token
+    '''
+    '''
+    data = urllib.urlencode({
+            'client_id': client_id,
+            'client_secret': client_secret,
+            'refresh_token': refresh_token,
+            'grant_type': 'refresh_token'})
+    request = urllib2.Request(url='https://accounts.google.com/o/oauth2/token',data=data)
+    request_open = urllib2.urlopen(request)
+    response = request_open.read()
+    request_open.close()
+    tokens = json.loads(response)
+    access_token = tokens['access_token']
+    print access_token
+    '''
 
-    response = response.read()
-    print response
     
     #now check token info
     data=urllib.urlencode({'access_token':access_token})
