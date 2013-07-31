@@ -1,6 +1,6 @@
 
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
-<html xmlns="http://www.w3.org/1999/xhtml">
+
+<html>
 <link rel="stylesheet" type="text/css" href="eorlive.css">
 <head>
   <script type="text/javascript" src="https://www.google.com/jsapi"></script>
@@ -16,7 +16,8 @@
     
 
     var queryText=encodeURIComponent('select A,B,C,D,E');
-    var key='0Au_2bmQn8fR4dHFqb0VwNHpKdjBoWFZrVzV3dm8zenc';
+    <!--var key='0Au_2bmQn8fR4dHFqb0VwNHpKdjBoWFZrVzV3dm8zenc';-->
+    var key='0Ate0sqkDCwhydEpHMnlHckFSRjRhaE5IdHFUcDd2enc'
     var query = new google.visualization.Query('http://spreadsheets.google.com/a/google.com/tq?key='+key+'&tq='+queryText);
     document.getElementById("obslog").innerHTML="http://spreadsheets.google.com/a/google.com/tq?key="+key+"&tq="+queryText;
     
@@ -28,7 +29,7 @@
     }
     var data = response.getDataTable();
     var table = new google.visualization.Table(document.getElementById("obslog"));
-    table.draw(data, {showRowNumber: false});
+    table.draw(data, {showRowNumber: false, width: 1000});
     });
     }
 
@@ -102,13 +103,52 @@
     {
     if(xhr.status==200 && xhr.readyState==4)
     {
-    document.getElementById("timeMIT").innerHTML=xhr.responseText;
+    var timestr=xhr.responseText;
+    var bostonTime=timestr.substr(0,19);
+    var phoenixTime=timestr.substr(19,19);
+    var sydneyTime=timestr.substr(38,19);
+    var bangaloreTime=timestr.substr(57,19);
+    var perthTime=timestr.substr(76,19);
+    document.getElementById("timeBoston").innerHTML=bostonTime;
+    document.getElementById("timePhoenix").innerHTML=phoenixTime;
+    document.getElementById("timeSydney").innerHTML=sydneyTime;
+    document.getElementById("timeBangalore").innerHTML=bangaloreTime;
+    document.getElementById("timeMWA").innerHTML=perthTime;
     }
     };
     xhr.open("GET","ServerTime.php",true);
     xhr.send();
     }
     
+    function getG9Day()
+    {
+    var xhr=createXHR()
+    xhr.onreadystatechange=function()
+    {
+    if(xhr.status==200 && xhr.readyState==4)
+    {
+    document.getElementById("DayCount").innerHTML=xhr.responseText;
+    }
+    };
+    xhr.open("GET","G9DayCount.php",true);
+    xhr.send();
+    }
+
+    function getG9()
+    {
+    var xhr=createXHR()
+    xhr.onreadystatechange=function()
+    {
+    if(xhr.status==200 && xhr.readyState==4)
+    {
+    document.getElementById("TotCount").innerHTML=xhr.responseText;
+    }
+    };
+    xhr.open("GET","G9Count.php",true);
+    xhr.send();
+    }
+    
+
     function commandCount()
     {
     var xhr=createXHR();
@@ -166,11 +206,15 @@
 			  {
 			  getTime();
 			  getNextObs();
+			  getG9Day();
+			  getG9();
 			  }
 			  window.onload=init();
 			 google.setOnLoadCallback(loadLog);
 			 var refresh1=window.setInterval("getTime()",1000);
 			 var refresh2=window.setInterval("getNextObs()",60000);
+			 var refresh3=window.setInterval("getG9Day()",60000);
+			 var refresh4=window.setInterval("getG9()",60000);
   </script>
 </head>
 
@@ -179,20 +223,47 @@
 <h1> EoR Observing Webpage </h1>
 </div>
 <table class="timetable" id="timetable">
-<tr> <th> MIT </th> <th> Curtin </th> </tr>
-<tr> <td> <div id="timeMIT" class="time">Loading...</div></td><td> <div="timeCurtin"> </td></tr>
+<tr> <th class="timeth"> Boston </th> <th class="timeth"> Pheonix </th> <th class="timeth"> Sidney </th> <th class="timeth"> Bangalore </th> <th class="timeth"> MWA Site </th></tr>
+<tr> <td id="timeBoston" class="time">Loading...</td><td id="timePhoenix" class="time">Loading... </td> <td id="timeSydney">Loading...</td><td id="timeBangalore" class="time">Loading...</td><td id="timeMWA">Loading...</td></tr>
 </table>
-<div id="nextobstitle" class="leftlabel">
-<h2>Next Observation in : </h2><div id="nextobsinner" class="nextobsinner"></div>
-<div id="nextobs" class="righdata">
-</div>
-</div>
-</div>
-<div id="obslogwrapper" class="wrapper">
-<a href= ></a>
-<div id="obslog" class="obslog">
+<table>
+<tr>
+<td id="nextobstitle" class="nextobs">
+<font size="5">Next Observation in :</font> 
+</td>
+<td id="nextobs" class="nextobs">
+</td>
+</tr>
+<tr>
+<td class="nextobs">
+Next 24 Hours
+</td>
+<td class="nextobs">
+Total Queued
+</td>
+</tr>
+<tr>
+<td id="DayCount" class="nextobs">
+
+</td>
+<td id="TotCount" class="nextobs">
+</td>
+</tr>
+</table>
+<table>
+<tr>
+<td id="obslog" class="obslog" colspan="2">
 Loading...
-</div>\
-</div>
+</td>
+</tr>
+<tr>
+<td colspan="2">
+<a class="button" href="https://docs.google.com/forms/d/1TbSXkRDUajoVls3tg6df9ZoJsnCf0Eu5LD2juNPEn0M/viewform" target="_blank">Make a Log Entry!</a>
+</td>
+</tr>
+<tr class="plotwrapper"><td id="timeplot" class="plot"><iframe width="500" height="300" scrolling="no" frameborder="no" src="https://www.google.com/fusiontables/embedviz?containerId=gviz_canvas&amp;viz=GVIZ&amp;t=LINE_AGGREGATE&amp;isXyPlot=true&amp;bsize=0&amp;q=select+col0%2C+col4%2C+col5%2C+col1+from+1UspWE7G7ccKncYTUbEkpSaSitomsN-7vLkNdx-I&amp;qrs=+where+col0+%3E%3D+&amp;qre=+and+col0+%3C%3D+&amp;qe=+order+by+col0+asc&amp;uiversion=2&amp;gco_forceIFrame=true&amp;gco_hasLabelsColumn=true&amp;width=500&amp;height=300"></iframe></td>
+<td id="rxplot" class="plot"><iframe width="500" height="300" scrolling="no" frameborder="no" src="https://www.google.com/fusiontables/embedviz?containerId=gviz_canvas&amp;viz=GVIZ&amp;t=LINE_AGGREGATE&amp;isXyPlot=true&amp;bsize=0&amp;q=select+col0%2C+col7%2C+col6%2C+col8%2C+col9%2C+col10%2C+col11%2C+col12%2C+col13%2C+col14%2C+col15%2C+col16%2C+col18%2C+col19%2C+col20%2C+col21+from+1UspWE7G7ccKncYTUbEkpSaSitomsN-7vLkNdx-I&amp;qrs=+where+col0+%3E%3D+&amp;qre=+and+col0+%3C%3D+&amp;qe=+order+by+col0+asc&amp;uiversion=2&amp;gco_forceIFrame=true&amp;gco_hasLabelsColumn=true&amp;width=500&amp;height=300"></iframe></td></tr>
+</table>
+
 </body>
 </html>

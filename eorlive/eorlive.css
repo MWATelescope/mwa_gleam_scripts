@@ -16,15 +16,17 @@ text-align:center;
 }
 div.obslog
 {
-max-width:200 px;
+display:inline;
+width:500 px;
 color:black;
 }
 table.timetable
 {
 color:white;
 }
-div.nextobs
+td.nextobs
 {
+valign:middle;
 color:white;
 }
 div.nextobsinner
@@ -35,12 +37,72 @@ div.time
 {
 color:white;
 }
-div.leftlabel
+div.inline
 {
 color:white;
 }
-div.rightdata
+div.label
 {
-float:right;
 color:white;
 }
+li.plotwrapper
+{
+display:inline;
+float:left;
+}
+table
+{
+margin-right:auto;
+margin-left:auto;
+}
+table.timetable
+{
+    width: 1000 px;
+    border: 1 px solid white;
+}
+th.timeth
+{
+    text-align:center;
+    width:166 px;
+    border: 5 px solid white;
+}
+td.time
+{
+width:166 px;
+text-align:center;
+}
+
+
+
+ul.plot
+{
+height:auto;
+width:auto;
+display:inline;
+float:left;
+}
+
+td.plot
+{
+height:300 px;
+width:500 px;
+padding:0 px;
+}
+td.obslog
+{
+width:500 px;
+color:black;
+}
+a.button
+{
+    -moz-appearance: button;
+    -ms-appearance: button;
+    -o-appearance: button;
+    -webkit-appearance: button;
+    appearance: button;
+    text-decoration: none;
+    color: #000;
+    padding: 0.2em 0.4em;
+}
+
+
