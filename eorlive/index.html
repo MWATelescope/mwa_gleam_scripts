@@ -1,10 +1,39 @@
 
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml">
+<link rel="stylesheet" type="text/css" href="eorlive.css">
 <head>
   <script type="text/javascript" src="https://www.google.com/jsapi"></script>
   <script src="jquery-latest.js"></script>
   <script type="text/javascript">
+    
+
+    google.load("visualization", "1", {'packages':['table']});
+
+    function loadLog()
+    {
+    
+    
+
+    var queryText=encodeURIComponent('select A,B,C,D,E');
+    var key='0Au_2bmQn8fR4dHFqb0VwNHpKdjBoWFZrVzV3dm8zenc';
+    var query = new google.visualization.Query('http://spreadsheets.google.com/a/google.com/tq?key='+key+'&tq='+queryText);
+    document.getElementById("obslog").innerHTML="http://spreadsheets.google.com/a/google.com/tq?key="+key+"&tq="+queryText;
+    
+    query.send(
+    function(response){
+    if (response.isError()) {
+    alert('Error in query: ' + response.getMessage() + ' ' + response.getDetailedMessage());
+    return;
+    }
+    var data = response.getDataTable();
+    var table = new google.visualization.Table(document.getElementById("obslog"));
+    table.draw(data, {showRowNumber: false});
+    });
+    }
+
+
+    
 
     function createXHR()
     {
@@ -21,6 +50,21 @@
     }
     }
 
+    <!-- This Function get's the time of the next Observation-->
+    function getNextObs()
+    {
+    var xhr=createXHR();
+    xhr.onreadystatechange=function()
+    {
+    if(xhr.status==200 && xhr.readyState==4)
+    {
+    document.getElementById("nextobs").innerHTML=xhr.responseText;
+    }
+    }
+    xhr.open("GET","NextG9Obs.php",true);
+    xhr.send();
+    }
+
     function recentData()
     {
     var xhr = createXHR();
@@ -34,6 +78,7 @@
     xhr.open("GET","LastData.php",true);
     xhr.send();
     }
+
 
 
     function showG9()
@@ -57,7 +102,7 @@
     {
     if(xhr.status==200 && xhr.readyState==4)
     {
-    document.getElementById("myDiv").innerHTML=xhr.responseText;
+    document.getElementById("timeMIT").innerHTML=xhr.responseText;
     }
     };
     xhr.open("GET","ServerTime.php",true);
@@ -120,56 +165,34 @@
 			  function init()
 			  {
 			  getTime();
-			  showG9();
-			  recentData();
-			  commandCount();
-			  goodCounts();
-			  diskSpace();
+			  getNextObs();
 			  }
 			  window.onload=init();
-			  var refreshId0 = window.setInterval("getTime()",1000);
-			  var refreshId1 = window.setInterval("showG9()",10000);
-			  var refreshId2 = window.setInterval("recentData()",1000);
-			  var refreshId3 = window.setInterval("commandCount()",10000);
-			  var refreshId4 = window.setInterval("goodCounts()",120000);
-			  var refreshId5 = window.setInterval("diskSpace()",10000);
+			 google.setOnLoadCallback(loadLog);
+			 var refresh1=window.setInterval("getTime()",1000);
+			 var refresh2=window.setInterval("getNextObs()",60000);
   </script>
 </head>
 
 <body>
-<div id="divqText"></div>
-The Time at MIT is 
-<div id="myDiv">Loading...</div>
-<iframe width="800" height="600" scrolling="no" frameborder="no" src="https://www.google.com/fusiontables/embedviz?containerId=gviz_canvas&amp;q=select+col0%2C+col1%2C+col4+from+1UspWE7G7ccKncYTUbEkpSaSitomsN-7vLkNdx-I+order+by+col0+asc&amp;viz=GVIZ&amp;t=SCATTER&amp;rmax=250&amp;uiversion=2&amp;gco_forceIFrame=true&amp;gco_hasLabelsColumn=true&amp;width=800&amp;height=600"></iframe>
-
-<iframe width="800" height="200" src="http://cerberus.mwa128t.org/cgi-bin/nagios3/status.cgi?hostgroup=tiles&style=summary&noheader"></iframe>
-The Total Number of G0009 Hours is
-<div id="G9Div">Loading...</div>
-<div id="visualization_div" style="width: 900px; height: 500px;"></div>
-Last NGAS Download
-<div id="LastData">Loading...</div>
-Number of Commanded Observations in Last 12 Hours
-<div id="commandCount">Loading...</div>
-Disk Space (/eor-02/r2/ for now)
-<div id="diskSpace">Loading...</div>
-Disk Space
-<div id="diskSpace (/nfs/eor-02/r1 for now)">Loading...</div>
-Number of Commanded Observations that Receiver Indicated "Good" on
-<div id="goodCount1">Loading...</div>
-<div id="goodCount2">Loading...</div>
-<div id="goodCount3">Loading...</div>
-<div id="goodCount4">Loading...</div>
-<div id="goodCount5">Loading...</div>
-<div id="goodCount6">Loading...</div>
-<div id="goodCount7">Loading...</div>
-<div id="goodCount8">Loading...</div>
-<div id="goodCount9">Loading...</div>
-<div id="goodCount10">Loading...</div>
-<div id="goodCount11">Loading...</div>
-<div id="goodCount12">Loading...</div>
-<div id="goodCount13">Loading...</div>
-<div id="goodCount14">Loading...</div>
-<div id="goodCount15">Loading...</div>
-<div id="goodCount16">Loading...</div>
+<div id="title" class="title">
+<h1> EoR Observing Webpage </h1>
+</div>
+<table class="timetable" id="timetable">
+<tr> <th> MIT </th> <th> Curtin </th> </tr>
+<tr> <td> <div id="timeMIT" class="time">Loading...</div></td><td> <div="timeCurtin"> </td></tr>
+</table>
+<div id="nextobstitle" class="leftlabel">
+<h2>Next Observation in : </h2><div id="nextobsinner" class="nextobsinner"></div>
+<div id="nextobs" class="righdata">
+</div>
+</div>
+</div>
+<div id="obslogwrapper" class="wrapper">
+<a href= ></a>
+<div id="obslog" class="obslog">
+Loading...
+</div>\
+</div>
 </body>
 </html>
