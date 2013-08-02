@@ -21,7 +21,6 @@ using namespace std;
 //#define DEC_KEY "DECIMATION"
 
 #define PRINTERRMSG(status) {if (status != 0) { \
-fits_read_errmsg(errmsg);                       \
 fits_report_error(stderr, status);              \
 return status;                                  \
 }}                                              \
