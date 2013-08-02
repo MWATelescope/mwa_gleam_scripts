@@ -1,4 +1,4 @@
-import urllib2,urllib,simplejson,sys,httplib,json,pickle,psycopg2,os,traceback
+import urllib2,urllib,simplejson,sys,httplib,json,pickle,psycopg2,os,traceback,re
 from mwapy.ephem_utils import GPSseconds_now
 from datetime import datetime
 
@@ -108,9 +108,57 @@ class FusionConnector():
         request.request(method,sqlcmd,headers=headers)
         response=request.getresponse()
         self.write_log(str(response.status)+' '+response.reason)
-        
-        
 
+
+    def get_mit_download_time(self):
+        request=urllib2.Request(url='http://eor-02.mit.edu:7777/QUERY?query=files_list&format=list')
+        request_open=urllib2.urlopen(request)
+        response=request_open.read()
+        request_open.close()
+        lineiterator=iter(response.splitlines())
+        #iterate through all obserations at MIT, check obsid in data base to see if observation is G0009
+        #if it is, add total observation seconds to observation time
+        p=re.compile('/[0-9]{10}_')
+        id_list=[]
+        for line in lineiterator:
+            m=p.search(line)
+            if(m):
+                obsid=int(line[m.start()+1:m.end()-1])
+                if(not(obsid in id_list)):
+                    id_list.append(obsid)
+                    id_list.sort()
+        #now iterate through obsid list check if data data is G0009 and find observation time
+        tottime=0.
+        rows_g9 = self.send_eor_query('select starttime, stoptime, projectid from mwa_setting where projectid=\'G0009\'')
+        for row in rows_g9:
+            if(row[0] in id_list):
+                    tottime+=(row[1]-row[0])
+            
+
+        return tottime/3600.
+    
+    def get_fail_rates(self):
+        quarter_hour_cmds=self.send_eor_query("select count(*) from (select distinct on (observation_number) observation_number, mode from obsc_mwa_setting where observation_number >(gpsnow()-15*60) and mode!='standby' ) as foo")
+        cmd_count=0.
+        try:
+            quarter_hour_cmds=quarter_hour_cmds[0]
+            cmd_count=quarter_hour_cmds[0]
+        except Exception,e:
+            self.write_log("Error getting total command counts : "+str(e))
+        fail_rates=range(0,16)
+        for rx in range(1,17):
+            good_cmds=self.send_eor_query("select count(*) from (select distinct on (rr.observation_number,rx_state_good) rr.observation_number from recv_readiness rr inner join obsc_mwa_setting oc on rr.observation_number=oc.observation_number where rr.rx_id="+str(rx)+" and rr.observation_number > (gpsnow()-15*60) and oc.mode!='standby' and rr.rx_state_good='t') as foo")
+            try:
+                fail_rates[rx-1]=1.-good_cmds[0][0]/cmd_count
+            except Exception,e:
+                fail_rates[rx-1]=0.
+                self.write_log("Error computing failure rate : "+str(e))
+        return fail_rates
+            
+            
+                                              
+
+    
     def send_eor_query(self,query):
         try:
             eorconn = psycopg2.connect(database=self.dbname,user=self.user,password=self.password,host=self.host)
@@ -131,8 +179,11 @@ class FusionConnector():
         
 
 
+
+
     def insert_data(self):     
-   #first add up all observation times
+        fail_rates=self.get_fail_rates()
+        hours_at_mit=self.get_mit_download_time()
         nowtime=GPSseconds_now()
         rows=self.send_eor_query('select starttime, stoptime from mwa_setting where projectid=\'G0009\' and stoptime<'+str(nowtime))
         totobssecs=0.
@@ -147,7 +198,7 @@ class FusionConnector():
             totschsecs=totschsecs+row[1]-row[0]
         totschhours=totschsecs/3600.
         nowtime=datetime.utcnow()
-        query='INSERT INTO %s (Date,Total_Hours_Observed,Total_Hours_Scheduled) VALUES (\'%s\',%s,%s)'%(self.tableid,nowtime.isoformat(' '),str(totobshours),str(totschhours))
+        query='INSERT INTO %s (Date,Hours_Observed,Hours_Scheduled,Hours_At_MIT,RxFail1,RxFail2,RxFail3,RxFail4,RxFail5,RxFail6,RxFail7,RxFail8,RxFail9,RxFail10,RxFail11,RxFail12,RxFail13,RxFail14,RxFail15,RxFail16) VALUES (\'%s\',%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)'%(self.tableid,nowtime.isoformat(' '),str(totobshours),str(totschhours),str(hours_at_mit),str(fail_rates[0]),str(fail_rates[1]),str(fail_rates[2]),str(fail_rates[3]),str(fail_rates[4]),str(fail_rates[5]),str(fail_rates[6]),str(fail_rates[7]),str(fail_rates[8]),str(fail_rates[9]),str(fail_rates[10]),str(fail_rates[11]),str(fail_rates[12]),str(fail_rates[13]),str(fail_rates[14]),str(fail_rates[15]))
         self.send_fusion_query('POST',query,{'Content-Length':0})
 
         
