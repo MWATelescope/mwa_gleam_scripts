@@ -1,0 +1,6 @@
+<?php
+$time1 = Time();
+$date1 = date("h:i:s A",$time1);
+echo $date1;
+?>
+

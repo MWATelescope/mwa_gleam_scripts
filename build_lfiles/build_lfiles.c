@@ -28,6 +28,7 @@ int npol;
 int nstation;
 int nfrequency;
 int debug=0;
+char *input_file[MAX_FILES];
 
 void printerror( int status)
 {
@@ -93,9 +94,9 @@ int getHDUsInfo(int nfiles, fitsfile *fptr[MAX_FILES], int num_hdus_in_file[MAX_
 
     /* sanity checks */
     for (i=1; i< nfiles; i++) {
-        if ( abs(num_hdus_in_file[i]-num_hdus_in_file[i-1]) > 1) {
-            fprintf(stderr,"ERROR: serious mismatch between number of HDUs in files (%d vs %d). Exiting.\n",
-                            num_hdus_in_file[i],num_hdus_in_file[i-1]);
+        if ( abs(num_hdus_in_file[i]-num_hdus_in_file[i-1]) > 4) {
+            fprintf(stderr,"ERROR: serious mismatch between number of HDUs in files %s (%d) vs %s (%d). Exiting.\n",
+                            input_file[i],num_hdus_in_file[i], input_file[i-1], num_hdus_in_file[i-1]);
             return EXIT_FAILURE;
         }
     }
@@ -156,7 +157,6 @@ int main(int argc, char **argv) {
     // mode 1 is multiple timesteps from a FITS file
     long datadims[2];
 
-    char *input_file[MAX_FILES];
     char *output_file = NULL;
     int num_hdus_in_file[MAX_FILES];
     int ninput;
