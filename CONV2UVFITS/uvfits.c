@@ -11,6 +11,7 @@ For the FITS-IDI format, see: http://www.aips.nrao.edu/FITS-IDI.html
 #include <math.h>
 #include <fitsio.h>
 #include <float.h>
+#include <assert.h>
 #include "slalib.h"
 #include "uvfits.h"
 
@@ -21,7 +22,7 @@ For the FITS-IDI format, see: http://www.aips.nrao.edu/FITS-IDI.html
 
 /* private function prototypes */
 static int writeAntennaData(fitsfile *fptr, uvdata *data);
-void printHeader(fitsfile *fptr, int header_number);
+void printHeader(fitsfile *fptr);
 int readAntennaTable(fitsfile *fptr,uvdata *obj);
 int writeSourceData(fitsfile *fptr, uvdata *data);
 
@@ -40,31 +41,21 @@ void uvfitsSetDebugLevel(int in_debug) {
 
 
 /******************************
- ! NAME:      readUVFITS
- ! PURPOSE:   read a UVFITS file and create/populate a uvdata data structure
+ ! NAME:      readUVFITSOpenInit
+ ! PURPOSE:   open a UVFITS file and create a uvdata data structure
+ !            This also reads the antenna table
  ! ARGUMENTS: filename: name of UVFITS file to read
  !            data: pointer to pointer data struct. The struct will be allocated by this function.
  ! RETURNS:   integer. 0 success, nonzero error. Returns CFITSIO error codes if a CFITSIO error
  !            occurred. returns -1 for malloc failure.
 ******************************/
-int readUVFITS(char *filename, uvdata **data) {
+int readUVFITSOpenInit(char *filename, uvdata **data, fitsfile **outfptr) {
   fitsfile *fptr;
-  int i,j,k,l,status=0,retcode=0,num_hdu=0,hdu_type=0,grp_row_size=0,index=0;
-  int bitpix,naxis,pcount,gcount,num_pol,num_freq,num_bl=0,time_index=0,bl_index=0;
-  int date_pindex=4,uscale_pindex=0,vscale_pindex=1,wscale_pindex=2;
+  int i,status=0,num_hdu=0,hdu_type=0;
+  int bitpix,naxis;
   long naxes[MAX_CSIZE];
   char temp[84];
-  char *ptype[MAX_CSIZE],*ctype[MAX_CSIZE];
-  float crval[MAX_CSIZE],crpix[MAX_CSIZE],cdelt[MAX_CSIZE],*grp_row=NULL,*grp_par=NULL;
-  float currtime=FLT_MAX,mintime=FLT_MAX;
-  double pscal[MAX_CSIZE],pzero[MAX_CSIZE];
-  uvdata *obj;
-
-  /* init */
-  for (i=0; i<MAX_CSIZE; i++ ) {
-    ptype[i]=NULL;
-    ctype[i]=NULL;
-  }
+  uvdata *obj=NULL;
 
   /* open the file */
   fits_open_file(&fptr,filename, READONLY, &status);
@@ -72,6 +63,7 @@ int readUVFITS(char *filename, uvdata **data) {
     fprintf(stderr,"readUVFITS: failed to open file <%s>\n",filename);
     return status;
   }
+  *outfptr = fptr;
 
   /* get data size, number of extensions etc */
   fits_get_num_hdus(fptr,&num_hdu,&status);
@@ -85,30 +77,24 @@ int readUVFITS(char *filename, uvdata **data) {
     fprintf(stderr,"readUVFITS: first HDU in file is not an image. type: %d\n",hdu_type);
   }
 
-  /* print out all the headers for debugging*/
-  if (debug) {
-    for(i=1;i<=num_hdu; i++) {
-      printHeader(fptr,i);
-    }
-    fits_movabs_hdu(fptr, 1, NULL, &status);
-  }
-
-  /* get data size */
+  /* get dimensions of vis data */
   fits_get_img_param(fptr,6,&bitpix,&naxis,naxes,&status);
+
   if (debug) {
     fprintf(stdout,"readUVFITS: NAXIS is %d\n",naxis);
     for(i=0;i<naxis;i++) fprintf(stdout,"\tNAXIS%d is %d\n",i+1,(int)naxes[i]);
   }
   if (status !=0 ) {
+    fits_report_error(stderr,status);
     fprintf(stderr,"readUVFITS: status %d after get img params\n",status);
+    return status;
   }
 
   /* basic stuff seems to be in order, allocate space for data structure (not visibilites yet) */
   *data = calloc(1,sizeof(uvdata));
   if(*data==NULL) {
     fprintf(stderr,"readUVFITS: no malloc for main struct\n");
-    status = -1;
-    goto EXIT;
+    return -1;
   }
   obj = *data;
   obj->visdata=NULL;
@@ -123,22 +109,365 @@ int readUVFITS(char *filename, uvdata **data) {
   obj->date = calloc(1,sizeof(double));
   if (obj->source==NULL || obj->date==NULL) {
     fprintf(stderr,"readUVFITS: no malloc for source table\n");
-    status=-1; goto EXIT;
+    return -1;
   }
+  obj->n_pol = naxes[2];
+  obj->n_freq = naxes[3];
+
+  /* examine headers and read the antenna table */
+  for(i=1;i<=num_hdu; i++) {
+
+    fits_movabs_hdu(fptr, i, NULL, &status);
+    if (status) {
+        fits_report_error(stderr,status);
+        return status;
+    }
+
+    if (debug) {
+        fprintf(stdout," *** Printing header index %d\n",i);
+        printHeader(fptr);
+    }
+
+    temp[0] = '\0';
+    fits_read_key(fptr,TSTRING,"EXTNAME",temp,NULL,&status);
+    if (status == 0 && strncmp(temp,"AIPS AN",7)==0) {
+        if(debug) printf("AN table is in HDU %d\n",i);
+        status = readAntennaTable(fptr,obj);
+    }
+    /* clear errors from trying to read keywords that possibly aren't there */
+    fits_clear_errmsg();
+    status=0;
+  }
+  fits_movabs_hdu(fptr, 1, NULL, &status);  // go back to start
+  return 0;
+}
+
+
+/******************************
+ ! NAME:      readUVFITSInitIterator
+ ! PURPOSE:   open a UVFITS file and create a uvdata data structure for successive data reads
+ !            each data read fetches a single timestep of data for all baselines,freqs,pols
+ !            This also reads the antenna table
+ ! ARGUMENTS: filename: name of UVFITS file to read
+ !            data: pointer to pointer data struct. The struct will be allocated by this function.
+ ! RETURNS:   integer. 0 success, nonzero error. Returns CFITSIO error codes if a CFITSIO error
+ !            occurred. returns -1 for malloc failure.
+******************************/
+int readUVFITSInitIterator(char *filename, uvdata **data, uviterator **iterator) {
+  fitsfile *fptr=NULL;
+  int i,status=0,max_bl,grp_row_size;
+  char temp[84]="";
+  uviterator *iter=NULL;
+
+  /* init */
+
+  /* open the file and get basic info*/
+  status = readUVFITSOpenInit(filename, data, &fptr);
+  if(status!=0) {
+    fprintf(stderr,"readUVFITS: failed to read file <%s>\n",filename);
+    return status;
+  }
+  iter = calloc(1,sizeof(uviterator));
+  assert(iter != NULL);
+  *iterator = iter;
+  iter->fptr = fptr;
 
   /* find out how many groups there are. There is one group for each source,time,baseline combination.
      we don't know how many baselines there are yet- have to work this out while reading the data.
      The rows must be time ordered or everything will break.  */
   fits_read_key(fptr,TSTRING,"GROUPS",temp,NULL,&status);
-  if (temp[0] != 'T') fprintf(stderr,"readUVFITS: GROUPS fits keyword not set\n");
-  fits_read_key(fptr,TINT,"PCOUNT",&pcount,NULL,&status);
-  fits_read_key(fptr,TINT,"GCOUNT",&gcount,NULL,&status);
-  if (debug) fprintf(stdout,"PCOUNT is %d, GCOUNT is %d\n",pcount,gcount);
-  fits_read_key(fptr,TSTRING,"OBJECT",obj->source->name,NULL,&status);
-  fits_read_key(fptr,TDOUBLE,"OBSRA",&(obj->source->ra),NULL,&status);
-  fits_read_key(fptr,TDOUBLE,"OBSDEC",&(obj->source->dec),NULL,&status);
+  if (temp[0] != 'T') {
+    fprintf(stderr,"readUVFITS: GROUPS fits keyword not set. This is not a uvfits file.\n");
+    return -1;
+  }
+  fits_read_key(fptr,TINT,"PCOUNT",&(iter->pcount),NULL,&status);
+  fits_read_key(fptr,TINT,"GCOUNT",&(iter->gcount),NULL,&status);
+  fits_read_key(fptr,TSTRING,"OBJECT",(*data)->source->name,NULL,&status);
+  fits_read_key(fptr,TDOUBLE,"OBSRA",&((*data)->source->ra),NULL,&status);
+  fits_read_key(fptr,TDOUBLE,"OBSDEC",&((*data)->source->dec),NULL,&status);
   if (status !=0) {
     fprintf(stderr,"readUVFITS WARNING: status %d while getting basic keywords.\n",status);
+    fits_clear_errmsg();
+    status=0;
+  }
+  if (iter->pcount==0 || iter->gcount==0) {
+    fprintf(stderr,"ERROR: pcount: %d, gcount %d. Cannot be zero\n",iter->pcount,iter->gcount);
+    return -1;
+  }
+
+  /* get the details of the observations PTYPE/CTYPE keyword from header*/
+  /* set defaults fisrt */
+  for (i=0; i<3; i++) {
+    iter->pscal[i] = 1.0;
+    iter->pzero[i] = 0.0;
+  }
+  for(i=0; i<iter->pcount; i++) {
+    char typedesc[84];
+    double temp_pscal=0,temp_pzero=0;
+
+    sprintf(temp,"PTYPE%d",i+1);
+    fits_read_key(fptr,TSTRING,temp,typedesc,NULL,&status);
+    sprintf(temp,"PSCAL%d",i+1);
+    fits_read_key(fptr,TDOUBLE,temp,&temp_pscal,NULL,&status);
+    sprintf(temp,"PZERO%d",i+1);
+    fits_read_key(fptr,TDOUBLE,temp,&temp_pzero,NULL,&status);
+    if(debug) fprintf(stdout,"PTYPE%d: '%s', PSCAL: %g, PZERO: %g\n",i+1,typedesc,temp_pscal,temp_pzero);
+
+    /* remember the stuff we care about */
+    if (strncmp("DATE",typedesc,4)==0) {
+      iter->base_date = temp_pzero;
+    }
+    if (strncmp("UU",typedesc,2)==0) {
+      iter->pscal[0] = temp_pscal;
+      iter->pzero[0] = temp_pzero;
+    }
+    if (strncmp("VV",typedesc,2)==0) {
+      iter->pscal[1] = temp_pscal;
+      iter->pzero[1] = temp_pzero;
+    }
+    if (strncmp("WW",typedesc,2)==0) {
+      iter->pscal[2] = temp_pscal;
+      iter->pzero[2] = temp_pzero;
+
+    }
+  }
+  if(iter->base_date == 0.0) {
+    fprintf(stderr,"ERROR: no JD read from PTYPE keywords in header.\n");
+    return -1;
+  }
+
+  /* get the CTYPEs, which start at CRVAL2 */
+  for(i=0; i<=7; i++) {
+    char typedesc[84]="";
+    double crval=0,crpix=1,cdelt=0;
+
+    sprintf(temp,"CTYPE%d",i+2);
+    fits_read_key(fptr,TSTRING,temp,typedesc,NULL,&status);
+    if (status != 0) {
+      if(debug) fprintf(stdout,"no more C keys. status: %d\n",status);
+      status =0;
+      fits_clear_errmsg();
+      break;
+    }
+    sprintf(temp,"CRVAL%d",i+2);
+    fits_read_key(fptr,TDOUBLE,temp,&crval,NULL,&status);
+    sprintf(temp,"CRPIX%d",i+2);
+    fits_read_key(fptr,TDOUBLE,temp,&crpix,NULL,&status);
+    sprintf(temp,"CDELT%d",i+2);
+    fits_read_key(fptr,TDOUBLE,temp,&cdelt,NULL,&status);
+    if(debug) fprintf(stdout,"CRVAL%d: %g,\tCRPIX%d: %g,\tCDELT%d: %g,\tCTYPE%d: %s\n",
+		      i+2,crval,i+2,crpix,i+2,cdelt,i+2,typedesc);
+
+    /* check for the stuff we're interested in */
+    if (strncmp("FREQ",typedesc,4)==0) {
+      /* centre freq is CRVAL, BW is CDELT */
+      (*data)->cent_freq = crval;
+      (*data)->freq_delta = cdelt;
+    }
+    if (strncmp("STOKES",typedesc,6)==0) {
+      (*data)->pol_type = crval;
+    }
+    /* RA and DEC should be in the OBSRA and OBSDEC fields already */
+    if (strncmp("RA",typedesc,2)==0) {
+    }
+    if (strncmp("DEC",typedesc,3)==0) {
+    }
+  }
+  /* allocate space for visibility data. In iterator mode, we only keep one timestep, so the
+     arrays of pointers in the uvdata structure are overkill but it doesn't hurt */
+  (*data)->visdata = calloc(1,sizeof(float *));
+  (*data)->weightdata = calloc(1,sizeof(float *));
+  (*data)->baseline = calloc(1,sizeof(float *));
+  (*data)->n_baselines = calloc(1,sizeof(int));
+  (*data)->u = calloc(1,sizeof(double *));
+  (*data)->v = calloc(1,sizeof(double *));
+  (*data)->w = calloc(1,sizeof(double *));
+  (*data)->date = calloc(1,sizeof(double));
+
+  if ((*data)->weightdata==NULL || (*data)->visdata==NULL || (*data)->baseline==NULL || 
+        (*data)->u==NULL || (*data)->v==NULL || (*data)->w==NULL || (*data)->date==NULL ) {
+    fprintf(stderr,"readUVFITSInitIterator: no malloc for vis data\n");
+    return -1;
+  }
+
+  /* now alloc space for the visibilities and u,v,weight values. We already know the max number
+     of baselines from how many antennas are in the antenna table */
+  max_bl = (*data)->array->n_ant * ((*data)->array->n_ant+1)/2;
+  (*data)->visdata[0] = malloc(sizeof(float)*(*data)->n_freq*(*data)->n_pol*max_bl*2);
+  (*data)->weightdata[0] = malloc(sizeof(float)*(*data)->n_freq*(*data)->n_pol*max_bl);
+  (*data)->baseline[0]=malloc(max_bl*sizeof(float));
+  (*data)->u[0] = calloc(max_bl,sizeof(double));
+  (*data)->v[0] = calloc(max_bl,sizeof(double));
+  (*data)->w[0] = calloc(max_bl,sizeof(double));
+  if ((*data)->visdata[0]==NULL || (*data)->weightdata[0]==NULL || (*data)->baseline[0]==NULL) {
+    fprintf(stderr,"readUVFITSInitIterator: No malloc for vis data\n");
+    return -1;
+  }
+
+  grp_row_size = 3*((*data)->n_pol)*((*data)->n_freq); // 3*npols*nfreqs
+  iter->grp_row = malloc(sizeof(float)*grp_row_size);
+  iter->grp_par = malloc(sizeof(float)*iter->pcount);
+  if (iter->grp_row==NULL || iter->grp_par==NULL) {
+      fprintf(stderr,"readUVFITSInitIterator: no malloc for group row or params\n");
+      return -1;
+  }
+
+  return 0;
+}
+
+
+/******************************
+ ! NAME:      addGroupRow
+ ! PURPOSE:   add a row of data (one baseline/time) to the output data structure.
+ ! ARGUMENTS: obj: data structure returned by InitIterator for resulting data
+ !            iter: a uviterator iterator context structure
+ ! RETURNS:   void
+******************************/
+void addGroupRow(uvdata *obj, uviterator *iter) {
+    int k,l,index=0,j,time_index=0;
+
+    j = obj->n_baselines[time_index];
+    obj->baseline[time_index][j] = iter->grp_par[3];
+    obj->date[time_index] = iter->grp_par[4]+iter->base_date;
+    obj->u[time_index][j] = iter->grp_par[0]*iter->pscal[0] + iter->pzero[0];
+    obj->v[time_index][j] = iter->grp_par[1]*iter->pscal[1] + iter->pzero[1];
+    obj->w[time_index][j] = iter->grp_par[2]*iter->pscal[2] + iter->pzero[2];
+
+    if (debug) fprintf(stdout,"Adding vis. (u,v,w): %g,%g,%g. Bl: %f. Time: %f. N_baselines: %d\n",
+                obj->u[time_index][j], obj->v[time_index][j], obj->w[time_index][j], obj->baseline[time_index][j],
+                iter->grp_par[4],j);
+
+    for(k=0; k<obj->n_freq; k++) {
+        for(l=0; l< obj->n_pol; l++) {
+          obj->visdata[time_index][(j*obj->n_freq*obj->n_pol+k*obj->n_pol + l)*2+0] = iter->grp_row[index++];   // real
+          obj->visdata[time_index][(j*obj->n_freq*obj->n_pol+k*obj->n_pol + l)*2+1] = iter->grp_row[index++];   // imag
+          obj->weightdata[time_index][j*obj->n_freq*obj->n_pol+k*obj->n_pol + l] = iter->grp_row[index++];      // weight
+        }
+    }
+    obj->n_baselines[time_index]++;
+}
+
+
+/******************************
+ ! NAME:      readUVFITSnextIter
+ ! PURPOSE:   get the next chunk of time from an open uvfits file and fill uvdata structure.
+ !            requires prior call to readUVFITSInitIterator
+ ! ARGUMENTS: obj: data structure returned by InitIterator for resulting data
+ !            iter: a uviterator iterator context structure
+ ! RETURNS:   integer. 0 success, nonzero error. Returns CFITSIO error codes if a CFITSIO error
+ !            occurred. returns -1 for malloc failure.
+ !            return code 1 means normal completion end of file
+******************************/
+int readUVFITSnextIter(uvdata *obj, uviterator *iter) {
+  int grp_row_size,i,status=0,done=0;
+  int max_bl,n_bl=0;
+  float currtime=FLT_MAX;
+  fitsfile *fptr;
+ 
+  fptr = (fitsfile *)iter->fptr;
+  max_bl = obj->array->n_ant*(obj->array->n_ant + 1)/2;
+  grp_row_size = 3*(obj->n_pol)*(obj->n_freq); // 3*npols*nfreqs
+
+  obj->n_baselines[0]=0;  // this is a new time, so reset the number of baselines for this time before adding new data
+
+  while (!done) {
+
+    /* read a row from the parameters. contains U,V,W,baseline,time */
+    fits_read_grppar_flt(fptr,iter->grp_index+1,1,iter->pcount, iter->grp_par, &status);
+    if (status != 0) {
+      fprintf(stderr,"readUVFITS: error reading group %d. status: %d\n",iter->grp_index+1,status);
+      return status;
+    }
+
+    if (debug) fprintf(stdout,"Read group %d of %d. Time: %f\n",iter->grp_index+1,iter->gcount,iter->grp_par[4]);
+
+    /* if the time changes, we're done for this chunk */
+    if (currtime != iter->grp_par[4] && currtime != FLT_MAX) {
+
+      if (debug) printf("*** new time *** %f\n",iter->grp_par[4]);
+      /* check that time is increasing only */
+      if (iter->grp_par[4] < currtime) {
+          fprintf(stderr,"readUVFITS ERROR: data is not time ordered. current: %f, new: %f\n",currtime,iter->grp_par[4]);
+          return -1;
+      }
+      done=1;
+    }
+    else {
+        // read the vis/weight values for all freqs for this time/baseline
+        fits_read_img_flt(fptr, iter->grp_index+1, 1, grp_row_size, 0.0, iter->grp_row, NULL, &status);
+        if (status) {
+            fprintf(stderr,"Error reading image row index %d\n",i);
+            fits_report_error(stderr,status);
+            return status;
+        }
+
+        addGroupRow(obj,iter);
+        n_bl++; // count how many baselines we've read and do some sanity checks
+        if (n_bl > max_bl) {
+            fprintf(stderr,"ERROR: counted %d baselines for time %g. Expected max: %d\n",n_bl,iter->grp_par[4],max_bl);
+        }
+        iter->grp_index++;
+        currtime = iter->grp_par[4];
+    }
+    if (iter->grp_index>=iter->gcount) {
+        // we've reached the end
+        done=1;
+        status=1;
+    }
+  }
+  return status;
+}
+
+
+/******************************
+ ! NAME:      readUVFITS
+ ! PURPOSE:   read an entire UVFITS file and create/populate a uvdata data structure
+ ! ARGUMENTS: filename: name of UVFITS file to read
+ !            data: pointer to pointer data struct. The struct will be allocated by this function.
+ ! RETURNS:   integer. 0 success, nonzero error. Returns CFITSIO error codes if a CFITSIO error
+ !            occurred. returns -1 for malloc failure.
+******************************/
+int readUVFITS(char *filename, uvdata **data) {
+  fitsfile *fptr=NULL;
+  int i,j,k,l,status=0,retcode=0,grp_row_size=0,index=0;
+  int pcount,gcount,num_bl=0,time_index=0,bl_index=0;
+  int date_pindex=4,uscale_pindex=0,vscale_pindex=1,wscale_pindex=2;
+  char temp[84];
+  char *ptype[MAX_CSIZE],*ctype[MAX_CSIZE];
+  float crval[MAX_CSIZE],crpix[MAX_CSIZE],cdelt[MAX_CSIZE],*grp_row=NULL,*grp_par=NULL;
+  float currtime=FLT_MAX,mintime=FLT_MAX;
+  double pscal[MAX_CSIZE],pzero[MAX_CSIZE];
+  uvdata *obj;
+
+  /* init */
+  memset(ptype,0,MAX_CSIZE*sizeof(char *));
+  memset(ctype,0,MAX_CSIZE*sizeof(char *));
+
+  /* open the file and get basic info*/
+  status = readUVFITSOpenInit(filename, data, &fptr);
+  if(status!=0) {
+    fprintf(stderr,"readUVFITS: failed to read file <%s>\n",filename);
+    goto EXIT;
+  }
+  obj = *data;
+
+  /* find out how many groups there are. There is one group for each source,time,baseline combination.
+     we don't know how many baselines there are yet- have to work this out while reading the data.
+     The rows must be time ordered or everything will break.  */
+  fits_read_key(fptr,TSTRING,"GROUPS",temp,NULL,&status);
+  if (temp[0] != 'T') {
+    fprintf(stderr,"readUVFITS: GROUPS fits keyword not set. This is not a uvfits file.\n");
+    status=-1;
+    goto EXIT;
+  }
+  fits_read_key(fptr,TINT,"PCOUNT",&pcount,NULL,&status);
+  fits_read_key(fptr,TINT,"GCOUNT",&gcount,NULL,&status);
+  fits_read_key(fptr,TSTRING,"OBJECT",(*data)->source->name,NULL,&status);
+  fits_read_key(fptr,TDOUBLE,"OBSRA",&((*data)->source->ra),NULL,&status);
+  fits_read_key(fptr,TDOUBLE,"OBSDEC",&((*data)->source->dec),NULL,&status);
+  if (status !=0) {
+    fprintf(stderr,"readUVFITS WARNING: status %d while getting basic keywords.\n",status);
+    fits_clear_errmsg();
     status=0;
   }
 
@@ -187,6 +516,7 @@ int readUVFITS(char *filename, uvdata **data) {
     if (status != 0) {
       if(debug) fprintf(stdout,"no more C keys. status: %d\n",status);
       status =0;
+      fits_clear_errmsg();
       break;
     }
     sprintf(temp,"CRVAL%d",i+2);
@@ -201,16 +531,14 @@ int readUVFITS(char *filename, uvdata **data) {
     /* check for the stuff we're interested in */
     if (strncmp("FREQ",ctype[i],4)==0) {
       /* centre freq is CRVAL, BW is CDELT */
-      obj->cent_freq = crval[i];
-      obj->freq_delta = cdelt[i];
+      (*data)->cent_freq = crval[i];
+      (*data)->freq_delta = cdelt[i];
     }
   }
 
-  obj->n_pol = num_pol = naxes[2];
-  obj->n_freq = num_freq = naxes[3];
-  grp_row_size = naxes[1]*naxes[2]*naxes[3]*gcount;
+  grp_row_size = 3*((*data)->n_pol)*((*data)->n_freq); // 3*npols*nfreqs
   /* each row in the group table has this size */
-  grp_row = malloc(sizeof(float)*grp_row_size);
+  grp_row = malloc(sizeof(float)*grp_row_size*gcount);
   grp_par = malloc(sizeof(float)*pcount);
   if (grp_row==NULL || grp_par==NULL) {
     fprintf(stderr,"readUVFITS: no malloc for big arrays\n");
@@ -219,16 +547,26 @@ int readUVFITS(char *filename, uvdata **data) {
 
   /* for reasons I don't understand, it doesn't work to only read a section
      of this file at a time. So read the whole lot... */
-  fits_read_img(fptr,TFLOAT,1,grp_row_size,NULL,grp_row,NULL,&status);
+/*  fits_read_img(fptr,TFLOAT,1,grp_row_size*gcount,NULL,grp_row,NULL,&status);
   if (status != 0) {
     fprintf(stderr,"readUVFITS: error reading data %d. status: %d\n",i,status);
     status = -1; goto EXIT;
   }
+  if (debug) printf("Read %d items from the group row\n",grp_row_size*gcount);
+*/
+
   /* copy data into data structure. We know how many groups there are, but we don't know
      how many different baselines or time units there are. The data must be ordered by increasing
      time, so we keep track of the time until it changes. This then tells us how many baselines
      there are. If there are missing baselines in the first time step, it will be bad.... */
   for (i=0; i< gcount; i++) {
+
+    fits_read_img_flt(fptr, i+1, 1, grp_row_size, 0.0, grp_row+i*grp_row_size, NULL, &status);
+    if (status) {
+        fprintf(stderr,"Error reading image row index %d\n",i);
+        fits_report_error(stderr,status);
+        goto EXIT;
+    }
 
     /* read a row from the parameters. contains U,V,W,baseline,time */
     fits_read_grppar_flt(fptr,i+1,1,pcount, grp_par, &status);
@@ -244,17 +582,17 @@ int readUVFITS(char *filename, uvdata **data) {
       if (debug) printf("new time: %f\n",currtime);
       /* check that time is increasing only */
       if (currtime < mintime) {
-	if (mintime != FLT_MAX) {
-	  fprintf(stderr,"readUVFITS ERROR: data is not time ordered. current: %f, min: %f\n",currtime,mintime);
-	}
-	else {
-	  /* first time around, set mintime */
-	  mintime = currtime;
-	}
+        if (mintime != FLT_MAX) {
+          fprintf(stderr,"readUVFITS ERROR: data is not time ordered. current: %f, min: %f\n",currtime,mintime);
+        }
+        else {
+          /* first time around, set mintime */
+            mintime = currtime;
+        }
       }
 
       /* allocate space for visibility data. Increase
-	 the size of these arrays to have one for each time sample */
+        the size of these arrays to have one for each time sample */
       obj->visdata = realloc(obj->visdata,sizeof(float *)*(time_index+1));
       obj->weightdata = realloc(obj->weightdata,sizeof(float *)*(time_index+1));
       obj->baseline = realloc(obj->baseline,sizeof(float *)*(time_index+1));
@@ -266,8 +604,8 @@ int readUVFITS(char *filename, uvdata **data) {
 
       if (obj->weightdata==NULL || obj->visdata==NULL || obj->baseline==NULL || 
 	  obj->u==NULL || obj->v==NULL || obj->w==NULL || obj->date==NULL ) {
-	fprintf(stderr,"readUVFITS: no malloc in param loop\n");
-	status = -1; goto EXIT;
+        fprintf(stderr,"readUVFITS: no malloc in param loop\n");
+        status = -1; goto EXIT;
       }
 
       obj->visdata[time_index]=NULL;
@@ -315,11 +653,11 @@ int readUVFITS(char *filename, uvdata **data) {
 
   /* now alloc space for the visibilities */
   for (i=0; i< time_index; i++) {
-      obj->visdata[i] = malloc(sizeof(float)*num_freq*num_pol*num_bl*2);
-      obj->weightdata[i] = malloc(sizeof(float)*num_freq*num_pol*num_bl);
+      obj->visdata[i] = malloc(sizeof(float)*obj->n_freq*obj->n_pol*num_bl*2);
+      obj->weightdata[i] = malloc(sizeof(float)*obj->n_freq*obj->n_pol*num_bl);
       if (obj->visdata[i]==NULL || obj->weightdata[i]==NULL) {
-	fprintf(stderr,"No malloc in time loop\n");
-	status = -1; goto EXIT;
+        fprintf(stderr,"No malloc in time loop\n");
+        status = -1; goto EXIT;
       }
   }
 
@@ -328,30 +666,14 @@ int readUVFITS(char *filename, uvdata **data) {
     for (j=0; j<obj->n_baselines[i]; j++) {
 
       /* vis data and weights. U,V,W already done above. */
-      for(k=0; k<num_freq; k++) {
-	for(l=0; l< num_pol; l++) {
-	  obj->visdata[i][(j*num_pol*num_freq+k*num_pol + l)*2+0] = grp_row[index++];
-	  obj->visdata[i][(j*num_pol*num_freq+k*num_pol + l)*2+1] = grp_row[index++];
-	  obj->weightdata[i][j*num_pol*num_freq+k*num_pol + l] = grp_row[index++];
-	}
+      for(k=0; k<obj->n_freq; k++) {
+        for(l=0; l< obj->n_pol; l++) {
+          obj->visdata[i][(j*obj->n_freq*obj->n_pol+k*obj->n_pol + l)*2+0] = grp_row[index++];   // real
+          obj->visdata[i][(j*obj->n_freq*obj->n_pol+k*obj->n_pol + l)*2+1] = grp_row[index++];   // imag
+          obj->weightdata[i][j*obj->n_freq*obj->n_pol+k*obj->n_pol + l] = grp_row[index++];      // weight
+        }
       }
     }
-  }
-
-  /* read antenna table. Search thru HDUs to find it. */
-  for(i=2;i<=num_hdu; i++) {
-    fits_movabs_hdu(fptr, i, NULL, &status);
-    temp[0] = '\0';
-    fits_read_key(fptr,TSTRING,"EXTNAME",temp,NULL,&status);
-    if (strncmp(temp,"AIPS AN",7)!=0) {
-      if (debug) fprintf(stdout,"readUVFITS: Ignoring extension type: %s\n",temp);
-      continue;
-    }
-    if(debug) {
-      fprintf(stdout,"AN table is in HDU %d\n",i);
-      fflush(stdout);
-    }
-    status = readAntennaTable(fptr,obj);
   }
 
  EXIT:
@@ -504,14 +826,14 @@ int writeUVFITSiterator(char *filename, uvdata *data, void **vfptr, double *jd_d
   for (i=0; i<N_CTYPES; i++){
     /* this fills in the CRVAL etc arrays with some generic values, then
        specific cases are updated below. */
+    sprintf(tempstr,"CTYPE%d",(int)i+3);
+    fits_update_key(fptr,TSTRING, tempstr, ctypes[i] , NULL, &status);
     sprintf(tempstr,"CRVAL%d",(int)i+3);
     fits_update_key(fptr,TFLOAT, tempstr, &temp , NULL, &status);
     sprintf(tempstr,"CRPIX%d",(int)i+3);
     fits_update_key(fptr,TFLOAT, tempstr, &temp , NULL, &status);
     sprintf(tempstr,"CDELT%d",(int)i+3);
     fits_update_key(fptr,TFLOAT, tempstr, &temp , NULL, &status);
-    sprintf(tempstr,"CTYPE%d",(int)i+3);
-    fits_update_key(fptr,TSTRING, tempstr, ctypes[i] , NULL, &status);
   }
 
   /* set the input pol type. for circular, CRVAL3 should be -1, CDELT3 -1
@@ -846,18 +1168,16 @@ void printAntennaData(uvdata *data,FILE *fp) {
 
 /**************************
  ! NAME:      printHeader
- ! PURPOSE:   debugging utility to print a header from an open FITS file.
+ ! PURPOSE:   debugging utility to print the header of the current HDU from an open FITS file.
  ! ARGUMENTS: fptr: pointer to open FITS file.
- !            header_number: HDU number in the file. starts at 1.
  ! RETURNS:   void
  **************************/
-void printHeader(fitsfile *fptr, int header_number) {
+void printHeader(fitsfile *fptr) {
   int i,status=0,nkeys=0;
   char *str=NULL,line[81];
 
-  fits_movabs_hdu(fptr, header_number, NULL, &status);
   fits_hdr2str(fptr,TRUE,NULL,0,&str,&nkeys,&status);
-  printf("Header %d. There are %d keys\n",header_number,nkeys);
+  printf("Current header. There are %d keys\n",nkeys);
   for(i=0; i<nkeys; i++) {
     memset(line,'\0',81);
     strncpy(line,str+i*80,80);
