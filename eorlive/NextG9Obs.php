@@ -8,33 +8,35 @@ ini_set('display_errors',1);
  error_reporting(E_ALL);
 function getTimeSymbol($seconds){
 	 $symbols=array('Weeks','Days','Hours','Minutes','Seconds');
-	 $minutes=$seconds/60.;
+	 $minutes=(float)$seconds/60.;
 	 $hours=$minutes/60.;
 	 $days=$hours/24.;
 	 $weeks=$days/7.;
 	 $one=1.0;
-	 echo gettype($weeks);
-	 echo gettype($one);
-	 echo $weeks < $one;
-	 if(bccomp($weeks,$one))
+	//	 echo gettype($weeks);
+	 //echo gettype($one);
+	 //echo $weeks < $one;
+	 //echo bccomp($hours,$one);
+
+	 if(bccomp($weeks,$one)>0)
 	 {
 		return sprintf('%.2f '.$symbols[0],$weeks);
 	 }
-	 elseif(bccomp($days,$one))
+	 elseif(bccomp($days,$one)>0)
 	 {
 		return sprintf('%.2f '.$symbols[1],$days);
 	 }
-	 elseif(bccomp($hours,$one))
+	 elseif(bccomp($hours,$one)>0)
 	 {
 		return sprintf('%.2f '.$symbols[2],$hours);
 	 }
-	 elseif(bccomp($minutes,$one))
+	 elseif(bccomp($minutes,$one)>0)
 	 {
-		return sprintf('%.2f '.$symbols[3],$minutes);
+		return sprintf('%d '.$symbols[3],$minutes);
 	 }
 	 else
 	 {
-		return sprintf('%.2f '.$symbols[4],$seconds);
+		return sprintf('%d '.$symbols[4],$seconds);
 	 }
 
 
@@ -75,13 +77,15 @@ if($row=pg_fetch_row($result)){
 
 	
 	$obsstarttime=$row[0];
+	//echo $tstamp;
 	$obsstamp=substr($tstamp,0,18);
-	$obstime=strtotime($obsstamp);	
 	$oldzone = date_default_timezone_get();
 	date_default_timezone_set("UTC");
+	$obstime=strtotime($obsstamp);		
 	$utctime=date("Y-m-d H:i:s",$obstime);
 	date_default_timezone_set($oldzone);
-	echo getTimeSymbol((float)$obsstarttime-(float)$nowtime)." (".$utctime.")";
+	$deltastr = getTimeSymbol($obsstarttime-$nowtime);
+	echo "$deltastr"."($utctime) (UTC)";
 				
 }
 else

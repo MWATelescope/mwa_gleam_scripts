@@ -20,10 +20,6 @@ display:inline;
 width:500 px;
 color:black;
 }
-table.timetable
-{
-color:white;
-}
 td.nextobs
 {
 valign:middle;
@@ -58,18 +54,24 @@ margin-left:auto;
 table.timetable
 {
     width: 1000 px;
-    border: 1 px solid white;
+    border: 4 px;
+    border-color:white;
+    color: white;
 }
 th.timeth
 {
     text-align:center;
-    width:166 px;
+    max-width:125 px;
     border: 5 px solid white;
+}
+th
+{
+   color:white;
 }
 td.time
 {
-width:166 px;
-text-align:center;
+border: 1 px solid white;
+max-width:125 px;
 }
 
 
