@@ -2,7 +2,7 @@
 ini_set('display_errors',1); 
 error_reporting(E_ALL);     
 //$infoXML = new SimpleXMLElement("<obsInfo></obsInfo>");
-$host="eor-db.mit.edu";
+$host="ngas01.ivec.org";
 $dbname="mwa";
 $user="mwa";
 $password="BowTie";
@@ -11,10 +11,15 @@ $dbconn=pg_connect("host=$host dbname=$dbname user=$user password=$password") or
 $query = "select * from obsc_mwa_setting where starttime<=gpsnow() and endtime>gpsnow()";
 $result = pg_query($dbconn,$query) or die('Query Failed');
 $obs = pg_fetch_row($result);
+$query = "select count(*) from (select observation_number from data_files where observation_number = $observation_number)";
+$result = pg_query($dbconn,$query) or die('Query Failed');
+
 echo '<?xml version="1.0" encoding="ISO-8859-1"?><obsquery>';
 if(!empty($obs)){
-	echo '<isobs>'.'1'.'</isobs>';
-
+	echo '<isobs> 1</isobs>';
+	echo '<observation_number> $obs[0]</observation_number>';
+	echo '<obsname>$obs[3]</obsname>';
+	echo '<
 	/*
 	$infoXML->addAttribute('observation_number',obs[0]);
 	$infoXML->addAttribute('starttime',obs[1]);
