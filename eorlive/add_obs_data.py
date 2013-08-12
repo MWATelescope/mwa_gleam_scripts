@@ -179,8 +179,16 @@ class FusionConnector():
             exit()
         
 
+    def check_obs(self):
+        #get list of all G009 mwa_setting entries
 
-
+        #for each entry, overwrite fusion table
+        obsids = []
+        dates = []
+        rows=self.send_eor_query('select starttime from mwa_setting where projectid=\'G0009\'');
+        for row in rows:
+            drows = self.send_eor_equery('select 
+            date.append(row[0]
 
     def insert_data(self):     
         fail_rates=self.get_fail_rates()

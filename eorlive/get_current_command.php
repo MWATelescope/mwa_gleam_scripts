@@ -13,13 +13,14 @@ $result = pg_query($dbconn,$query) or die('Query Failed');
 $obs = pg_fetch_row($result);
 $query = "select count(*) from (select observation_number from data_files where observation_number = $observation_number)";
 $result = pg_query($dbconn,$query) or die('Query Failed');
-
+$files = pg_fetch_row($result);
 echo '<?xml version="1.0" encoding="ISO-8859-1"?><obsquery>';
 if(!empty($obs)){
 	echo '<isobs> 1</isobs>';
 	echo '<observation_number> $obs[0]</observation_number>';
 	echo '<obsname>$obs[3]</obsname>';
-	echo '<
+	echo '<projectid>$obs[9]</projectid>';
+	echo '<files>$files</files>';
 	/*
 	$infoXML->addAttribute('observation_number',obs[0]);
 	$infoXML->addAttribute('starttime',obs[1]);
