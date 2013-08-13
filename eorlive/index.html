@@ -82,6 +82,46 @@
 
 
 
+    function currentObs()
+    {
+    var xhr = createXHR();
+    xhr.onreadystatechange=function()
+    {
+    if(xhr.status==200 && xhr.readyState==4)
+    {
+    var x = xhr.responseXML;
+    var isobs=x.getElementsByTagName("isobs");
+    isobs=parseInt(isobs[0].firstChild.nodeValue);
+    var obs1 = x.childNodes[0].childNodes[1];
+    var obs2 = x.childNodes[0].childNodes[2];
+    var curobs=x.childNodes[0].childNodes[0];
+    document.getElementById("lastobsid1").innerHTML =obs1.childNodes[0].childNodes[0].nodeValue;
+    document.getElementById("lastobsname1").innerHTML=obs1.childNodes[1].childNodes[0].nodeValue;
+    document.getElementById("lastobsfiles1").innerHTML=obs1.childNodes[2].childNodes[0].nodeValue;
+    document.getElementById("lastobsid2").innerHTML = obs2.childNodes[0].childNodes[0].nodeValue;
+    document.getElementById("lastobsname2").innerHTML=obs2.childNodes[1].childNodes[0].nodeValue;
+    document.getElementById("lastobsfiles2").innerHTML=obs2.childNodes[2].childNodes[0].nodeValue;
+    if( isobs==1 )
+    {
+    document.getElementById("curobsid").innerHTML = curobs.childNodes[1].childNodes[0].nodeValue;
+    document.getElementById("curobsname").innerHTML=curobs.childNodes[2].childNodes[0].nodeValue;
+    document.getElementById("curobsproj").innerHTML=curobs.childNodes[3].childNodes[0].nodeValue;
+    document.getElementById("curobsfiles").innerHTML=curobs.childNodes[4].childNodes[0].nodeValue;
+    }
+    else
+    {
+    document.getElementById("curobsid").innerHTML="Nothing Now";
+    document.getElementById("curobsname").innerHTML="N/A";
+    document.getElementById("curobsproj").innerHTML="N/A";
+    document.getElementById("curobsfiles").innerHTML="N/A";
+    }
+    }
+    };
+    xhr.open("GET","get_current_command.php",true);
+    xhr.send();
+    }
+
+
     function showG9()
     {
     var xhr = createXHR();
@@ -212,6 +252,7 @@
 			  function init()
 			  {
 			  getTime();
+			  currentObs();
 			  getNextObs();
 			  getG9Day();
 			  getG9();
@@ -222,6 +263,7 @@
 			 var refresh2=window.setInterval("getNextObs()",1000);
 			 var refresh3=window.setInterval("getG9Day()",60000);
 			 var refresh4=window.setInterval("getG9()",60000);
+			  var refresh5=window.setInterval("currentObs()",20000);
   </script>
 </head>
 
@@ -233,6 +275,13 @@
 <tr> <th class="timeth"> Boston </th> <th class="timeth"> Pheonix </th> <th class="timeth">Seattle</th><th class="timeth"> Sydney </th> <th class="timeth"> Perth </th> <th class="timeth"> Bangalore </th><th class="timeth">UTC </th></tr>
 <tr> <td id="timeBoston" class="time">Loading...</td><td id="timePhoenix" class="time">Loading... </td> <td id="timeSeattle" class="time">Loading...</td><td id="timeSydney" class="time">Loading...</td><td id="timePerth" class="time">Loading...</td><td class="time" id="timeBangalore">Loading...</td><td class="time" id="timeUTC">Loading...</td></tr>
 </table>
+<table>
+<tr><th> </th><th> Observation Number </th> <th> Observation Name </th><th> Project Id</th> <th>Files</th><th>Date</th></tr>
+<tr><th>Obs Now</th><td id="curobsid">Loading... </td><td id="curobsname">Loading...</td><td id="curobsproj">Loading...</td><td id="curobsfiles">Loading...</td><td>Loading...</td></tr>
+<tr><th>Last G0009</th><td id="lastobsid1">Loading...</td><td id="lastobsname1">Loading...</td><td>G0009</td><td id="lastobsfiles1">Loading...</td><td>Loading...</td></tr>
+<tr><th>2nd Last G0009</th></td><td id="lastobsid2">Loading...</td><td id="lastobsname2">Loading...</td><td>G0009</td><td id="lastobsfiles2">Loading...</td><td>Loading...</td></tr>
+</table>
+
 <table>
 <tr>
 <td id="nextobstitle" class="nextobs">
