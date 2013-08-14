@@ -9,11 +9,12 @@ client_secret='Gvj8cXWeowwHuFBtJCCaa2Ry'
 api_key='AIzaSyBktkXh2A4xPv4W1aEY6E3Bm1PcQr64pk4'
 table_id='1UspWE7G7ccKncYTUbEkpSaSitomsN-7vLkNdx-I'
 host='eor-db.mit.edu'
+hostcurtin='ngas01.ivec.org'
 dbname='mwa'
 user='mwa'
 password='BowTie'
 logfile='/nfs/blank/h4215/aaronew/MWA_Tools/eorlive/FusionConnect.log'
-
+int_min="20"
 class FusionConnector():
     #initialization should only be run once. A pickled instance of FusionConnector will be used to automatically update the google fusion table
     def __init__(self):
@@ -138,7 +139,7 @@ class FusionConnector():
         return tottime/3600.
     
     def get_fail_rates(self):
-        quarter_hour_cmds=self.send_eor_query("select count(*) from (select distinct on (observation_number) observation_number, mode from obsc_mwa_setting where observation_number >(gpsnow()-15*60) and mode!='standby' ) as foo")
+        quarter_hour_cmds=self.send_eor_query("select count(*) from (select distinct on (observation_number) observation_number, mode from obsc_mwa_setting where observation_number >(gpsnow()-"+int_min"*60) and mode!='standby' ) as foo")
         cmd_count=0.
         try:
             quarter_hour_cmds=quarter_hour_cmds[0]
@@ -147,7 +148,7 @@ class FusionConnector():
             self.write_log("Error getting total command counts : "+str(e))
         fail_rates=range(0,16)
         for rx in range(1,17):
-            good_cmds=self.send_eor_query("select count(*) from (select distinct on (rr.observation_number,rx_state_good) rr.observation_number from recv_readiness rr inner join obsc_mwa_setting oc on rr.observation_number=oc.observation_number where rr.rx_id="+str(rx)+" and rr.observation_number > (gpsnow()-15*60) and oc.mode!='standby' and rr.rx_state_good='t') as foo")
+            good_cmds=self.send_eor_query("select count(*) from (select distinct on (rr.observation_number,rx_state_good) rr.observation_number from recv_readiness rr inner join obsc_mwa_setting oc on rr.observation_number=oc.observation_number where rr.rx_id="+str(rx)+" and rr.observation_number > (gpsnow()-"+int_min+"*60) and oc.mode!='standby' and rr.rx_state_good='t') as foo")
             try:
                 fail_rates[rx-1]=1.-good_cmds[0][0]/cmd_count
             except Exception,e:
@@ -178,8 +179,16 @@ class FusionConnector():
             exit()
         
 
+    def check_obs(self):
+        #get list of all G009 mwa_setting entries
 
-
+        #for each entry, overwrite fusion table
+        obsids = []
+        dates = []
+        rows=self.send_eor_query('select starttime from mwa_setting where projectid=\'G0009\'');
+        for row in rows:
+            drows = self.send_eor_equery('select 
+            date.append(row[0]
 
     def insert_data(self):     
         fail_rates=self.get_fail_rates()
@@ -209,6 +218,11 @@ if __name__=='__main__':
         pickle.dump(fuser,open(fusionname,'wb'))
     else:
         fuser=pickle.load(open(fusionname,'rb'))
-    fuser.insert_data()
+    #parse command line arguments
+    mode=sys.argv[1]
+    if(int(mode)==0):
+        fuser.insert_data()
+    else:
+        fuser.check_obs()
     pickle.dump(fuser,open(fusionname,'wb'))
         
