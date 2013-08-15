@@ -20,11 +20,15 @@ if(!empty($obs)){
   $query = "select count(*) from (select observation_num from data_files where observation_num = $observation_number) as foo;";
   $result = pg_query($dbconn,$query) or die('Query Failed');
   $files = pg_fetch_row($result);
+  $query = "select timestamp_gps($observation_number);";
+  $date_result=pg_query($dbconn,$query) or die('Query Failed');
+  $date_result=pg_fetch_row($date_result);
   echo "<isobs>1</isobs>";
   echo "<observation_number>".$obs[0]."</observation_number>";
   echo "<obsname>".$obs[1]."</obsname>";
   echo "<projectid>".$obs[2]."</projectid>";
   echo "<files>".$files[0]."</files>";
+  echo "<date>".$date_result[0]."</date>";
 }
 else
   {
@@ -40,9 +44,13 @@ $observation_number=$obs[0];
 $query = "select count(*) from (select observation_num from data_files where observation_num=$observation_number) as foo;";
 $fresult=pg_query($dbconn,$query) or die('query failed');
 $files = pg_fetch_row($fresult);
+$query = "select timestamp_gps($observation_number);";
+$date_result=pg_query($dbconn,$query) or die('Query Failed');
+$date_result=pg_fetch_row($date_result);
 echo "<observation_number>".$obs[0]."</observation_number>";
 echo "<obsname>".$obs[1]."</obsname>";
 echo "<files>".$files[0]."</files>";
+echo "<date>".$date_result[0]."</date>";
 echo "</lastobs1>";
 
 echo "<lastobs2>";
@@ -51,9 +59,13 @@ $observation_number=$obs[0];
 $query = "select count(*) from (select observation_num from data_files where observation_num=$observation_number)as foo;";
 $fresult=pg_query($dbconn,$query) or die('query failed');
 $files=pg_fetch_row($fresult);
+$query = "select timestamp_gps($observation_number);";
+$date_result=pg_query($dbconn,$query) or die('Query Failed');
+$date_result=pg_fetch_row($date_result);
 echo "<observation_number>".$obs[0]."</observation_number>";
 echo "<obsname>".$obs[1]."</obsname>";
 echo "<files>".$files[0]."</files>";
+echo "<date>".$date_result[0]."</date>";
 //now get last two observations
 echo "</lastobs2>";
 
