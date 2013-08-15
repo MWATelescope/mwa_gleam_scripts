@@ -139,7 +139,7 @@ class FusionConnector():
         return tottime/3600.
     
     def get_fail_rates(self):
-        quarter_hour_cmds=self.send_eor_query("select count(*) from (select distinct on (observation_number) observation_number, mode from obsc_mwa_setting where observation_number >(gpsnow()-"+int_min"*60) and mode!='standby' ) as foo")
+        quarter_hour_cmds=self.send_eor_query("select count(*) from (select distinct on (observation_number) observation_number, mode from obsc_mwa_setting where observation_number >(gpsnow()-"+int_min+"*60) and mode!='standby' ) as foo")
         cmd_count=0.
         try:
             quarter_hour_cmds=quarter_hour_cmds[0]
@@ -185,10 +185,10 @@ class FusionConnector():
         #for each entry, overwrite fusion table
         obsids = []
         dates = []
-        rows=self.send_eor_query('select starttime from mwa_setting where projectid=\'G0009\'');
-        for row in rows:
-            drows = self.send_eor_equery('select 
-            date.append(row[0]
+        rows=self.send_eor_query('select starttime from mwa_setting where projectid=\'G0009\'')
+#        for row in rows:
+ #           drows = self.send_eor_equery('select 
+  #          date.append(row[0]
 
     def insert_data(self):     
         fail_rates=self.get_fail_rates()
