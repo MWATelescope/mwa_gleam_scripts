@@ -15,7 +15,7 @@
     
     
 
-    var queryText=encodeURIComponent('select A,B,C,D,E limit 10');
+    var queryText=encodeURIComponent('select A,B,C,D,E order by A desc limit 10');
     <!--var key='0Au_2bmQn8fR4dHFqb0VwNHpKdjBoWFZrVzV3dm8zenc';-->
     var key='0Ate0sqkDCwhydEpHMnlHckFSRjRhaE5IdHFUcDd2enc'
     var query = new google.visualization.Query('http://spreadsheets.google.com/a/google.com/tq?key='+key+'&tq='+queryText);
@@ -109,7 +109,7 @@
     document.getElementById("curobsname").innerHTML=curobs.childNodes[2].childNodes[0].nodeValue;
     document.getElementById("curobsproj").innerHTML=curobs.childNodes[3].childNodes[0].nodeValue;
     document.getElementById("curobsfiles").innerHTML=curobs.childNodes[4].childNodes[0].nodeValue;
-    document.getElementById("curobsdate").innerHTML=curobs.childeNoes[5].childNodes[0].nodeValue;
+    document.getElementById("curobsdate").innerHTML=curobs.childNodes[5].childNodes[0].nodeValue;
     }
     else
     {

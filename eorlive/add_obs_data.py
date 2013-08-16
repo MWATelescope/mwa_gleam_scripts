@@ -8,6 +8,7 @@ redirect_uri='http://localhost'
 client_secret='Gvj8cXWeowwHuFBtJCCaa2Ry'
 api_key='AIzaSyBktkXh2A4xPv4W1aEY6E3Bm1PcQr64pk4'
 table_id='1UspWE7G7ccKncYTUbEkpSaSitomsN-7vLkNdx-I'
+obstable_id='1poo8vJn8FHcwuZ0OlF-IGpOY5krFvOH-dSZIyPc'
 host='eor-db.mit.edu'
 hostcurtin='ngas01.ivec.org'
 dbname='mwa'
@@ -109,7 +110,14 @@ class FusionConnector():
         request.request(method,sqlcmd,headers=headers)
         response=request.getresponse()
         self.write_log(str(response.status)+' '+response.reason)
-
+    
+    def get_mit_filelist(self):
+        request=urllib2.Request(url='http://eor-02.mit.edu:7777/QUERY?query=files_list&format=list')
+        request_open=urllib2.urlopen(request)
+        response=request_open.read()
+        request_open.close()
+        return iter(response.splitlines())
+        #iterate through all obserations at MIT, check obsid in data base to see if observation is G0009
 
     def get_mit_download_time(self):
         request=urllib2.Request(url='http://eor-02.mit.edu:7777/QUERY?query=files_list&format=list')
@@ -181,14 +189,45 @@ class FusionConnector():
 
     def check_obs(self):
         #get list of all G009 mwa_setting entries
-
         #for each entry, overwrite fusion table
         obsids = []
         dates = []
-        rows=self.send_eor_query('select starttime from mwa_setting where projectid=\'G0009\'')
-#        for row in rows:
- #           drows = self.send_eor_equery('select 
-  #          date.append(row[0]
+        names=[]
+        durations=[]
+        mrofiles=[]
+        mitfiles=[]
+        lineiterator=self.get_mit_filelist()
+        rows=self.send_eor_query('select observation_number,obsname,starttime,stoptime from obsc_mwa_setting where projectid=\'G0009\'')
+        self.write_log('deleting observations table')
+        query = 'DELETE FROM %s'%(obstable_id)
+        self.send_fusion_query('POST',query,{'Content-Length':0})
+
+        for row in rows:
+            obsnum=row[0]
+            obsdate=self.send_eor_query('select timestamp_gps('+str(row[0])+')')
+            dates.append(obsdate[0])
+            durations.append(row[3]-row[2])
+            names.append(row[2])
+            #find number of files
+            files=self.send_eor_query('select count(*) from (select observation_num from data_files where observation_num='+str(obsnum)+') as foo;')
+            mrofiles.append(files[0])
+            #now get mit files
+            p=re.compile('/[0-9]{10}_')
+            fcount=0
+            print obsnum
+            for line in lineiterator:
+                m=p.search(line)
+                if(m):
+                    obsid=int(line[m.start()+1:m.end()-1])
+                    if(obsid==int(obsnum)):
+                        print obsid, obsnum
+                        fcount+=1
+            mitfiles.append(fcount)
+            print obsdate[0]
+            query = 'INSERT INTO %s (ObsDate,ObsID,MROData,MITData,Duration) VALUES (\'%s\',%s,%s,%s,%s)'%(obstable_id,obsdate[0][0].isoformat(),str(obsnum),str(int(files[0][0])),str(fcount),str(row[3]-row[2]))
+            #now drop table at 
+            self.write_log('sending: '+query)
+            self.send_fusion_query('POST',query,{'Content-Length':0})
 
     def insert_data(self):     
         fail_rates=self.get_fail_rates()
