@@ -3,6 +3,9 @@
  */
 
 #include <time.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <assert.h>
 
 #define SIZE_ANT_NAME 8
 #define SIZE_SOURCE_NAME 16
@@ -68,12 +71,19 @@ typedef struct _uvdata {
   double **w;
 } uvdata;
 
+typedef struct {
+  int pcount,gcount,grp_index;
+  float pscal[3],pzero[3];  // for u,v,w
+  double base_date;         // date in PZERO5 which is the JD of the obs.
+  float *grp_par, *grp_row;
+  void *fptr;
+} uviterator;
+
 /* public function prototypes */
 int writeUVFITS(char *fname, uvdata *data);
 int writeUVinstant(void *fptr, uvdata *data, double jd_frac, int i);
 int writeUVFITSfinalise(void *vfptr, uvdata *data);
 int writeUVFITSiterator(char *filename, uvdata *data, void **vfptr, double *jd_day_trunc);
-int readUVFITS(char *fname, uvdata **data);
 void printUVData(uvdata *data, FILE *fp);
 void JD_to_Cal(double jd, int *year, int *month, int *day);
 void JD_get_GSTIA0(double jd, double *GSTIA0);
@@ -86,4 +96,8 @@ void DecodeBaseline(float blcode, int *b1, int *b2);
 void Geodetic2XYZ(double lat_rad, double lon_rad, double height_meters, double *X, double *Y, double *Z);
 void ENH2XYZ_absolute(double E,double N, double H, double lat_rad, double lon_rad, double *X, double *Y, double *Z);
 void ENH2XYZ_local(double E,double N, double H, double lat, double *X, double *Y, double *Z);
+/* reading API */
+int readUVFITS(char *fname, uvdata **data);
+int readUVFITSInitIterator(char *filename, uvdata **data, uviterator **iterator);
+int readUVFITSnextIter(uvdata *obj, uviterator *iter);
 
