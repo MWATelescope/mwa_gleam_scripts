@@ -98,15 +98,18 @@
     document.getElementById("lastobsid1").innerHTML =obs1.childNodes[0].childNodes[0].nodeValue;
     document.getElementById("lastobsname1").innerHTML=obs1.childNodes[1].childNodes[0].nodeValue;
     document.getElementById("lastobsfiles1").innerHTML=obs1.childNodes[2].childNodes[0].nodeValue;
+    document.getElementById("lastobsdate1").innerHTML=obs1.childNodes[3].childNodes[0].nodeValue;
     document.getElementById("lastobsid2").innerHTML = obs2.childNodes[0].childNodes[0].nodeValue;
     document.getElementById("lastobsname2").innerHTML=obs2.childNodes[1].childNodes[0].nodeValue;
     document.getElementById("lastobsfiles2").innerHTML=obs2.childNodes[2].childNodes[0].nodeValue;
+    document.getElementById("lastobsdate2").innerHTML=obs2.childNodes[3].childNodes[0].nodeValue;
     if( isobs==1 )
     {
     document.getElementById("curobsid").innerHTML = curobs.childNodes[1].childNodes[0].nodeValue;
     document.getElementById("curobsname").innerHTML=curobs.childNodes[2].childNodes[0].nodeValue;
     document.getElementById("curobsproj").innerHTML=curobs.childNodes[3].childNodes[0].nodeValue;
     document.getElementById("curobsfiles").innerHTML=curobs.childNodes[4].childNodes[0].nodeValue;
+    document.getElementById("curobsdate").innerHTML=curobs.childeNoes[5].childNodes[0].nodeValue;
     }
     else
     {
@@ -114,6 +117,7 @@
     document.getElementById("curobsname").innerHTML="N/A";
     document.getElementById("curobsproj").innerHTML="N/A";
     document.getElementById("curobsfiles").innerHTML="N/A";
+    document.getElementById("curobsdate").innerHTML="N/A";
     }
     }
     };
@@ -263,7 +267,7 @@
 			 var refresh2=window.setInterval("getNextObs()",1000);
 			 var refresh3=window.setInterval("getG9Day()",60000);
 			 var refresh4=window.setInterval("getG9()",60000);
-			  var refresh5=window.setInterval("currentObs()",20000);
+			  var refresh5=window.setInterval("currentObs()",15000);
   </script>
 </head>
 
@@ -271,15 +275,21 @@
 <div id="title" class="title">
 <h1> EoR Observing Webpage </h1>
 </div>
+
 <table class="timetable" id="timetable">
 <tr> <th class="timeth"> Boston </th> <th class="timeth"> Pheonix </th> <th class="timeth">Seattle</th><th class="timeth"> Sydney </th> <th class="timeth"> Perth </th> <th class="timeth"> Bangalore </th><th class="timeth">UTC </th></tr>
 <tr> <td id="timeBoston" class="time">Loading...</td><td id="timePhoenix" class="time">Loading... </td> <td id="timeSeattle" class="time">Loading...</td><td id="timeSydney" class="time">Loading...</td><td id="timePerth" class="time">Loading...</td><td class="time" id="timeBangalore">Loading...</td><td class="time" id="timeUTC">Loading...</td></tr>
 </table>
+
+<table>
+<tr><th colspan="4">Useful Links</th></tr>
+<tr><td><a href="https://docs.google.com/spreadsheet/ccc?key=0Ate0sqkDCwhydFNsNmEzdVJGOFdHUUdsQXFidVYzY0E#gid=0">Observer's Schedule</a></td><td><a href="http://nagios.mwa128t.org/cgi-bin/nagios3/status.cgi">nagios</a></td><td><a href="http://mro.mwa128t.org/observation/observing_status/">Observation Status</a></td><td><a href="http://mro.mwa128t.org/burst/live/">Tile Total Power</a></td></tr>
+</table>
 <table>
 <tr><th> </th><th> Observation Number </th> <th> Observation Name </th><th> Project Id</th> <th>Files</th><th>Date</th></tr>
-<tr><th>Obs Now</th><td id="curobsid">Loading... </td><td id="curobsname">Loading...</td><td id="curobsproj">Loading...</td><td id="curobsfiles">Loading...</td><td>Loading...</td></tr>
-<tr><th>Last G0009</th><td id="lastobsid1">Loading...</td><td id="lastobsname1">Loading...</td><td>G0009</td><td id="lastobsfiles1">Loading...</td><td>Loading...</td></tr>
-<tr><th>2nd Last G0009</th></td><td id="lastobsid2">Loading...</td><td id="lastobsname2">Loading...</td><td>G0009</td><td id="lastobsfiles2">Loading...</td><td>Loading...</td></tr>
+<tr><th>Obs Now</th><td id="curobsid">Loading... </td><td id="curobsname">Loading...</td><td id="curobsproj">Loading...</td><td id="curobsfiles">Loading...</td><td id="curobsdate">Loading...</td></tr>
+<tr><th>Last G0009</th><td id="lastobsid1">Loading...</td><td id="lastobsname1">Loading...</td><td>G0009</td><td id="lastobsfiles1">Loading...</td><td id="lastobsdate1">Loading...</td></tr>
+<tr><th>2nd Last G0009</th></td><td id="lastobsid2">Loading...</td><td id="lastobsname2">Loading...</td><td>G0009</td><td id="lastobsfiles2">Loading...</td><td id="lastobsdate2">Loading...</td></tr>
 </table>
 
 <table>
