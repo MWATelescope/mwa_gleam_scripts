@@ -15,6 +15,10 @@ corr2uvfits: corr2uvfits.c uvfits.c libsla.a
 	ranlib libsla.a
 	cc $(CFLAGS) $(INCS) $(CFITSIO_INCS) -o corr2uvfits corr2uvfits.c uvfits.c $(CFITSIO_LIBS) -lcfitsio -lsla -lm
 
+test_readuvfits: test_readuvfits.c uvfits.c libsla.a
+	ranlib libsla.a
+	cc $(CFLAGS) $(INCS) $(CFITSIO_INCS) -o $@ $^ $(CFITSIO_LIBS) -lcfitsio -lsla -lm
+
 libsla.a:
 	cd SLALIB_C ; make
 	rm -f SLALIB_C/*.o
