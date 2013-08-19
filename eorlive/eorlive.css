@@ -53,8 +53,8 @@ margin-left:auto;
 }
 table.timetable
 {
-    width: 1000 px;
-    border: 4 px;
+    width: 1000px;
+    border: 4px;
     border-color:white;
     color: white;
 }
@@ -62,7 +62,7 @@ th.timeth
 {
     text-align:center;
     max-width:125 px;
-    border: 5 px solid white;
+    border: 5px solid white;
 }
 th
 {
@@ -70,7 +70,7 @@ th
 }
 td.time
 {
-border: 1 px solid white;
+border: 1px solid white;
 max-width:125 px;
 }
 
