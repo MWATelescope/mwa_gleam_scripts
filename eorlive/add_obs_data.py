@@ -227,7 +227,7 @@ class FusionConnector():
                 return 1
             else:
                 return 0
-        except Exception e:
+        except Exception, e:
             print 'Observation Number Invalid'
             
 
