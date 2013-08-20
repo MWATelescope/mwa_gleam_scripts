@@ -30,6 +30,8 @@ class FusionConnector():
         self.password=password
         self.log_file=logfile
 
+
+
         print 'Visit the URL below in a browser to authorize'
         print '%s?client_id=%s&redirect_uri=%s&scope=%s&response_type=code' % \
             ('https://accounts.google.com/o/oauth2/auth',
