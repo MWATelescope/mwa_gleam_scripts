@@ -192,7 +192,12 @@ class FusionConnector():
         loccmd = 'python /nfs/pritchard/d1/mwa/python/mwa_git/mwatools_setup/bin/obslocate.py -s eor-db.mit.edu -r eor-02.mit.edu -o '+str(obsid)
         p=subprocess.Popen([loccmd,],stdout=subprocess.PIPE,stderr=subprocess.PIPE,shell=True)
         outstr = p.communicate()
-        mitstr = outstr[1]
+        print outstr
+        mitstr = outstr[0]
+        loccmd = 'python /nfs/pritchard/d1/mwa/python/mwa_git/mwatools_setup/bin/obslocate.py -s eor-db.mit.edu -r ngas01.ivec.org -o '+str(obsid)
+        p=subprocess.Popen([loccmd,],stdout=subprocess.PIPE,stderr=subprocess.PIPE,shell=True)
+        outstr = p.communicate()
+        print outstr
         curstr = outstr[0]
         fmatch = re.compile('[0-9]{1,2}\n')
         fmit = fmatch.search(mitstr)
@@ -200,11 +205,31 @@ class FusionConnector():
         nmit = 0
         ncur = 0
         if(fmit):
-            nmit = int(mitstr[fmit.start():fmit.end()-2])
+            nmit = int(mitstr[fmit.start():fmit.end()-1])
         if(fcur):
-            ncur = int(curstr[fcur.start():fcur.end()-2])
+            ncur = int(curstr[fcur.start():fcur.end()-1])
         return(ncur,nmit)
+        print ncur
+        print nmit
+
+
+    def check_mit(self,obsid):
+        query = 'SELECT MITData, MROData FROM %s where ObsID=%s'%(obstable_id,obsid)
+        response=self.send_fusion_query('GET',query,{})
+        response = json.loads(response.read())
+        try:
+            fusionrows=response['rows']
         
+            nmit = int(fusionrows[0][0])
+            nmro = int(fusionrows[0][1])
+        
+            if(nmit==nmro):
+                return 1
+            else:
+                return 0
+        except Exception e:
+            print 'Observation Number Invalid'
+            
 
     def check_obs(self):
         #get list of all G009 mwa_setting entries
