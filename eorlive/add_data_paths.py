@@ -22,9 +22,10 @@ if __name__=='__main__':
         fuser=pickle.load(open(fusionname,'rb'))
     parser = argparse.ArgumentParser(description='Check if data is at MIT')
     parser.add_argument('obsid',metavar='obs_number',type=int)
-    parser.add_argument('uvpath',metavar='uvfits path',type=str)
-    parser.add_argument('mspath',metavar='ms path',type=str)
+    parser.add_argument('-u','--uvfits',metavar='uvfits path',type=str,default='')
+    parser.add_argument('-m','--ms',metavar='ms path',type=str,default='')
     args=parser.parse_args()
-    add_paths(fuser,args.obsid,args.uvpath,args.mspath)
+    
+    add_paths(fuser,args.obsid,args.uvfits,args.ms)
     
     
