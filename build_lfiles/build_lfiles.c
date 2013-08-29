@@ -71,6 +71,7 @@ void usage() {
     fprintf(stdout,"\t-n\t <nseconds> -- how many seconds to process. Default: all\n");
     fprintf(stdout,"\t-T\t <factor> [default == 1] -- by what factor to average in time\n");
     fprintf(stdout,"\t-F\t <factor> [default == 1] -- by what factor to average in frequency (must be power of 2)\n");
+    fprintf(stdout,"\t-P\t <type>   Output product type. A: autos, C: cross, B: both. Default: both\n");
     fprintf(stdout,"\t-p\t -- image in primary header -- NOW ASSUMED IF MODE == 0\n");
     fprintf(stdout,"\t-a\t append to output instead of clobber\n");
     fprintf(stdout,"\t-d\t enable debugging messages\n");
@@ -94,7 +95,7 @@ int getHDUsInfo(int nfiles, fitsfile *fptr[MAX_FILES], int num_hdus_in_file[MAX_
 
     /* sanity checks */
     for (i=1; i< nfiles; i++) {
-        if ( abs(num_hdus_in_file[i]-num_hdus_in_file[i-1]) > 4) {
+        if ( fabs((num_hdus_in_file[i]-num_hdus_in_file[i-1])/(num_hdus_in_file[i]+1.0)) > 0.1) {
             fprintf(stderr,"ERROR: serious mismatch between number of HDUs in files %s (%d) vs %s (%d). Exiting.\n",
                             input_file[i],num_hdus_in_file[i], input_file[i-1], num_hdus_in_file[i-1]);
             return EXIT_FAILURE;
@@ -157,7 +158,7 @@ int main(int argc, char **argv) {
     // mode 1 is multiple timesteps from a FITS file
     long datadims[2];
 
-    char *output_file = NULL;
+    char *output_file = NULL,prod_type='B';
     int num_hdus_in_file[MAX_FILES];
     int ninput;
     int nfiles = 0;
@@ -202,7 +203,7 @@ int main(int argc, char **argv) {
 
     memset(num_hdus_in_file,0,sizeof(num_hdus_in_file));
 
-    while ((arg = getopt(argc, argv, "m:i:f:F:s:v:n:o:apT:d")) != -1) {
+    while ((arg = getopt(argc, argv, "m:i:f:F:s:v:n:o:apT:P:d")) != -1) {
 
         switch (arg) {
             case 'h':
@@ -230,6 +231,9 @@ int main(int argc, char **argv) {
                 break;
             case 'n':
                 nseconds = atoi(optarg);
+                break;
+            case 'P':
+                prod_type = optarg[0];
                 break;
             case 'o':
                 output_file = strdup(optarg);
@@ -266,6 +270,11 @@ int main(int argc, char **argv) {
     }
     if (output_file == NULL) {
         output_file = "last_dump";
+    }
+
+    if (prod_type!='B' && prod_type !='A' && prod_type!='C') {
+        fprintf(stderr,"Unknown product type '%c'\n",prod_type);
+        exit(EXIT_FAILURE);
     }
 
     int ifile,stophdu;
@@ -349,15 +358,15 @@ int main(int argc, char **argv) {
         FILE *cross=NULL;
 
         if (!appendtofile) {
-            autos = fopen(lacfilename,"w");
-            cross = fopen(lccfilename,"w");
+            if (prod_type=='B' || prod_type=='A') autos = fopen(lacfilename,"w");
+            if (prod_type=='B' || prod_type=='C') cross = fopen(lccfilename,"w");
         }
         else {
-            autos = fopen(lacfilename,"a");
-            cross = fopen(lccfilename,"a");
+            if (prod_type=='B' || prod_type=='A') autos = fopen(lacfilename,"a");
+            if (prod_type=='B' || prod_type=='C') cross = fopen(lccfilename,"a");
         }
 
-        if (autos == NULL || cross == NULL) {
+        if ((autos == NULL && (prod_type=='A'||prod_type=='B')) || (cross == NULL && (prod_type=='B'||prod_type=='C'))) {
             fprintf(stderr,"Cannot open %s or %s\n",lacfilename,lccfilename);
             exit(EXIT_FAILURE);
         }
@@ -497,8 +506,8 @@ int main(int argc, char **argv) {
                     }
                 }
 
-                fwrite(lac_accum,sizeof(float),lacspcLength/fscrunch_factor,autos);
-                fwrite(lcc_accum,sizeof(float complex),lccspcLength/fscrunch_factor,cross);
+                if (autos !=NULL) fwrite(lac_accum,sizeof(float),lacspcLength/fscrunch_factor,autos);
+                if (cross !=NULL) fwrite(lcc_accum,sizeof(float complex),lccspcLength/fscrunch_factor,cross);
                 memset(lcc_accum,0,lccspcLength*sizeof(float complex));
                 memset(lac_accum,0,lacspcLength*sizeof(float));
                 if (debug) {
@@ -520,8 +529,8 @@ int main(int argc, char **argv) {
 
         printf(" Done.\n");
 
-        fclose(autos);
-        fclose(cross);
+        if (autos!=NULL) fclose(autos);
+        if (cross!=NULL) fclose(cross);
 
     }
     else if (mode == 2) {
