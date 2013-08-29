@@ -95,7 +95,7 @@ int getHDUsInfo(int nfiles, fitsfile *fptr[MAX_FILES], int num_hdus_in_file[MAX_
 
     /* sanity checks */
     for (i=1; i< nfiles; i++) {
-        if ( abs(num_hdus_in_file[i]-num_hdus_in_file[i-1]) > 4) {
+        if ( fabs((num_hdus_in_file[i]-num_hdus_in_file[i-1])/(num_hdus_in_file[i]+1.0)) > 0.1) {
             fprintf(stderr,"ERROR: serious mismatch between number of HDUs in files %s (%d) vs %s (%d). Exiting.\n",
                             input_file[i],num_hdus_in_file[i], input_file[i-1], num_hdus_in_file[i-1]);
             return EXIT_FAILURE;
