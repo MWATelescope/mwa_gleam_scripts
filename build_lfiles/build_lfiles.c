@@ -366,7 +366,7 @@ int main(int argc, char **argv) {
             if (prod_type=='B' || prod_type=='C') cross = fopen(lccfilename,"a");
         }
 
-        if ((autos == NULL && (prod_type=='A'||prod_type=='B')) || (cross == NULL && (prod_type=='A'||prod_type=='C'))) {
+        if ((autos == NULL && (prod_type=='A'||prod_type=='B')) || (cross == NULL && (prod_type=='B'||prod_type=='C'))) {
             fprintf(stderr,"Cannot open %s or %s\n",lacfilename,lccfilename);
             exit(EXIT_FAILURE);
         }
