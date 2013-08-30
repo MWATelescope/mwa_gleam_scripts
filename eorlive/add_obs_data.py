@@ -2,7 +2,7 @@ import urllib2,urllib,simplejson,sys,httplib,json,pickle,psycopg2,os,traceback,r
 from mwapy.ephem_utils import GPSseconds_now
 from datetime import datetime
 
-fusionname='/nfs/blank/h4215/aaronew/MWA_Tools/eorlive/FConn.p'
+fusionname='/nfs/blank/h4215/beards/MWA_Tools/eorlive/FConn.p'
 client_id='1059126630788.apps.googleusercontent.com'
 redirect_uri='http://localhost'
 client_secret='Gvj8cXWeowwHuFBtJCCaa2Ry'
@@ -14,7 +14,7 @@ hostcurtin='ngas01.ivec.org'
 dbname='mwa'
 user='mwa'
 password='BowTie'
-logfile='/nfs/blank/h4215/aaronew/MWA_Tools/eorlive/FusionConnect.log'
+logfile='/nfs/blank/h4215/beards/MWA_Tools/eorlive/FusionConnect.log'
 int_min="20"
 class FusionConnector():
     #initialization should only be run once. A pickled instance of FusionConnector will be used to automatically update the google fusion table
@@ -231,6 +231,18 @@ class FusionConnector():
                 return 0
         except Exception, e:
             print 'Observation Number Invalid'
+
+    def read_uvfits_loc(self,obsid):
+        query = 'SELECT UVFITS_Files FROM %s where ObsID=%s'%(obstable_id,obsid)
+        response=self.send_fusion_query('GET',query,{})
+        response = json.loads(response.read())
+        try:
+            fusionrows=response['rows']
+            return fusionrows[0][0]
+        except Exception, e:
+            print 'Observation Number Invalid'
+
+            
             
 
     def check_obs(self):
