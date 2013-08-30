@@ -151,7 +151,14 @@ class FusionConnector():
         return tottime/3600.
     
     def get_fail_rates(self):
-        quarter_hour_cmds=self.send_eor_query("select count(*) from (select distinct on (observation_number) observation_number, mode from obsc_mwa_setting where observation_number >(gpsnow()-"+int_min+"*60) and mode!='standby' ) as foo")
+        gps_cmd = self.send_eor_query("select gpsnow()")
+        try:
+            gps_use=gps_use[0][0]
+        except Exception,e:
+            self.write_log("Error getting current gps time : "+str(e))
+            gps_use="gpsnow()"
+            
+        quarter_hour_cmds=self.send_eor_query("select count(*) from (select distinct on (observation_number) observation_number, mode from obsc_mwa_setting where observation_number >("+gps_use+"-"+int_min+"*60) and observation_number <("+gps_use+"-30) and mode!='standby' ) as foo")
         cmd_count=0.
         try:
             quarter_hour_cmds=quarter_hour_cmds[0]
@@ -160,7 +167,7 @@ class FusionConnector():
             self.write_log("Error getting total command counts : "+str(e))
         fail_rates=range(0,16)
         for rx in range(1,17):
-            good_cmds=self.send_eor_query("select count(*) from (select distinct on (rr.observation_number,rx_state_good) rr.observation_number from recv_readiness rr inner join obsc_mwa_setting oc on rr.observation_number=oc.observation_number where rr.rx_id="+str(rx)+" and rr.observation_number > (gpsnow()-"+int_min+"*60) and oc.mode!='standby' and rr.rx_state_good='t') as foo")
+            good_cmds=self.send_eor_query("select count(*) from (select distinct on (rr.observation_number,rx_state_good) rr.observation_number from recv_readiness rr inner join obsc_mwa_setting oc on rr.observation_number=oc.observation_number where rr.rx_id="+str(rx)+" and rr.observation_number > ("+gps_use+"-"+int_min+"*60) and rr.observation_number > ("+gps_use+"-30) and oc.mode!='standby' and rr.rx_state_good='t') as foo")
             try:
                 fail_rates[rx-1]=1.-good_cmds[0][0]/cmd_count
             except Exception,e:
