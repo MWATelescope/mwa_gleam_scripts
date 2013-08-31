@@ -162,7 +162,7 @@ class FusionConnector():
         for rx in range(1,17):
             good_cmds=self.send_eor_query("select count(*) from (select distinct on (rr.observation_number,rx_state_good) rr.observation_number from recv_readiness rr inner join obsc_mwa_setting oc on rr.observation_number=oc.observation_number where rr.rx_id="+str(rx)+" and rr.observation_number > (gpsnow()-"+int_min+"*60) and oc.mode!='standby' and rr.rx_state_good='t') as foo")
             try:
-                fail_rates[rx-1]=1.-good_cmds[0][0]/cmd_count
+                fail_rates[rx-1]=1.-float(good_cmds[0][0])/float(cmd_count)
             except Exception,e:
                 fail_rates[rx-1]=0.
                 self.write_log("Error computing failure rate : "+str(e))

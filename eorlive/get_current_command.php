@@ -1,6 +1,7 @@
 <?php
 header("Content-type: text/xml");
 $host="ngas01.ivec.org";
+$host="eor-db.mit.edu";
 $dbname="mwa";
 $user="mwa";
 $password="BowTie";
