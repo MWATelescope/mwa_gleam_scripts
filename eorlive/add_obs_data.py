@@ -2,7 +2,7 @@ import urllib2,urllib,simplejson,sys,httplib,json,pickle,psycopg2,os,traceback,r
 from mwapy.ephem_utils import GPSseconds_now
 from datetime import datetime
 
-fusionname='/nfs/blank/h4215/beards/MWA_Tools/eorlive/FConn.p'
+fusionname='/nfs/blank/h4215/aaronew/MWA_Tools/eorlive/FConn.p'
 client_id='1059126630788.apps.googleusercontent.com'
 redirect_uri='http://localhost'
 client_secret='Gvj8cXWeowwHuFBtJCCaa2Ry'
@@ -10,12 +10,20 @@ api_key='AIzaSyBktkXh2A4xPv4W1aEY6E3Bm1PcQr64pk4'
 table_id='1UspWE7G7ccKncYTUbEkpSaSitomsN-7vLkNdx-I'
 obstable_id='1poo8vJn8FHcwuZ0OlF-IGpOY5krFvOH-dSZIyPc'
 host='eor-db.mit.edu'
+fail_log='/nfs/blank/h4215/aaronew/MWA_Tools/eorlive/fail_cmd.log'
 hostcurtin='ngas01.ivec.org'
 dbname='mwa'
 user='mwa'
 password='BowTie'
-logfile='/nfs/blank/h4215/beards/MWA_Tools/eorlive/FusionConnect.log'
+logfile='/nfs/blank/h4215/aaronew/MWA_Tools/eorlive/FusionConnect.log'
 int_min="20"
+
+def write_fail_log(message):
+    nowtime=datetime.now()
+    logfile=open(fail_log,'a')
+    logfile.write(nowtime.isoformat(' ')+' : '+message+'\n')
+    logfile.close()
+
 class FusionConnector():
     #initialization should only be run once. A pickled instance of FusionConnector will be used to automatically update the google fusion table
     def __init__(self):
@@ -153,13 +161,15 @@ class FusionConnector():
     def get_fail_rates(self):
         gps_cmd = self.send_eor_query("select gpsnow()")
         try:
-            gps_use=gps_use[0][0]
+            gps_use=str(gps_cmd[0][0])
         except Exception,e:
             self.write_log("Error getting current gps time : "+str(e))
             gps_use="gpsnow()"
-            
-        quarter_hour_cmds=self.send_eor_query("select count(*) from (select distinct on (observation_number) observation_number, mode from obsc_mwa_setting where observation_number >("+gps_use+"-"+int_min+"*60) and observation_number <("+gps_use+"-30) and mode!='standby' ) as foo")
+        query = "select count(*) from (select distinct on (observation_number) observation_number, mode from obsc_mwa_setting where observation_number >("+gps_use+"-"+int_min+"*60) and observation_number <("+gps_use+"-30) and mode!='standby' ) as foo"
+        write_fail_log('Executing query total commands: '+query)
+        quarter_hour_cmds=self.send_eor_query(query)
         cmd_count=0.
+        write_fail_log('Executing query total commands: '+query)
         try:
             quarter_hour_cmds=quarter_hour_cmds[0]
             cmd_count=quarter_hour_cmds[0]
@@ -167,7 +177,11 @@ class FusionConnector():
             self.write_log("Error getting total command counts : "+str(e))
         fail_rates=range(0,16)
         for rx in range(1,17):
-            good_cmds=self.send_eor_query("select count(*) from (select distinct on (rr.observation_number,rx_state_good) rr.observation_number from recv_readiness rr inner join obsc_mwa_setting oc on rr.observation_number=oc.observation_number where rr.rx_id="+str(rx)+" and rr.observation_number > ("+gps_use+"-"+int_min+"*60) and rr.observation_number > ("+gps_use+"-30) and oc.mode!='standby' and rr.rx_state_good='t') as foo")
+
+            query="select count(*) from (select distinct on (rr.observation_number,rx_state_good) rr.observation_number from recv_readiness rr inner join obsc_mwa_setting oc on rr.observation_number=oc.observation_number where rr.rx_id="+str(rx)+" and rr.observation_number > ("+gps_use+"-"+int_min+"*60) and rr.observation_number < ("+gps_use+"-30) and oc.mode!='standby' and rr.rx_state_good='t') as foo"
+            write_fail_log('Executing query on Rx '+str(rx)+': '+query)
+            good_cmds=self.send_eor_query(query)
+
             try:
                 fail_rates[rx-1]=1.-float(good_cmds[0][0])/float(cmd_count)
             except Exception,e:
