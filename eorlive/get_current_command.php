@@ -1,6 +1,7 @@
 <?php
 header("Content-type: text/xml");
 $host="ngas01.ivec.org";
+$host="eor-db.mit.edu";
 $dbname="mwa";
 $user="mwa";
 $password="BowTie";
@@ -37,7 +38,7 @@ else
 echo "</curobs>";
 
 echo "<lastobs1>";
-$query = "select observation_number,obsname from obsc_mwa_setting where stoptime<gpsnow() and projectid='G0009' order by observation_number desc limit 2";
+$query = "select observation_number,obsname, projectid from obsc_mwa_setting where stoptime<gpsnow() and (projectid='G0009' or projectid='G0010') order by observation_number desc limit 2";
 $result = pg_query($dbconn,$query) or die("Query Failed");
 $obs = pg_fetch_row($result);
 $observation_number=$obs[0];
@@ -51,6 +52,7 @@ echo "<observation_number>".$obs[0]."</observation_number>";
 echo "<obsname>".$obs[1]."</obsname>";
 echo "<files>".$files[0]."</files>";
 echo "<date>".$date_result[0]."</date>";
+echo "<projectid>".$obs[2]."</projectid>";
 echo "</lastobs1>";
 
 echo "<lastobs2>";
@@ -66,7 +68,7 @@ echo "<observation_number>".$obs[0]."</observation_number>";
 echo "<obsname>".$obs[1]."</obsname>";
 echo "<files>".$files[0]."</files>";
 echo "<date>".$date_result[0]."</date>";
-//now get last two observations
+echo "<projectid>".$obs[2]."</projectid>";
 echo "</lastobs2>";
 
 echo "</obsquery>";

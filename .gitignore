@@ -23,5 +23,6 @@ casatasks/pbgain.py
 casatasks/pbgain_cli.py
 configs/mwapy.egg-info
 casatasks/*-e
+/eorlive/FusionConnect.log
 *#*
 *.o
