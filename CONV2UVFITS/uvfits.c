@@ -260,8 +260,8 @@ int readUVFITSInitIterator(char *filename, uvdata **data, uviterator **iterator)
 
     /* check for the stuff we're interested in */
     if (strncmp("FREQ",typedesc,4)==0) {
-      /* centre freq is CRVAL, BW is CDELT */
-      (*data)->cent_freq = crval;
+      /* reference freq is CRVAL at pixel CRPIX, BW is CDELT */
+      (*data)->cent_freq = crval + ( ((*data)->n_freq)/2 +1-crpix)*cdelt;
       (*data)->freq_delta = cdelt;
     }
     if (strncmp("STOKES",typedesc,6)==0) {
@@ -359,7 +359,7 @@ void addGroupRow(uvdata *obj, uviterator *iter) {
  !            return code 1 means normal completion end of file
 ******************************/
 int readUVFITSnextIter(uvdata *obj, uviterator *iter) {
-  int grp_row_size,i,status=0,done=0;
+  int grp_row_size,status=0,done=0;
   int max_bl,n_bl=0;
   float currtime=FLT_MAX;
   fitsfile *fptr;
@@ -396,7 +396,7 @@ int readUVFITSnextIter(uvdata *obj, uviterator *iter) {
         // read the vis/weight values for all freqs for this time/baseline
         fits_read_img_flt(fptr, iter->grp_index+1, 1, grp_row_size, 0.0, iter->grp_row, NULL, &status);
         if (status) {
-            fprintf(stderr,"Error reading image row index %d\n",i);
+            fprintf(stderr,"readUVFITSnextIter: Error reading image row for time index %d\n",iter->grp_index+1);
             fits_report_error(stderr,status);
             return status;
         }
@@ -924,7 +924,7 @@ int writeUVinstant(void *vfptr, uvdata *data, double jd_frac, int i) {
     nelements = 3*data->n_pol*data->n_freq*data->n_baselines[i];
     array = malloc((nelements+N_GRP_PARAMS)*sizeof(float));
     if(array==NULL) {
-        fprintf(stderr,"writeUVFITS: no malloc\n");
+        fprintf(stderr,"writeUVinstant: no malloc\n");
         exit(EXIT_FAILURE);
     }
 

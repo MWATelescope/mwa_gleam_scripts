@@ -103,6 +103,8 @@
     document.getElementById("lastobsname2").innerHTML=obs2.childNodes[1].childNodes[0].nodeValue;
     document.getElementById("lastobsfiles2").innerHTML=obs2.childNodes[2].childNodes[0].nodeValue;
     document.getElementById("lastobsdate2").innerHTML=obs2.childNodes[3].childNodes[0].nodeValue;
+    document.getElementById("lastobsproj").innerHTML=obs1.childNodes[4].childNodes[0].nodeValue;
+    document.getElementById("lastobs2proj").innerHTML=obs1.childNodes[4].childNodes[0].nodeValue;
     if( isobs==1 )
     {
     document.getElementById("curobsid").innerHTML = curobs.childNodes[1].childNodes[0].nodeValue;
@@ -294,8 +296,8 @@ Observations and their Locations</a></td><td><a href="http://telemetry.mwa128t.o
 <table>
 <tr><th> </th><th> Observation Number </th> <th> Observation Name </th><th> Project Id</th> <th>Files</th><th>Date</th></tr>
 <tr><th>Obs Now</th><td id="curobsid">Loading... </td><td id="curobsname">Loading...</td><td id="curobsproj">Loading...</td><td id="curobsfiles">Loading...</td><td id="curobsdate">Loading...</td></tr>
-<tr><th>Last G0009</th><td id="lastobsid1">Loading...</td><td id="lastobsname1">Loading...</td><td>G0009</td><td id="lastobsfiles1">Loading...</td><td id="lastobsdate1">Loading...</td></tr>
-<tr><th>2nd Last G0009</th></td><td id="lastobsid2">Loading...</td><td id="lastobsname2">Loading...</td><td>G0009</td><td id="lastobsfiles2">Loading...</td><td id="lastobsdate2">Loading...</td></tr>
+<tr><th>Last</th><td id="lastobsid1">Loading...</td><td id="lastobsname1">Loading...</td><td id="lastobsproj">Loading...</td><td id="lastobsfiles1">Loading...</td><td id="lastobsdate1">Loading...</td></tr>
+<tr><th>2nd Last</th></td><td id="lastobsid2">Loading...</td><td id="lastobsname2">Loading...</td><td id="lastobs2proj">Loading...</td><td id="lastobsfiles2">Loading...</td><td id="lastobsdate2">Loading...</td></tr>
 </table>
 
 <table>

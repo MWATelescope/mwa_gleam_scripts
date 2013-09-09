@@ -47,6 +47,7 @@ function getTimeSymbol($seconds){
 $dbconn=pg_connect("host=$host dbname=$dbname user=$user password=$password" ) or die ("could not connect to server\n");
 
 $pid='\'G0009\'';
+$pid1='\'G0010\'';
 $query = "select gpsnow()";
 $result=pg_query($dbconn,$query) or die('Query Failed');
 
@@ -59,7 +60,7 @@ echo "gpsnow() is not working";
 exit;
 }
 
-$query = "select * from mwa_setting where projectid=$pid and starttime>gpsnow() order by starttime asc limit 1";
+$query = "select * from mwa_setting where (projectid=$pid or projectid=$pid1) and starttime>gpsnow() order by starttime asc limit 1";
 $result=pg_query($dbconn,$query) or die('Query Failed');
 if($row=pg_fetch_row($result)){
 
