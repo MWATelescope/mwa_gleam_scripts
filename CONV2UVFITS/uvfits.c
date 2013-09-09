@@ -359,7 +359,7 @@ void addGroupRow(uvdata *obj, uviterator *iter) {
  !            return code 1 means normal completion end of file
 ******************************/
 int readUVFITSnextIter(uvdata *obj, uviterator *iter) {
-  int grp_row_size,i,status=0,done=0;
+  int grp_row_size,status=0,done=0;
   int max_bl,n_bl=0;
   float currtime=FLT_MAX;
   fitsfile *fptr;
@@ -396,7 +396,7 @@ int readUVFITSnextIter(uvdata *obj, uviterator *iter) {
         // read the vis/weight values for all freqs for this time/baseline
         fits_read_img_flt(fptr, iter->grp_index+1, 1, grp_row_size, 0.0, iter->grp_row, NULL, &status);
         if (status) {
-            fprintf(stderr,"Error reading image row index %d\n",i);
+            fprintf(stderr,"readUVFITSnextIter: Error reading image row for time index %d\n",iter->grp_index+1);
             fits_report_error(stderr,status);
             return status;
         }
