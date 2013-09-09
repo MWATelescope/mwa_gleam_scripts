@@ -39,7 +39,7 @@ void parse_cmdline(const int argc,char * const argv[]) {
 
 
 int main(int argc, char *argv[]) {
-    int res=0,chunk=0;
+    int res=0,chunk=0,i;
     uvdata *data_old,*data_new;
     uviterator *iter;
 
@@ -67,6 +67,18 @@ int main(int argc, char *argv[]) {
         fprintf(stdout,"Chunk %d. Time: %f. baselines: %d\n",chunk++,data_new->date[0],data_new->n_baselines[0]);
     }
 
+    /* print a few vis values */
+    for (i=0; i<10; i++) {
+        int f,p;
+        fprintf(stdout,"u,v,w: %g,%g,%g. Baseline: %f.\n",data_new->u[0][0],data_new->v[0][0],data_new->w[0][0],data_new->baseline[0][0]);
+        for (f=0; f<data_new->n_freq; f++) {
+            fprintf(stdout,"Freq %g ",data_new->cent_freq +data_new->freq_delta*(f-data_new->n_freq/2));
+            for(p=0; p<data_new->n_pol; p++) {
+                fprintf(stdout,"%g ",data_new->visdata[0][p+data_new->n_pol*f]);
+            }
+            fprintf(stdout,"\n");
+        }
+    }
 
     return 0;
 }

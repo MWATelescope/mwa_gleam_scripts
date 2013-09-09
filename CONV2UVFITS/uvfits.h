@@ -48,6 +48,7 @@ typedef struct _array_table {
 } array_data;
 
 
+/* see notes on iterator mode below for how this data structure is used in that case */
 typedef struct _uvdata {
   int  n_pol;
   int  pol_type;        /* index to signal what kind of data: 1: Stokes, -1: Circ, -5: Linear */
@@ -61,7 +62,9 @@ typedef struct _uvdata {
   ant_table *antennas;  /* a pointer to an array of ant_tables the size of the number of antennas */
   array_data *array;    /* a pointer to an array struct */
   float **visdata;      /* array the size of n_vis whose elements point to arrays of visibiliites
-                           the size of n_freq*n_pol*n_baselines complex floats */
+                           the size of n_pol*n_freq*n_baselines complex floats. The data are ordered so
+                           that pol changes most quickly, then freq, and baseline most slowly. Index with:
+                           visdata[baseline*(n_pol*n_freq) + freq*n_pol + pol] as a float complex */
   float **weightdata;   /* weight data for visibiliites. Same data ordering as above, just float,
                            not complex */
   float **baseline;     /* same ordering again. encoded baseline using Miriad encoding convention */
@@ -98,6 +101,19 @@ void ENH2XYZ_absolute(double E,double N, double H, double lat_rad, double lon_ra
 void ENH2XYZ_local(double E,double N, double H, double lat, double *X, double *Y, double *Z);
 /* reading API */
 int readUVFITS(char *fname, uvdata **data);
+
+/* iterator mode API:
+   In this mode, the uvfits file is opened once and read many times, once for each time chunk
+   in the file. This conserves system memory and allows processing of large uvfits files limited by
+   disk read speed, not memory.
+
+   To use this mode, don't use readUVFITS(). Instead use readUVFITSInitIterator() once to open the file
+   and read the array table, then do a while loop on readUVFITSnextIter() to get a single time chunk of
+   data from the file. See test_readuvfits.c for a very simple example.
+
+   In this case, the uvdata data structure only contains a single time instant (n_vis=1), so all the arrays of arrays
+   have only 1 element in them and they all should be accessed via array index 0.
+*/
 int readUVFITSInitIterator(char *filename, uvdata **data, uviterator **iterator);
 int readUVFITSnextIter(uvdata *obj, uviterator *iter);
 

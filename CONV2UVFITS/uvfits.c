@@ -260,8 +260,8 @@ int readUVFITSInitIterator(char *filename, uvdata **data, uviterator **iterator)
 
     /* check for the stuff we're interested in */
     if (strncmp("FREQ",typedesc,4)==0) {
-      /* centre freq is CRVAL, BW is CDELT */
-      (*data)->cent_freq = crval;
+      /* reference freq is CRVAL at pixel CRPIX, BW is CDELT */
+      (*data)->cent_freq = crval + ( ((*data)->n_freq)/2 +1-crpix)*cdelt;
       (*data)->freq_delta = cdelt;
     }
     if (strncmp("STOKES",typedesc,6)==0) {
@@ -924,7 +924,7 @@ int writeUVinstant(void *vfptr, uvdata *data, double jd_frac, int i) {
     nelements = 3*data->n_pol*data->n_freq*data->n_baselines[i];
     array = malloc((nelements+N_GRP_PARAMS)*sizeof(float));
     if(array==NULL) {
-        fprintf(stderr,"writeUVFITS: no malloc\n");
+        fprintf(stderr,"writeUVinstant: no malloc\n");
         exit(EXIT_FAILURE);
     }
 
