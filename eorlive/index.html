@@ -34,8 +34,6 @@
     }
 
 
-    
-
     function createXHR()
     {
     try{
@@ -78,6 +76,11 @@
     };
     xhr.open("GET","LastData.php",true);
     xhr.send();
+    }
+
+    function refreshBeam()
+    {
+<!--      document.getElementById("beamImage").innerHTML="<img src='current_beam.png'>"-->
     }
 
 
@@ -270,6 +273,7 @@
 			 var refresh3=window.setInterval("getG9Day()",60000);
 			 var refresh4=window.setInterval("getG9()",60000);
 			  var refresh5=window.setInterval("currentObs()",15000);
+			  var resresh6=window.setInterval("refreshBeam()",60000);
   </script>
 </head>
 
@@ -292,6 +296,9 @@ href="http://mro.mwa128t.org/observation/observing_status/">Observation Status</
 href="http://mro.mwa128t.org/burst/live/">Tile Total Power</a></td><td><a
 href="https://www.google.com/fusiontables/DataSource?docid=1poo8vJn8FHcwuZ0OlF-IGpOY5krFvOH-dSZIyPc"> Table of G0009
 Observations and their Locations</a></td><td><a href="http://telemetry.mwa128t.org">Autocorrelations</a></td></tr>
+</table>
+<table>
+<!--<tr><td id="beamimage"><img src='current_beam.png'></td></tr>-->
 </table>
 <table>
 <tr><th> </th><th> Observation Number </th> <th> Observation Name </th><th> Project Id</th> <th>Files</th><th>Date</th></tr>

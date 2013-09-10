@@ -212,12 +212,12 @@ class FusionConnector():
             exit()
 
     def get_n_data(self,obsid):
-        loccmd = 'python /nfs/pritchard/d1/mwa/python/mwa_git/mwatools_setup/bin/obslocate.py -s eor-db.mit.edu -r eor-02.mit.edu -o '+str(obsid)
+        loccmd = 'python /csr/mwa/python/mwa_git/mwatools_setup/bin/obslocate.py -s eor-db.mit.edu -r eor-02.mit.edu -o '+str(obsid)
         p=subprocess.Popen([loccmd,],stdout=subprocess.PIPE,stderr=subprocess.PIPE,shell=True)
         outstr = p.communicate()
         print outstr
         mitstr = outstr[0]
-        loccmd = 'python /nfs/pritchard/d1/mwa/python/mwa_git/mwatools_setup/bin/obslocate.py -s eor-db.mit.edu -r ngas01.ivec.org -o '+str(obsid)
+        loccmd = 'python /csr/mwa/python/mwa_git/mwatools_setup/bin/obslocate.py -s eor-db.mit.edu -r ngas01.ivec.org -o '+str(obsid)
         p=subprocess.Popen([loccmd,],stdout=subprocess.PIPE,stderr=subprocess.PIPE,shell=True)
         outstr = p.communicate()
         print outstr
@@ -269,20 +269,11 @@ class FusionConnector():
     def check_obs(self):
         #get list of all G009 mwa_setting entries
         #retrieve entire fusion table
-        '''
-        obsids = []
-        dates = []
-        names=[]
-        durations=[]
-        mrofiles=[]
-        mitfiles=[]
-        filelist=[]
-        lineiterator=self.get_mit_filelist()
-        '''
+
         #get all g0009 observations
-        rows=self.send_eor_query('select observation_number,obsname,starttime,stoptime from obsc_mwa_setting where projectid=\'G0009\'')
+        rows=self.send_eor_query('select observation_number,obsname,starttime,stoptime,dec_phase_center from obsc_mwa_setting where projectid=\'G0009\'')
         self.write_log('deleting observations table')
-        query = 'SELECT ObsID,MROData,CurtinData,MITData, ROWID FROM %s'%(obstable_id)
+        query = 'SELECT ObsID,MROData,CurtinData,MITData,ROWID,Dec,ObsName FROM %s'%(obstable_id)
         response= self.send_fusion_query('GET',query,{})
         #load the table
         #print response.read()
@@ -290,6 +281,8 @@ class FusionConnector():
         fusionrows = response['rows']
         #add rows to everything
         fusion_obsids = []
+        fusion_decs=[]
+        fusion_obsnames=[]
         fusion_curtindata = []
         fusion_mitdata = []
         fusion_mrodata = []
@@ -308,30 +301,50 @@ class FusionConnector():
                 fusion_mitdata.append(int(row[3]))
             else:
                 fusion_mitdata.append(0)
+            fusion_decs.append(row[5])
+            fusion_obsnames.append(row[6])
             fusion_rowids.append(row[4])
-        #now go through all g009 observations and process each row
+        #now go through all g0009 observations and process each row
+
         for row in rows:
             #if the obsid is not in the fusion rows than get date, get number of files at MIT and Curtin
+
             if(not(int(row[0]) in fusion_obsids)):
+                
                 obsdate=self.send_eor_query('select timestamp_gps('+str(row[0])+')')
                 #find number of files at MRO
                 nmro=self.send_eor_query('select count(*) from (select observation_num from data_files where observation_num='+str(int(row[0]))+') as foo;')[0][0]
                 #find number of files at MIT and Curtin
                 (ncur,nmit)=self.get_n_data(int(row[0]))
-                query = 'INSERT INTO %s (ObsDate,ObsID,MROData,CurtinData,MITData,Duration) VALUES (\'%s\',%s,%s,%s,%s,%s)'%(obstable_id,obsdate[0][0].isoformat(),str(row[0]),str(nmro),str(ncur),str(nmit),str(int(row[3])-int(row[2])))
+                query = 'INSERT INTO %s (ObsDate,ObsID,ObsName,Dec,MROData,CurtinData,MITData,Duration) VALUES (\'%s\',%s,%s,%s,%s,%s,%s,%s)'%(obstable_id,obsdate[0][0].isoformat(),str(row[0]),str(row[1]),str(row[4]),str(nmro),str(ncur),str(nmit),str(int(row[3])-int(row[2])))
                 response=self.send_fusion_query('POST',query,{'Content-Length':0})
                 print response.status,response.reason
                 #check of the number of fils at MIT or Curtin are less than the number of files at the MRO
+                
             else:
                 obsind = fusion_obsids.index(int(row[0]))
+                print obsind
+                print row[1]
+                print row[4]
+                print fusion_decs[obsind]
+                if(0==len(str(fusion_obsnames[obsind]))):
+                    print 'Updating ObsName'
+                    query='UPDATE %s \nSET ObsName=\'%s\' \nWHERE ROWID=\'%s\''%(obstable_id,str(row[1]),str(fusion_rowids[obsind]))
+                    response=self.send_fusion_query('POST',query,{'Content-Length':0})
+                if('NaN'==fusion_decs[obsind]):
+                    print 'Updating Dec'
+                    query='UPDATE %s \nSET Dec=%s\nWHERE ROWID=\'%s\''%(obstable_id,str(row[4]),str(fusion_rowids[obsind]))
+                    response=self.send_fusion_query('POST',query,{'Content-Length':0})
                 if(not(fusion_mrodata[obsind]==fusion_mitdata[obsind])):# and fusion_curtindata[obsind]==fusion_mrodata[obsind])):
+                    '''
                     nmro = self.send_eor_query('select count(*) from (select observation_num from data_files where observation_num='+str(fusion_obsids[obsind])+') as foo;')[0][0]
                     print 'UPDATING!'
                     (ncur,nmit)=self.get_n_data(int(row[0]))
                     query = 'UPDATE %s\nSET MROData=%s,CurtinData=%s,MITData=%s\nWHERE ROWID=\'%s\''%(obstable_id,str(nmro),str(ncur),str(nmit),fusion_rowids[obsind])
                     response=self.send_fusion_query('POST',query,{'Content-Length':0})
                     print response.status,response.reason
-
+                    '''
+                
                 
         
         
