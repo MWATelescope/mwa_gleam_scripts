@@ -18,6 +18,8 @@ if __name__=="__main__":
     #remove all images
     pngfile = sorted(glob.glob('/nfs/blank/h4215/aaronew/MWA_Tools/eorlive/*.png'),key=os.path.getmtime)
     pngfile = pngfile[len(pngfile)-1]
+    print pngfile
+    sp.call('mv '+pngfile+' current_beam.png',shell=True)
     f=open('/nfs/blank/h4215/aaronew/MWA_Tools/eorlive/current_beam.log','a')
     nowtime=datetime.now()
     f.write(nowtime.isoformat(' ')+' successfully executed')
