@@ -1,4 +1,5 @@
-import urllib2,urllib,simplejson,sys,httplib,json,pickle,psycopg2,os,traceback,re,subprocess
+#!/usr/bin/env python
+import urllib2,urllib,simplejson,sys,httplib,json,pickle,psycopg2,os,traceback,re,subprocess,time
 from mwapy.ephem_utils import GPSseconds_now
 from datetime import datetime
 
@@ -121,6 +122,18 @@ class FusionConnector():
         request.request(method,sqlcmd,headers=headers)
         response=request.getresponse()
         self.write_log(str(response.status)+' '+response.reason)
+        while(int(response.status)==403):
+                    #sleep for ten seconds if 403, than try again
+            print '403 encounatered, waiting 5 seconds, than trying again'
+            time.sleep(5)
+            if(self.is_expired()):
+                self.get_new_token()
+            request=httplib.HTTPSConnection('www.googleapis.com')
+            sqlcmd='/fusiontables/v1/query?%s'%(urllib.urlencode({'access_token':self.access_token,'sql':query}))
+            self.write_log('Sending Fusion Command : '+sqlcmd)
+            request.request(method,sqlcmd,headers=headers)
+            response=request.getresponse()
+            self.write_log(str(response.status)+' '+response.reason)
         return response
     
     def get_mit_filelist(self):
@@ -212,30 +225,51 @@ class FusionConnector():
             exit()
 
     def get_n_data(self,obsid):
-        loccmd = 'python /nfs/pritchard/d1/mwa/python/mwa_git/mwatools_setup/bin/obslocate.py -s eor-db.mit.edu -r eor-02.mit.edu -o '+str(obsid)
+        loccmd = 'python /csr/mwa/python/mwa_git/mwatools_setup/bin/obslocate.py -s eor-db.mit.edu -r ngas01.ivec.org -o '+str(obsid)
         p=subprocess.Popen([loccmd,],stdout=subprocess.PIPE,stderr=subprocess.PIPE,shell=True)
         outstr = p.communicate()
-        print outstr
-        mitstr = outstr[0]
-        loccmd = 'python /nfs/pritchard/d1/mwa/python/mwa_git/mwatools_setup/bin/obslocate.py -s eor-db.mit.edu -r ngas01.ivec.org -o '+str(obsid)
-        p=subprocess.Popen([loccmd,],stdout=subprocess.PIPE,stderr=subprocess.PIPE,shell=True)
-        outstr = p.communicate()
-        print outstr
-        curstr = outstr[0]
-        fmatch = re.compile('[0-9]{1,2}\n')
-        fmit = fmatch.search(mitstr)
-        fcur = fmatch.search(curstr)
-        nmit = 0
+        self.write_log(outstr)
         ncur = 0
-        if(fmit):
-            nmit = int(mitstr[fmit.start():fmit.end()-1])
-        if(fcur):
-            ncur = int(curstr[fcur.start():fcur.end()-1])
-        return(ncur,nmit)
+        nmit = 0
+        ecur = 0
+        emit = 0
+        print outstr
+        curstr=outstr[0]
+        print '\n'
+        print curstr
+        fmatch = re.compile(' [0-9]{1,2}')
+        nmatch=0
+        matches=fmatch.findall(curstr)
+        nmatch=len(matches)
+        print 'matches:'
+        print matches
+        for match in matches:
+            print match
+            ncur = ncur+int(match)
+        if(nmatch==0):
+            ecur=1
+
+        loccmd = 'python /csr/mwa/python/mwa_git/mwatools_setup/bin/obslocate.py -s eor-db.mit.edu -r eor-02.mit.edu -o '+str(obsid)
+        p=subprocess.Popen([loccmd,],stdout=subprocess.PIPE,stderr=subprocess.PIPE,shell=True)
+        outstr = p.communicate()
+        self.write_log(outstr)
+        print outstr
+        mitstr=outstr[0]
+        print '\n'
+        print mitstr
+        fmatch = re.compile(' [0-9]{1,2}')
+        matches=fmatch.findall(mitstr)
+        nmatch=len(matches)
+        print 'matches:'
+        print matches
+        for match in matches:
+            nmit=nmit+int(match)
+        if(nmatch==0):
+            emit=1
         print ncur
         print nmit
-
-
+        return (nmit,emit,ncur,ecur)
+        
     def check_mit(self,obsid):
         query = 'SELECT MITData, MROData FROM %s where ObsID=%s'%(obstable_id,obsid)
         response=self.send_fusion_query('GET',query,{})
@@ -269,20 +303,11 @@ class FusionConnector():
     def check_obs(self):
         #get list of all G009 mwa_setting entries
         #retrieve entire fusion table
-        '''
-        obsids = []
-        dates = []
-        names=[]
-        durations=[]
-        mrofiles=[]
-        mitfiles=[]
-        filelist=[]
-        lineiterator=self.get_mit_filelist()
-        '''
+        
         #get all g0009 observations
-        rows=self.send_eor_query('select observation_number,obsname,starttime,stoptime from obsc_mwa_setting where projectid=\'G0009\'')
+        rows=self.send_eor_query('select observation_number,obsname,starttime,stoptime,dec_phase_center from obsc_mwa_setting where projectid=\'G0009\'')
         self.write_log('deleting observations table')
-        query = 'SELECT ObsID,MROData,CurtinData,MITData, ROWID FROM %s'%(obstable_id)
+        query = 'SELECT ObsID,MROData,CurtinData,MITData,ROWID,Dec,ObsName FROM %s'%(obstable_id)
         response= self.send_fusion_query('GET',query,{})
         #load the table
         #print response.read()
@@ -290,6 +315,8 @@ class FusionConnector():
         fusionrows = response['rows']
         #add rows to everything
         fusion_obsids = []
+        fusion_decs=[]
+        fusion_obsnames=[]
         fusion_curtindata = []
         fusion_mitdata = []
         fusion_mrodata = []
@@ -308,30 +335,71 @@ class FusionConnector():
                 fusion_mitdata.append(int(row[3]))
             else:
                 fusion_mitdata.append(0)
+            fusion_decs.append(row[5])
+            fusion_obsnames.append(row[6])
             fusion_rowids.append(row[4])
-        #now go through all g009 observations and process each row
+        #now go through all g0009 observations and process each row
+        
+        nupdate = 0
+        nnew =0
         for row in rows:
             #if the obsid is not in the fusion rows than get date, get number of files at MIT and Curtin
+
             if(not(int(row[0]) in fusion_obsids)):
+
                 obsdate=self.send_eor_query('select timestamp_gps('+str(row[0])+')')
                 #find number of files at MRO
                 nmro=self.send_eor_query('select count(*) from (select observation_num from data_files where observation_num='+str(int(row[0]))+') as foo;')[0][0]
                 #find number of files at MIT and Curtin
-                (ncur,nmit)=self.get_n_data(int(row[0]))
-                query = 'INSERT INTO %s (ObsDate,ObsID,MROData,CurtinData,MITData,Duration) VALUES (\'%s\',%s,%s,%s,%s,%s)'%(obstable_id,obsdate[0][0].isoformat(),str(row[0]),str(nmro),str(ncur),str(nmit),str(int(row[3])-int(row[2])))
+                (nmit,emit,ncur,ecur)=self.get_n_data(int(row[0]))
+                print 'number,MIT: '+str(nmit)
+                print 'Error MIT:' + str(emit)
+                print 'number Curtin: '+str(ncur)
+                print 'Error Curtin: '+str(ecur)
+
+                query = 'INSERT INTO %s (ObsDate,ObsID,ObsName,Dec,MROData,CurtinData,MITData,MIT_Error,Curtin_Error,Duration) VALUES (\'%s\',%s,\'%s\',%s,%s,%s,%s,%s,%s,%s)'%(obstable_id,obsdate[0][0].isoformat(),str(row[0]),str(row[1]),str(row[4]),str(nmro),str(ncur),str(nmit),str(emit),str(ecur),str(int(row[3])-int(row[2])))
                 response=self.send_fusion_query('POST',query,{'Content-Length':0})
                 print response.status,response.reason
                 #check of the number of fils at MIT or Curtin are less than the number of files at the MRO
+                nnew=nnew+1
             else:
                 obsind = fusion_obsids.index(int(row[0]))
+                print 'Line\n'
+                print obsind
+                print row[1]
+                print row[4]
+                if(0==len(str(fusion_obsnames[obsind]))):
+                    print 'Updating ObsName'
+                    query='UPDATE %s \nSET ObsName=\'%s\' \nWHERE ROWID=\'%s\''%(obstable_id,str(row[1]),str(fusion_rowids[obsind]))
+                    response=self.send_fusion_query('POST',query,{'Content-Length':0})
+                nupdate+=1
+                if('NaN'==fusion_decs[obsind]):
+                    if(row[4] is None):
+                        dec = -9999.9999
+                    else:
+                        dec=row[4]
+                    print 'Updating Dec'
+                    query='UPDATE %s \nSET Dec=%s\nWHERE ROWID=\'%s\''%(obstable_id,str(dec),str(fusion_rowids[obsind]))
+                    response=self.send_fusion_query('POST',query,{'Content-Length':0})
                 if(not(fusion_mrodata[obsind]==fusion_mitdata[obsind])):# and fusion_curtindata[obsind]==fusion_mrodata[obsind])):
+
                     nmro = self.send_eor_query('select count(*) from (select observation_num from data_files where observation_num='+str(fusion_obsids[obsind])+') as foo;')[0][0]
                     print 'UPDATING!'
-                    (ncur,nmit)=self.get_n_data(int(row[0]))
-                    query = 'UPDATE %s\nSET MROData=%s,CurtinData=%s,MITData=%s\nWHERE ROWID=\'%s\''%(obstable_id,str(nmro),str(ncur),str(nmit),fusion_rowids[obsind])
-                    response=self.send_fusion_query('POST',query,{'Content-Length':0})
-                    print response.status,response.reason
+                    (nmit,emit,ncur,ecur)=self.get_n_data(int(row[0]))
+                    print 'number,MIT: '+str(nmit)
+                    print 'Error MIT:' + str(emit)
+                    print 'number Curtin: '+str(ncur)
+                    print 'Error Curtin: '+str(ecur)
 
+                    query = 'UPDATE %s\nSET MROData=%s,CurtinData=%s,Curtin_Error=%s,MIT_Error=%s\nWHERE ROWID=\'%s\''%(obstable_id,str(nmro),str(ncur),str(ecur),str(emit),fusion_rowids[obsind])
+                    response=self.send_fusion_query('POST',query,{'Content-Length':0})
+                    #only update mit data if there are no errors for mit query
+                    if(not(emit)):
+                        query = 'UPDATE %s \nSET MITData=%s\nWHERE ROWID=\'%s\''%(obstable_id,str(nmit),fusion_rowids[obsind])
+                        response=self.send_fusion_query('POST',query,{'Content-Length':0})
+                    print response.status,response.reason
+        return (nnew,nupdate)
+                
                 
         
         
@@ -407,6 +475,21 @@ if __name__=='__main__':
     if(int(mode)==0):
         fuser.insert_data()
     else:
-        fuser.check_obs()
+        f = open('/nfs/blank/h4215/aaronew/MWA_Tools/eorlive/last_obs_start.log','w')
+        nowtime=datetime.now()
+        f.write(nowtime.isoformat(' '))
+        f.close()
+        f = open('/nfs/blank/h4215/aaronew/MWA_Tools/eorlive/obs_update.log','a')
+        f.write(nowtime.isoformat(' ')+' : starting\n')
+        f.close()
+        (nnew,nupdate)=fuser.check_obs()
+        f = open('/nfs/blank/h4215/aaronew/MWA_Tools/eorlive/last_obs_stop.log','w')
+        nowtime=datetime.now()
+        f.write(nowtime.isoformat(' '))
+        f.close()
+        f=open('/nfs/blank/h4215/aaronew/MWA_Tools/eorlive/obs_update.log','a')
+        f.write(nowtime.isoformat(' ')+' : finished with '+str(nnew)+' new entries and '+str(nupdate)+' updates\n')
+        f.close()
+
     pickle.dump(fuser,open(fusionname,'wb'))
         
