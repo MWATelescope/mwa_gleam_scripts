@@ -2,7 +2,8 @@
 import urllib2,urllib,simplejson,sys,httplib,json,pickle,psycopg2,os,traceback,re,subprocess,time
 from mwapy.ephem_utils import GPSseconds_now
 from datetime import datetime
-
+n_d = 20 
+update_d_all=False
 fusionname='/nfs/blank/h4215/aaronew/MWA_Tools/eorlive/FConn.p'
 client_id='1059126630788.apps.googleusercontent.com'
 redirect_uri='http://localhost'
@@ -122,9 +123,9 @@ class FusionConnector():
         request.request(method,sqlcmd,headers=headers)
         response=request.getresponse()
         self.write_log(str(response.status)+' '+response.reason)
-        while(int(response.status)==403):
+        while((int(response.status)==403 or int(response.status==503))):
                     #sleep for ten seconds if 403, than try again
-            print '403 encounatered, waiting 5 seconds, than trying again'
+            print str(response.status)+'encountered, waiting 5 seconds, than trying again'
             time.sleep(5)
             if(self.is_expired()):
                 self.get_new_token()
@@ -303,7 +304,6 @@ class FusionConnector():
     def check_obs(self):
         #get list of all G009 mwa_setting entries
         #retrieve entire fusion table
-        
         #get all g0009 observations
         rows=self.send_eor_query('select observation_number,obsname,starttime,stoptime,dec_phase_center from obsc_mwa_setting where projectid=\'G0009\'')
         self.write_log('deleting observations table')
@@ -458,8 +458,50 @@ class FusionConnector():
         for row in rows:
             totschsecs=totschsecs+row[1]-row[0]
         totschhours=totschsecs/3600.
+        fmt = '%Y-%m-%d %H:%M:%S'
+        #update all of the derivative entries retroactively 
+        if(update_d_all):
+            query = 'SELECT Hours_Scheduled,Hours_Observed,Hours_At_MIT,ROWID,Date FROM %s ORDER BY Date ASC'%(self.tableid)
+            response=self.send_fusion_query('GET',query,{})#get all rows
+            print response.status,response.reason
+            response=json.loads(response.read())
+            fusionrows=response['rows']
+            for mm in range(n_d,len(fusionrows)):
+                print fusionrows[mm-n_d][4][:19]
+                print fusionrows[mm][4][:19]
+                time1=datetime.strptime(fusionrows[mm-n_d][4][:19],fmt)
+                time2=datetime.strptime(fusionrows[mm][4][:19],fmt)
+                dt = (time2-time1).seconds/3600.
+                print dt
+                dmit = round((float(fusionrows[mm][2])-float(fusionrows[mm-n_d][2]))/dt,4)
+                dsch = round((float(fusionrows[mm][0])-float(fusionrows[mm-n_d][0]))/dt,4)
+                dobs = round((float(fusionrows[mm][1])-float(fusionrows[mm-n_d][1]))/dt,4)
+                print dmit
+                query='UPDATE %s \nSET D_Hours_Scheduled=%s,D_Hours_At_MIT=%s,D_Hours_Observed=%s\nWHERE ROWID=\'%s\''%(self.tableid,str(dsch),str(dmit),str(dobs),fusionrows[mm][3])
+                response=self.send_fusion_query('POST',query,{'Content-Length':0})
+                print mm
+                print response.status,response.reason
+        #get the pervious number of hours to compute dhours/dt
+        query = 'SELECT Hours_Scheduled,Hours_Observed,Hours_At_MIT,Date FROM %s ORDER BY Date DESC LIMIT 20'%(self.tableid)
+        response=self.send_fusion_query('GET',query,{})
+        response = json.loads(response.read())
+        fusionrow = response['rows']
+        dsched=fusionrow[n_d-1][0]
+        dobs = fusionrow[n_d-1][1]
+        dmit = fusionrow[n_d-1][2]
+        dt=datetime.strptime(fusionrow[n_d-1][3][:19],fmt)
+        dt = (datetime.now()-dt).seconds/3600.
+        
         nowtime=datetime.utcnow()
-        query='INSERT INTO %s (Date,Hours_Observed,Hours_Scheduled,Hours_At_MIT,RxFail1,RxFail2,RxFail3,RxFail4,RxFail5,RxFail6,RxFail7,RxFail8,RxFail9,RxFail10,RxFail11,RxFail12,RxFail13,RxFail14,RxFail15,RxFail16) VALUES (\'%s\',%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)'%(self.tableid,nowtime.isoformat(' '),str(totobshours),str(totschhours),str(hours_at_mit),str(fail_rates[0]),str(fail_rates[1]),str(fail_rates[2]),str(fail_rates[3]),str(fail_rates[4]),str(fail_rates[5]),str(fail_rates[6]),str(fail_rates[7]),str(fail_rates[8]),str(fail_rates[9]),str(fail_rates[10]),str(fail_rates[11]),str(fail_rates[12]),str(fail_rates[13]),str(fail_rates[14]),str(fail_rates[15]))
+        #convert to hours/min
+        print str(dmit) + ' ' + str(hours_at_mit)
+        dsched = round((totschhours-dsched)/dt,4)
+        dobs = round((totobshours-dobs)/dt,4)
+        dmit = round((hours_at_mit-dmit)/dt,4)
+        print dmit
+        print dobs
+        print dsched
+        query='INSERT INTO %s (Date,Hours_Observed,Hours_Scheduled,Hours_At_MIT,RxFail1,RxFail2,RxFail3,RxFail4,RxFail5,RxFail6,RxFail7,RxFail8,RxFail9,RxFail10,RxFail11,RxFail12,RxFail13,RxFail14,RxFail15,RxFail16,D_Hours_Observed,D_Hours_Scheduled,D_Hours_At_MIT) VALUES (\'%s\',%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)'%(self.tableid,nowtime.isoformat(' '),str(totobshours),str(totschhours),str(hours_at_mit),str(fail_rates[0]),str(fail_rates[1]),str(fail_rates[2]),str(fail_rates[3]),str(fail_rates[4]),str(fail_rates[5]),str(fail_rates[6]),str(fail_rates[7]),str(fail_rates[8]),str(fail_rates[9]),str(fail_rates[10]),str(fail_rates[11]),str(fail_rates[12]),str(fail_rates[13]),str(fail_rates[14]),str(fail_rates[15]),str(dsched),str(dobs),str(dmit))
         self.send_fusion_query('POST',query,{'Content-Length':0})
 
         
