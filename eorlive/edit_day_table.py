@@ -33,6 +33,7 @@ def get_hours(day_list):
     hours_uvfits=0.
     totsecs = 0.
     for row in day_list:
+        hours_mro+=float(row['duration'])
         if(row['dec']==-30.0):
             hours_eor0+=float(row['duration'])
         elif(row['dec']==-27.0):
@@ -41,7 +42,7 @@ def get_hours(day_list):
             hours_eor2+=float(row['duration'])
         if(row['data_mit']==row['data_mro']):
             hours_mit+=float(row['duration'])
-            if(row['uvfits']=='1'):
+            if(row['uvfits']==1):
                 hours_uvfits+=float(row['duration'])
         if(row['data_paw']==row['data_mro']):
             hours_paw+=float(row['duration'])
@@ -49,20 +50,20 @@ def get_hours(day_list):
 
 
 def get_band(obs_name):
-    bandsearch=re.compile('/^[a-z]{3,4}_')
+    bandsearch=re.compile('^[a-z]{3,4}_')
     bandfind = bandsearch.search(obs_name)
     if(bandfind):
-        return obs_name[m.start():m.end()-1]
+        return obs_name[bandfind.start():bandfind.end()-1]
     else:
         return 'NA'
 
 #************************************************************
 #get data and arrange it into a dictionary
 #************************************************************
-def import_data(fconnector):
+def import_data(fconn):
     fmt = '%Y-%m-%dT%H:%M:%S'
     query = 'SELECT ObsDate, ObsID, ObsName, Dec, MROData, CurtinData, MITData, Duration, UVFITS_Files,ROWID FROM %s'%(obstable_id)
-    response = fconnector.send_fusion_query('GET',query,{})
+    response = fconn.send_fusion_query('GET',query,{})
     response = json.loads(response.read())
     fusionrows=response['rows']
     data_dict={}
@@ -99,12 +100,13 @@ def update_day(julian_day,data_dict,fconn):
     print response.status,response.reason
     response=json.loads(response.read())
     try:
-        rowid=response['rows'][0]
-        query = 'UPDATE %s\nSET EoR0-Hours=%s,EoR1-Hours=%s,Hours_Pawsey=%s,Hours_MRO=%s,Hours_MIT=%s,Hours_UVFITS=%s,Band=%s\nWHERE ROWID=\'%s\''%(daytable_id,str(hours_eor0),str(hours_eor1),str(hours_pawsey),str(hours_mro),str(hours_mit),str(hours_uvfits),str(band),str(night_date),str(band))
+        rowid=response['rows'][0][0]
+        query = 'UPDATE %s\nSET Hours_EoR0=%s,Hours_EoR1=%s,Hours_EoR2=%s,Hours_Pawsey=%s,Hours_MRO=%s,Hours_MIT=%s,Hours_UVFITS=%s,Night_Date=\'%s\',Band=\'%s\'\nWHERE ROWID=\'%s\''%(daytable_id,str(hours_eor0),str(hours_eor1),str(hours_eor2),str(hours_pawsey),str(hours_mro),str(hours_mit),str(hours_uvfits),str(night_date),str(band),rowid)
+        print query
         response=fconn.send_fusion_query('POST',query,{'Content-Length':0})
         print response.status,response.reason
     except KeyError:
-        query = 'INSERT INTO %s (Julian_Date,Night_Date,EoR0-Hours,EoR1-Hours,Hours_Pawsey,Hours_MRO,Hours_MIT,Hours_UVFITS,Band) VALUES (%s,\'%s\',%s,%s,%s,%s,%s,%s,%s)'%(daytable_id,str(julian_day),str(night_date),str(hours_eor0),str(hours_eor1),str(hours_pawsey),str(hours_mro),str(hours_mit),str(hours_uvfits),str(band))
+        query = 'INSERT INTO %s (Julian_Day,Night_Date,Hours_EoR0,Hours_EoR1,Hours_EoR2,Hours_Pawsey,Hours_MRO,Hours_MIT,Hours_UVFITS,Band) VALUES (%s,\'%s\',%s,%s,%s,%s,%s,%s,%s,\'%s\')'%(daytable_id,str(julian_day),str(night_date),str(hours_eor0),str(hours_eor1),str(hours_eor2),str(hours_pawsey),str(hours_mro),str(hours_mit),str(hours_uvfits),str(band))
         print query
         response=fconn.send_fusion_query('POST',query,{'Content-Length':0})
         print response.status,response.reason
