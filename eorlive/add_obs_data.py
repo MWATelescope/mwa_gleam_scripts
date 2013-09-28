@@ -230,7 +230,7 @@ class FusionConnector():
         loccmd = 'python /csr/mwa/python/mwa_git/mwatools_setup/bin/obslocate.py -s eor-db.mit.edu -r ngas01.ivec.org -o '+str(obsid)
         p=subprocess.Popen([loccmd,],stdout=subprocess.PIPE,stderr=subprocess.PIPE,shell=True)
         outstr = p.communicate()
-        self.write_log(outstr)
+        print outstr
         ncur = 0
         nmit = 0
         ecur = 0
@@ -246,28 +246,28 @@ class FusionConnector():
         print 'matches:'
         print matches
         for match in matches:
-            print match
             ncur = ncur+int(match)
         if(nmatch==0):
             ecur=1
-
         loccmd = 'python /csr/mwa/python/mwa_git/mwatools_setup/bin/obslocate.py -s eor-db.mit.edu -r eor-02.mit.edu -o '+str(obsid)
         p=subprocess.Popen([loccmd,],stdout=subprocess.PIPE,stderr=subprocess.PIPE,shell=True)
         outstr = p.communicate()
-        self.write_log(outstr)
         print outstr
         mitstr=outstr[0]
         print '\n'
         print mitstr
-        fmatch = re.compile(' [0-9]{1,2}')
+        fmatch = re.compile('eor-[0-9]{2}.mit.edu: [0-9]{1,2}')
         matches=fmatch.findall(mitstr)
         nmatch=len(matches)
         print 'matches:'
         print matches
         for match in matches:
+            nmatch = re.compile(' [0-9]{1,2}')
+            nn=nmatch.search(match)
+            nmit=int(match[nn.start()+1:nn.end()])
             nmit=nmit+int(match)
         if(nmatch==0):
-            emit=1
+            emit=0
         print ncur
         print nmit
         return (nmit,emit,ncur,ecur)
@@ -306,7 +306,7 @@ class FusionConnector():
         #get list of all G009 mwa_setting entries
         #retrieve entire fusion table
         #get all g0009 observations
-        rows=self.send_eor_query('select observation_number,obsname,starttime,stoptime,dec_phase_center from obsc_mwa_setting where projectid=\'G0009\'')
+        rows=self.send_eor_query('select observation_number,obsname,starttime,stoptime,dec_phase_center from obsc_mwa_setting where projectid=\'G0009\' order by observation_number desc')
         self.write_log('deleting observations table')
         query = 'SELECT ObsID,MROData,CurtinData,MITData,ROWID,Dec,ObsName FROM %s'%(obstable_id)
         response= self.send_fusion_query('GET',query,{})
@@ -343,6 +343,7 @@ class FusionConnector():
         
         nupdate = 0
         nnew =0
+        udpaterows=[]
         for row in rows:
             #if the obsid is not in the fusion rows than get date, get number of files at MIT and Curtin
 
@@ -364,42 +365,43 @@ class FusionConnector():
                 #check of the number of fils at MIT or Curtin are less than the number of files at the MRO
                 nnew=nnew+1
             else:
-                obsind = fusion_obsids.index(int(row[0]))
-                print 'Line\n'
-                print obsind
-                print row[1]
-                print row[4]
-                if(0==len(str(fusion_obsnames[obsind]))):
-                    print 'Updating ObsName'
-                    query='UPDATE %s \nSET ObsName=\'%s\' \nWHERE ROWID=\'%s\''%(obstable_id,str(row[1]),str(fusion_rowids[obsind]))
-                    response=self.send_fusion_query('POST',query,{'Content-Length':0})
-                nupdate+=1
-                if('NaN'==fusion_decs[obsind]):
-                    if(row[4] is None):
-                        dec = -9999.9999
-                    else:
-                        dec=row[4]
-                    print 'Updating Dec'
-                    query='UPDATE %s \nSET Dec=%s\nWHERE ROWID=\'%s\''%(obstable_id,str(dec),str(fusion_rowids[obsind]))
-                    response=self.send_fusion_query('POST',query,{'Content-Length':0})
-                if(not(fusion_mrodata[obsind]==fusion_mitdata[obsind])):# and fusion_curtindata[obsind]==fusion_mrodata[obsind])):
+                updaterows.append(row) #if the observation has already been recorded, push and update stats late.
+        for row in updaterows:
+            obsind = fusion_obsids.index(int(row[0]))
+            print 'Line\n'
+            print obsind
+            print row[1]
+            print row[4]
+            if(0==len(str(fusion_obsnames[obsind]))):
+                print 'Updating ObsName'
+                query='UPDATE %s \nSET ObsName=\'%s\' \nWHERE ROWID=\'%s\''%(obstable_id,str(row[1]),str(fusion_rowids[obsind]))
+                response=self.send_fusion_query('POST',query,{'Content-Length':0})
+            nupdate+=1
+            if('NaN'==fusion_decs[obsind]):
+                if(row[4] is None):
+                    dec = -9999.9999
+                else:
+                    dec=row[4]
+                print 'Updating Dec'
+                query='UPDATE %s \nSET Dec=%s\nWHERE ROWID=\'%s\''%(obstable_id,str(dec),str(fusion_rowids[obsind]))
+                response=self.send_fusion_query('POST',query,{'Content-Length':0})
+            if(not(fusion_mrodata[obsind]==fusion_mitdata[obsind])):# and fusion_curtindata[obsind]==fusion_mrodata[obsind])):
 
-                    nmro = self.send_eor_query('select count(*) from (select observation_num from data_files where observation_num='+str(fusion_obsids[obsind])+') as foo;')[0][0]
-                    print 'UPDATING!'
-                    (nmit,emit,ncur,ecur)=self.get_n_data(int(row[0]))
-                    print 'number,MIT: '+str(nmit)
-                    print 'Error MIT:' + str(emit)
-                    print 'number Curtin: '+str(ncur)
-                    print 'Error Curtin: '+str(ecur)
-
-                    query = 'UPDATE %s\nSET MROData=%s,CurtinData=%s,Curtin_Error=%s,MIT_Error=%s\nWHERE ROWID=\'%s\''%(obstable_id,str(nmro),str(ncur),str(ecur),str(emit),fusion_rowids[obsind])
-                    response=self.send_fusion_query('POST',query,{'Content-Length':0})
+                nmro = self.send_eor_query('select count(*) from (select observation_num from data_files where observation_num='+str(fusion_obsids[obsind])+') as foo;')[0][0]
+                print 'UPDATING!'
+                (nmit,emit,ncur,ecur)=self.get_n_data(int(row[0]))
+                print 'number,MIT: '+str(nmit)
+                print 'Error MIT:' + str(emit)
+                print 'number Curtin: '+str(ncur)
+                print 'Error Curtin: '+str(ecur)
+                query = 'UPDATE %s\nSET MROData=%s,CurtinData=%s,Curtin_Error=%s,MIT_Error=%s\nWHERE ROWID=\'%s\''%(obstable_id,str(nmro),str(ncur),str(ecur),str(emit),fusion_rowids[obsind])
+                response=self.send_fusion_query('POST',query,{'Content-Length':0})
                     #only update mit data if there are no errors for mit query
-                    if(not(emit)):
-                        query = 'UPDATE %s \nSET MITData=%s\nWHERE ROWID=\'%s\''%(obstable_id,str(nmit),fusion_rowids[obsind])
-                        response=self.send_fusion_query('POST',query,{'Content-Length':0})
+                if(not(emit)):
+                    query = 'UPDATE %s \nSET MITData=%s\nWHERE ROWID=\'%s\''%(obstable_id,str(nmit),fusion_rowids[obsind])
+                    response=self.send_fusion_query('POST',query,{'Content-Length':0})
                     print response.status,response.reason
-        return (nnew,nupdate)
+            return (nnew,nupdate)
                 
                 
         
