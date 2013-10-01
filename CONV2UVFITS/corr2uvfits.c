@@ -16,6 +16,7 @@ $Date: 2011-10-18 22:53:40 +0800 (Tue, 18 Oct 2011) $:    Date of last commit
 #include <math.h>
 #include <ctype.h>
 #include <fitsio.h>
+#include <assert.h>
 #include "slalib.h"
 #include "uvfits.h"
 
@@ -110,6 +111,7 @@ double arr_lat_rad=MWA_LAT*(M_PI/180.0),arr_lon_rad=MWA_LON*(M_PI/180.0),height=
 /************************
 ************************/
 int main(const int argc, char * const argv[]) {
+  void *vfptr = NULL;
   const char optstring[] = "vldS:a:c:o:I:H:A:F:f:";
   FILE *fpin_ac=NULL,*fpin_cc=NULL;
   int i,scan=0,res=0;
@@ -119,8 +121,9 @@ int main(const int argc, char * const argv[]) {
   array_data arraydat;
   source_table source;
   ant_table *antennas;
+  double jd_day_trunc;
 
-  fpd=stdout;
+  fpd=stderr;
 
   if(argc < 2) printusage(argv[0]);
   parse_cmdline(argc,argv,optstring);
@@ -184,10 +187,36 @@ int main(const int argc, char * const argv[]) {
 
   /* assign XYZ positions of the array for the site. */
   Geodetic2XYZ(arr_lat_rad,arr_lon_rad,height,&(arraydat.xyz_pos[0]),&(arraydat.xyz_pos[1]),&(arraydat.xyz_pos[2]));
+  if (debug) fprintf(fpd,"converted array location to XYZ\n");
+
+  /* open the iterator for writing. Need to have set the date in  */
+  res = writeUVFITSiterator(outfilename, &data, &vfptr, &jd_day_trunc);
+  if (res!=0) {
+    fprintf(stderr,"writeUVFITSiterator returned %d.\n",res);
+    return res;
+  }
+  if (debug) fprintf(fpd,"created UVFITS writer iterator\n");
 
   /* read each scan, populating the data structure. */
   scan=0;
   while ((res = readScan(fpin_ac,fpin_cc,scan, &header, &inputs, &data))==0) {
+    int status;
+
+    if (flagfilename != NULL) {
+      if (debug) fprintf(fpd,"Applying flags...\n");
+      res = applyFlagsFile(flagfilename,&data);
+      if(res!=0) {
+        fprintf(stderr,"Problems in applyFlagsFile. exiting\n");
+        exit(1);
+      }
+    }
+
+    /* write this chunk of data to the output file */
+    status = writeUVinstant(vfptr, &data, data.date[0]-jd_day_trunc,0);
+    if (status) {
+        fprintf(stderr,"ERROR: code %d when writing time instant %d\n",status,i);
+        exit(EXIT_FAILURE);
+    }
     scan++;
     if (scan ==header.n_scans) break;   // don't read more than is specified
   }
@@ -213,22 +242,8 @@ int main(const int argc, char * const argv[]) {
     }
   }
 
-  if (flagfilename != NULL) {
-    if (debug) fprintf(fpd,"Applying flags file...\n");
-    res = applyFlagsFile(flagfilename,&data);
-    if(res!=0) {
-      fprintf(stderr,"Problems in applyFlagsFile. exiting\n");
-      exit(1);
-    }
-  }
-
-  if (debug){
-    fprintf(fpd,"writing the UVFITS file\n");
-    fprintf(fpd,"there are %d time sets of visibilities with %d baselines\n",data.n_vis,data.n_baselines[0]);
-  }
-
-  /* we now have all the data, write it out */
-  writeUVFITS(outfilename,&data);
+  /* finish up and write the antenna table */
+  writeUVFITSfinalise(vfptr, &data);
 
   if(debug) fprintf(fpd,"finished writing UVFITS file\n");
   if(fpin_ac !=NULL) fclose(fpin_ac);
@@ -507,8 +522,11 @@ int qsort_compar_float(const void *p1, const void *p2) {
 
 /***************************
  ***************************/
-int readScan(FILE *fp_ac, FILE *fp_cc,int scan, Header *header, InpConfig *inps, uvdata *uvdata) {
+int readScan(FILE *fp_ac, FILE *fp_cc,int scan_count, Header *header, InpConfig *inps, uvdata *uvdata) {
 
+  static int bl_ind_lookup[MAX_ANT][MAX_ANT], init=0;
+  static float vis_weight=1.0;
+  static double date_zero=0.0;  // time of zeroth scan
   double ha=0,mjd,lmst,ra_app,dec_app;
   double ant_u[MAX_ANT],ant_v[MAX_ANT],ant_w[MAX_ANT]; //u,v,w for each antenna, in meters
   double u,v,w,cable_delay=0;
@@ -516,8 +534,8 @@ int readScan(FILE *fp_ac, FILE *fp_cc,int scan, Header *header, InpConfig *inps,
   double lmst2000, ha2000, newarrlat, ant_u_ep, ant_v_ep, ant_w_ep;
   double ra_aber, dec_aber;
   int i,inp1,inp2,ant1,ant2,pol1,pol2,bl_index=0,visindex,pol_ind,chan_ind,n_read;
-  int bl_ind_lookup[MAX_ANT][MAX_ANT],temp,baseline_reverse,total_ants,max_baselines;
-  float *visdata=NULL,vis_weight=1.0;
+  int temp,baseline_reverse,scan=0;
+  float *visdata=NULL;
 
   /* allocate space to read binary correlation data. Size is complex float * n_channels */
   visdata = calloc(2*uvdata->n_freq,sizeof(float));
@@ -526,86 +544,85 @@ int readScan(FILE *fp_ac, FILE *fp_cc,int scan, Header *header, InpConfig *inps,
       exit(1);
   }
 
-  /* count the total number of antennas actually present in the data */
-  total_ants = countPresentAntennas(inps);
-  max_baselines=total_ants*(total_ants+1)/2;
+  if (!init) {
+    /* count the total number of antennas actually present in the data */
+    if (debug) fprintf(fpd,"Init readscan.\n");
 
-  /* make a lookup table for which baseline corresponds to a correlation product */
-  if(header->corr_type=='A') {
-      /* autocorrelations only */
-      for(ant1=0; ant1 < uvdata->array->n_ant; ant1++) {
-        if (checkAntennaPresent(inps,ant1) == 0) continue;
-        if(debug) fprintf(fpd,"AUTO: bl %d is for ant %d\n",bl_index,ant1);
-        bl_ind_lookup[ant1][ant1] = bl_index++;
+    /* make a lookup table for which baseline corresponds to a correlation product */
+    if(header->corr_type=='A') {
+        /* autocorrelations only */
+        for(ant1=0; ant1 < uvdata->array->n_ant; ant1++) {
+          if (checkAntennaPresent(inps,ant1) == 0) continue;
+          if(debug) fprintf(fpd,"AUTO: bl %d is for ant %d\n",bl_index,ant1);
+          bl_ind_lookup[ant1][ant1] = bl_index++;
+      }
     }
-  }
-  else if(header->corr_type=='C') {
-      /* this for cross correlations only */
-      for (ant1=0; ant1 < uvdata->array->n_ant-1; ant1++) {
-        if (checkAntennaPresent(inps,ant1) == 0) continue;
-          for(ant2=ant1+1; ant2 < uvdata->array->n_ant; ant2++) {
-            if (checkAntennaPresent(inps,ant2) == 0) continue;
-            if(debug) fprintf(fpd,"CROSS: bl %d is for ants %d-%d\n",bl_index,ant1,ant2);
-            bl_ind_lookup[ant1][ant2] = bl_index++;
-          }
-      }
-  }
-  else {
-      /* this for auto and cross correlations */
-      for (ant1=0; ant1 < uvdata->array->n_ant; ant1++) {
-        if (checkAntennaPresent(inps,ant1) == 0) continue;
-          for(ant2=ant1; ant2 < uvdata->array->n_ant; ant2++) {
-            if (checkAntennaPresent(inps,ant2) == 0) continue;
-            if(debug) fprintf(fpd,"BOTH: bl %d is for ants %d-%d\n",bl_index,ant1,ant2);
-            bl_ind_lookup[ant1][ant2] = bl_index++;
-          }
-      }
-  }
+    else if(header->corr_type=='C') {
+        /* this for cross correlations only */
+        for (ant1=0; ant1 < uvdata->array->n_ant-1; ant1++) {
+          if (checkAntennaPresent(inps,ant1) == 0) continue;
+            for(ant2=ant1+1; ant2 < uvdata->array->n_ant; ant2++) {
+              if (checkAntennaPresent(inps,ant2) == 0) continue;
+              if(debug) fprintf(fpd,"CROSS: bl %d is for ants %d-%d\n",bl_index,ant1,ant2);
+              bl_ind_lookup[ant1][ant2] = bl_index++;
+            }
+        }
+    }
+    else {
+        /* this for auto and cross correlations */
+        for (ant1=0; ant1 < uvdata->array->n_ant; ant1++) {
+          if (checkAntennaPresent(inps,ant1) == 0) continue;
+            for(ant2=ant1; ant2 < uvdata->array->n_ant; ant2++) {
+              if (checkAntennaPresent(inps,ant2) == 0) continue;
+              if(debug) fprintf(fpd,"BOTH: bl %d is for ants %d-%d\n",bl_index,ant1,ant2);
+              bl_ind_lookup[ant1][ant2] = bl_index++;
+            }
+        }
+    }
 
-  /* increase size of arrays for the new scan */
-  uvdata->date=realloc(uvdata->date,(scan+1)*sizeof(double));
-  uvdata->visdata=realloc(uvdata->visdata,(scan+1)*sizeof(double *));
-  uvdata->weightdata=realloc(uvdata->weightdata,(scan+1)*sizeof(double *));
-  uvdata->u=realloc(uvdata->u,(scan+1)*sizeof(double *));
-  uvdata->v=realloc(uvdata->v,(scan+1)*sizeof(double *));
-  uvdata->w=realloc(uvdata->w,(scan+1)*sizeof(double *));
-  uvdata->n_baselines = realloc(uvdata->n_baselines,(scan+1)*sizeof(int));
-  uvdata->n_baselines[scan] = 0;
-  uvdata->baseline = realloc(uvdata->baseline,(scan+1)*sizeof(float *));
+    /* increase size of arrays for the new scan */
+    // date and n_baselines should already be allocated
+    assert(uvdata->date != NULL);
+    assert(uvdata->n_baselines[0] > 0);
+    uvdata->visdata=calloc(1,sizeof(double *));
+    uvdata->weightdata=calloc(1,sizeof(double *));
+    uvdata->u=calloc(1,sizeof(double *));
+    uvdata->v=calloc(1,sizeof(double *));
+    uvdata->w=calloc(1,sizeof(double *));
+    uvdata->baseline = calloc(1,sizeof(float *));
 
-  /* make space for the actual visibilities and weights */
-  if (debug) fprintf(fpd,"callocing array of %d floats for scan %d\n",max_baselines*uvdata->n_freq*uvdata->n_pol*2,scan);
-  uvdata->visdata[scan]    = calloc(max_baselines*uvdata->n_freq*uvdata->n_pol*2,sizeof(float));
-  uvdata->weightdata[scan] = calloc(max_baselines*uvdata->n_freq*uvdata->n_pol  ,sizeof(float));
-  uvdata->u[scan] = calloc(max_baselines,sizeof(double));
-  uvdata->v[scan] = calloc(max_baselines,sizeof(double));
-  uvdata->w[scan] = calloc(max_baselines,sizeof(double));
-  uvdata->baseline[scan] = calloc(max_baselines,sizeof(float));
-  if(uvdata->visdata[scan]==NULL || uvdata->weightdata[scan]==NULL || uvdata->visdata[scan]==NULL
-     || uvdata->visdata[scan]==NULL || uvdata->visdata[scan]==NULL || uvdata->baseline[scan]==NULL) {
-    fprintf(stderr,"readScan: no malloc for BIG arrays\n");
-    exit(1);
+    /* make space for the actual visibilities and weights */
+    if (debug) fprintf(fpd,"readScan: callocing array of %d floats\n",uvdata->n_baselines[scan]*uvdata->n_freq*uvdata->n_pol*2);
+    uvdata->visdata[scan]    = calloc(uvdata->n_baselines[scan]*uvdata->n_freq*uvdata->n_pol*2,sizeof(float));
+    uvdata->weightdata[scan] = calloc(uvdata->n_baselines[scan]*uvdata->n_freq*uvdata->n_pol  ,sizeof(float));
+    uvdata->u[scan] = calloc(uvdata->n_baselines[scan],sizeof(double));
+    uvdata->v[scan] = calloc(uvdata->n_baselines[scan],sizeof(double));
+    uvdata->w[scan] = calloc(uvdata->n_baselines[scan],sizeof(double));
+    uvdata->baseline[scan] = calloc(uvdata->n_baselines[scan],sizeof(float));
+    if(uvdata->visdata[scan]==NULL || uvdata->weightdata[scan]==NULL || uvdata->visdata[scan]==NULL
+       || uvdata->visdata[scan]==NULL || uvdata->visdata[scan]==NULL || uvdata->baseline[scan]==NULL) {
+      fprintf(stderr,"readScan: no malloc for BIG arrays\n");
+      exit(1);
+    }
+    /* set a weight for the visibilities based on integration time */
+    if(header->integration_time > 0.0) vis_weight = header->integration_time;
+
+    date_zero = uvdata->date[0];    // this is already initialised in applyHeader
+
+    init=1;
   }
   
-  /* set a weight for the visibilities based on integration time */
-  if(header->integration_time > 0.0) vis_weight = header->integration_time;
-
-  /* calc number of baselines depending on correlation product type(s) and how many antennas were active */
-  uvdata->n_baselines[scan] = total_ants*(total_ants+1)/2; //default: both auto and cross
-  if (header->corr_type=='A') uvdata->n_baselines[scan] = total_ants;
-  if (header->corr_type=='C') uvdata->n_baselines[scan] = total_ants*(total_ants-1)/2;
-
   /* set time of scan. Note that 1/2 scan time offset already accounted for in date[0]. */
-  if (scan > 0) uvdata->date[scan] = uvdata->date[0] + scan*header->integration_time/86400.0;
+  if (scan_count > 0) uvdata->date[scan] = date_zero + scan_count*header->integration_time/86400.0;
 
   /* set default ha/dec from header, if HA was specified. Otherwise, it will be calculated below */
   dec_app = header->dec_degs*(M_PI/180.0);
   mjd = uvdata->date[scan] - 2400000.5;  // get Modified Julian date of scan.
-  if (lock_pointing==0) {
-    ha = (header->ha_hrs_start+(scan+0.5)*header->integration_time/3600.0*1.00274)*(M_PI/12.0);
+  if (lock_pointing==0) {   // special case for RTS output which wants a phase centre fixed at an az/el, not ra/dec
+    ha = (header->ha_hrs_start+(scan_count+0.5)*header->integration_time/3600.0*1.00274)*(M_PI/12.0);
   } else {
     ha = (header->ha_hrs_start)*(M_PI/12.0);
-    mjd = uvdata->date[0] - 2400000.5;  // get Modified Julian date of scan.
+    mjd = date_zero - 2400000.5;  // get Modified Julian date of scan.
   }
 
   lmst = slaRanorm(slaGmst(mjd) + arr_lon_rad);  // local mean sidereal time, given array location
@@ -621,8 +638,7 @@ int readScan(FILE *fp_ac, FILE *fp_cc,int scan, Header *header, InpConfig *inps,
 
   /* convert mean RA/DEC of phase center to apparent for current observing time. This applies precession,
      nutation, annual abberation. */
-  slaMap(header->ra_hrs*(M_PI/12.0), header->dec_degs*(M_PI/180.0), 0.0, 0.0, 0.0, 0.0, 2000.0,
-     mjd, &ra_app, &dec_app);
+  slaMap(header->ra_hrs*(M_PI/12.0), header->dec_degs*(M_PI/180.0), 0.0, 0.0, 0.0, 0.0, 2000.0, mjd, &ra_app, &dec_app);
   if (debug) fprintf(fpd,"Precessed apparent coords (radian): RA: %g, DEC: %g\n",ra_app,dec_app);
   /* calc apparent HA of phase center, normalise to be between 0 and 2*pi */
   ha = slaRanorm(lmst - ra_app);
@@ -632,7 +648,7 @@ int readScan(FILE *fp_ac, FILE *fp_cc,int scan, Header *header, InpConfig *inps,
   * frame of epoch. (AML)
   */
 
-  if(debug) fprintf(fpd,"scan %d. lmst: %g (radian). HA (calculated): %g (radian)\n",scan, lmst,ha);
+  if(debug) fprintf(fpd,"scan %d. lmst: %g (radian). HA (calculated): %g (radian)\n",scan_count, lmst,ha);
 
   /* calc el,az of desired phase centre for debugging */
   if (debug) {
@@ -642,8 +658,7 @@ int readScan(FILE *fp_ac, FILE *fp_cc,int scan, Header *header, InpConfig *inps,
   }
 
   /* Compute the apparent direction of the phase center in the J2000 coordinate system */
-  aber_radec_rad(2000.0,mjd,header->ra_hrs*(M_PI/12.0),header->dec_degs*(M_PI/180.0),
-         &ra_aber,&dec_aber);
+  aber_radec_rad(2000.0,mjd,header->ra_hrs*(M_PI/12.0),header->dec_degs*(M_PI/180.0), &ra_aber,&dec_aber);
 
   /* Below, the routines "slaPrecl" and "slaPreces" do only a precession correction,
    * i.e, they do NOT do corrections for aberration or nutation.
@@ -686,7 +701,6 @@ int readScan(FILE *fp_ac, FILE *fp_cc,int scan, Header *header, InpConfig *inps,
       }
   }
  
-
   for(inp1=0; inp1 < header->n_inputs ; inp1++) {
     for(inp2=inp1; inp2 < header->n_inputs ; inp2++) {
 
@@ -1169,9 +1183,9 @@ int readHeader(char *header_filename, Header *header) {
 /*******************************
 *********************************/
 void initData(uvdata *data) {
-  data->date = malloc(sizeof(double));
+  data->date = calloc(1,sizeof(double));
   data->n_pol=0;
-  data->n_baselines=NULL;
+  data->n_baselines=calloc(1,sizeof(int));
   data->n_freq=0;
   data->n_vis=0;
   data->cent_freq=0.0;
@@ -1226,6 +1240,12 @@ int applyHeader(Header *header, uvdata *data) {
   /* extract RA, DEC from header. Beware negative dec and negative zero bugs. */
   data->source->ra  = header->ra_hrs;
   data->source->dec = header->dec_degs;
+
+  /* calcualte the number of baselines, required to be constant for all data */
+  data->n_baselines[0] = (data->array->n_ant)*(data->array->n_ant+1)/2; //default: both auto and cross
+  if (header->corr_type=='A') data->n_baselines[0] = data->array->n_ant;
+  if (header->corr_type=='C') data->n_baselines[0] = data->array->n_ant*(data->array->n_ant-1)/2;
+  if (debug) fprintf(fpd,"Corr type %c, so there are %d baselines\n",header->corr_type,data->n_baselines[0]);
 
   return 0;
 }

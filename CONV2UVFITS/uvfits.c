@@ -695,7 +695,7 @@ int readUVFITS(char *filename, uvdata **data) {
 
 /********************************
  ! NAME:      writeUVFITS
- ! PURPOSE:   write a UVFITS file
+ ! PURPOSE:   write a UVFITS file (old method where all data is read up front - deprecated)
  ! ARGUMENTS: filename: name of output file (will be created)
  !            data: pointer to uvdata struct that contains the data
  ! RETURNS:   integer: 0 success, nonzero failure. returns CFITSIO errors in the case of a CFITSIO error.
@@ -759,6 +759,10 @@ int writeUVFITSiterator(char *filename, uvdata *data, void **vfptr, double *jd_d
     fprintf(stderr,"There are no baselines.\n");
     return 1;
   }
+  if (filename==NULL || filename[0]=='\0') {
+    fprintf(stderr,"writeUVFITSiterator: empty file name\n");
+    return 1;
+  }
 
   /* open the file after checking to see if it already exists and clobbering */
   if ((fp=fopen(filename,"r"))!=NULL) {
@@ -775,12 +779,13 @@ int writeUVFITSiterator(char *filename, uvdata *data, void **vfptr, double *jd_d
      1- the (N_GRP_PARAMS) preamble of: U,V,W (nanoseconds),baseline (see below), time offset (days)
      2- the vis data as real,imag,weight for pol1, real,imag,weight for pol2 etc
      for each pol, then repeated for each freq channel */
-  /* using this function creates the keywords PCOUNT=5,GROUPS=T and GCOUNT=n_vis*data->n_baselines */
-  fits_write_grphdr(fptr,TRUE,FLOAT_IMG,NAXIS,naxes,N_GRP_PARAMS,data->n_vis*data->n_baselines[0],TRUE,&status);
+  /* using this function creates the keywords PCOUNT=5,GROUPS=T and GCOUNT=data->n_baselines.
+     GCOUNT must be incremented for each new write? */
+  fits_write_grphdr(fptr,TRUE,FLOAT_IMG,NAXIS,naxes,N_GRP_PARAMS,data->n_baselines[0],TRUE,&status);
 
   /* Write a keyword; must pass pointers to values */
   fits_update_key(fptr,TSTRING, "OBJECT", data->source->name, NULL, &status);
-  dtemp = data->source->ra*15.0;
+  dtemp = data->source->ra*15.0;    // FITS uses degrees for all angles
   fits_update_key(fptr,TDOUBLE, "OBSRA", &dtemp, NULL, &status);
   fits_update_key(fptr,TDOUBLE, "OBSDEC", &(data->source->dec), NULL, &status);
   fits_update_key(fptr,TSTRING, "TELESCOP", "MWA" , NULL, &status);
@@ -905,12 +910,13 @@ int writeUVFITSfinalise(void *vfptr, uvdata *data) {
  **************************/
 int writeUVinstant(void *vfptr, uvdata *data, double jd_frac, int i) {
     fitsfile *fptr;
-    static long ngroups=1;
+    static long ngroups=0,ntimes=0;
     double *u_ptr, *v_ptr, *w_ptr;
     float  *vis_ptr, *wt_ptr;
     float *array=NULL;
     int nelements,status=0;
     int l,j,k;
+    char msg[80];
 
     fptr = vfptr;   // this is basically to avoid having to include fitsio.h in uvfits.h 
 
@@ -918,7 +924,7 @@ int writeUVinstant(void *vfptr, uvdata *data, double jd_frac, int i) {
     if (data->n_pol <1 || data->n_freq < 1 || data->n_baselines[i] < 1) {
         fprintf(stderr,"ERROR: npols %d, nfreqs %d and n_baselines %d all must be > 0 at time index %d\n",data->n_pol, data->n_freq, data->n_baselines[i],i);
         return EXIT_FAILURE;
-    }   
+    } 
 
     /* magic number 3 here matches naxes[1] from above. */
     nelements = 3*data->n_pol*data->n_freq*data->n_baselines[i];
@@ -951,11 +957,15 @@ int writeUVinstant(void *vfptr, uvdata *data, double jd_frac, int i) {
       }
       /* Write each vis batch as a "random group" including 5 extra params at the front */
       /* the starting index must be 1, not 0.  fortran style. also for the vis index */
-      fits_write_grppar_flt(fptr,ngroups,1,3*data->n_pol*data->n_freq+N_GRP_PARAMS, array, &status);
+      fits_write_grppar_flt(fptr,ngroups+1,1,3*data->n_pol*data->n_freq+N_GRP_PARAMS, array, &status);
       /*      fprintf(stderr,"write group number: %d\n",i*data->n_baselines+l+1);*/
+      fits_report_error(stderr, status);  /* print out any error messages */
       if (status) return status;
       ngroups++;
     }
+    sprintf(msg,"%ld timesteps, %d baselines",++ntimes,data->n_baselines[i]);
+    fits_update_key(fptr, TLONG, "GCOUNT", &ngroups, msg, &status);
+    fits_report_error(stderr, status);  /* print out any error messages */
     free(array);
     return 0;
 }
