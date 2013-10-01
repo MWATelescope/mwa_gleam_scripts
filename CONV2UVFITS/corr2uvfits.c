@@ -627,15 +627,6 @@ int readScan(FILE *fp_ac, FILE *fp_cc,int scan_count, Header *header, InpConfig 
 
   lmst = slaRanorm(slaGmst(mjd) + arr_lon_rad);  // local mean sidereal time, given array location
 
-  /* if no RA was specified in the header,then calculate the RA based on lmst and array location
-     and update the ra */
-  if (header->ra_hrs == -99.0 ) {
-    header->ra_hrs = lmst*(12.0/M_PI) - header->ha_hrs_start;
-    uvdata->source->ra  = header->ra_hrs;
-    if (debug) fprintf(fpd,"Calculated RA_hrs: %g of field centre based on HA_hrs: %g and lmst_hrs: %g\n",
-                        header->ra_hrs,header->ha_hrs_start,lmst*(12.0/M_PI));
-  }
-
   /* convert mean RA/DEC of phase center to apparent for current observing time. This applies precession,
      nutation, annual abberation. */
   slaMap(header->ra_hrs*(M_PI/12.0), header->dec_degs*(M_PI/180.0), 0.0, 0.0, 0.0, 0.0, 2000.0, mjd, &ra_app, &dec_app);
@@ -1206,7 +1197,7 @@ void initData(uvdata *data) {
 ***********************/
 int applyHeader(Header *header, uvdata *data) {
 
-  double jdtime_base=0;
+  double jdtime_base=0,mjd,lmst;
   int n_polprod=0,i,res;
 
   data->n_freq = header->n_chans;
@@ -1236,6 +1227,19 @@ int applyHeader(Header *header, uvdata *data) {
 
   memset(data->source->name,0,SIZE_SOURCE_NAME+1);
   strncpy(data->source->name,header->field_name,SIZE_SOURCE_NAME);
+
+  mjd = data->date[0] - 2400000.5;  // get Modified Julian date of scan.
+  lmst = slaRanorm(slaGmst(mjd) + arr_lon_rad);  // local mean sidereal time, given array location
+
+  /* if no RA was specified in the header,then calculate the RA based on lmst and array location
+     and update the ra */
+  if (header->ra_hrs < -98.0 ) {
+    // set the RA to be for the middle of the scan
+//    header->ra_hrs = lmst*(12.0/M_PI) - header->ha_hrs_start + header->n_scans*header->integration_time*1.00274/(3600.0*2);   // include 1/2 scan offset
+    header->ra_hrs = lmst*(12.0/M_PI) - header->ha_hrs_start;  // match existing code. RA defined at start of scan
+    if (debug) fprintf(fpd,"Calculated RA_hrs: %g of field centre based on HA_hrs: %g and lmst_hrs: %g\n",
+                        header->ra_hrs,header->ha_hrs_start,lmst*(12.0/M_PI));
+  }
 
   /* extract RA, DEC from header. Beware negative dec and negative zero bugs. */
   data->source->ra  = header->ra_hrs;
