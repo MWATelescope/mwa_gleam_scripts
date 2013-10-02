@@ -43,7 +43,8 @@ void uvfitsSetDebugLevel(int in_debug) {
 /******************************
  ! NAME:      readUVFITSOpenInit
  ! PURPOSE:   open a UVFITS file and create a uvdata data structure
- !            This also reads the antenna table
+ !            This also reads the antenna table so you know how many antennas ther are.
+ !            This sets up for iterative reading of data via readUVFITSInitIterator
  ! ARGUMENTS: filename: name of UVFITS file to read
  !            data: pointer to pointer data struct. The struct will be allocated by this function.
  ! RETURNS:   integer. 0 success, nonzero error. Returns CFITSIO error codes if a CFITSIO error
@@ -111,7 +112,7 @@ int readUVFITSOpenInit(char *filename, uvdata **data, fitsfile **outfptr) {
     fprintf(stderr,"readUVFITS: no malloc for source table\n");
     return -1;
   }
-  obj->n_pol = naxes[2];
+  obj->n_pol = naxes[2];    // copy across number of pols and freqs
   obj->n_freq = naxes[3];
 
   /* examine headers and read the antenna table */
@@ -153,11 +154,11 @@ int readUVFITSOpenInit(char *filename, uvdata **data, fitsfile **outfptr) {
  ! RETURNS:   integer. 0 success, nonzero error. Returns CFITSIO error codes if a CFITSIO error
  !            occurred. returns -1 for malloc failure.
 ******************************/
-int readUVFITSInitIterator(char *filename, uvdata **data, uviterator **iterator) {
+int readUVFITSInitIterator(char *filename, uvdata **data, uvReadContext **iterator) {
   fitsfile *fptr=NULL;
   int i,status=0,max_bl,grp_row_size;
   char temp[84]="";
-  uviterator *iter=NULL;
+  uvReadContext *iter=NULL;
 
   /* init */
 
@@ -167,7 +168,7 @@ int readUVFITSInitIterator(char *filename, uvdata **data, uviterator **iterator)
     fprintf(stderr,"readUVFITS: failed to read file <%s>\n",filename);
     return status;
   }
-  iter = calloc(1,sizeof(uviterator));
+  iter = calloc(1,sizeof(uvReadContext));
   assert(iter != NULL);
   *iterator = iter;
   iter->fptr = fptr;
@@ -273,7 +274,7 @@ int readUVFITSInitIterator(char *filename, uvdata **data, uviterator **iterator)
     if (strncmp("DEC",typedesc,3)==0) {
     }
   }
-  /* allocate space for visibility data. In iterator mode, we only keep one timestep, so the
+  /* allocate space for visibility data. In iterator mode, we only keep one timestep (n_vis=1), so the
      arrays of pointers in the uvdata structure are overkill but it doesn't hurt */
   (*data)->visdata = calloc(1,sizeof(float *));
   (*data)->weightdata = calloc(1,sizeof(float *));
@@ -282,7 +283,7 @@ int readUVFITSInitIterator(char *filename, uvdata **data, uviterator **iterator)
   (*data)->u = calloc(1,sizeof(double *));
   (*data)->v = calloc(1,sizeof(double *));
   (*data)->w = calloc(1,sizeof(double *));
-  (*data)->date = calloc(1,sizeof(double));
+  (*data)->n_vis=1;
 
   if ((*data)->weightdata==NULL || (*data)->visdata==NULL || (*data)->baseline==NULL || 
         (*data)->u==NULL || (*data)->v==NULL || (*data)->w==NULL || (*data)->date==NULL ) {
@@ -320,10 +321,10 @@ int readUVFITSInitIterator(char *filename, uvdata **data, uviterator **iterator)
  ! NAME:      addGroupRow
  ! PURPOSE:   add a row of data (one baseline/time) to the output data structure.
  ! ARGUMENTS: obj: data structure returned by InitIterator for resulting data
- !            iter: a uviterator iterator context structure
+ !            iter: a uvReadContext iterator context structure
  ! RETURNS:   void
 ******************************/
-void addGroupRow(uvdata *obj, uviterator *iter) {
+void addGroupRow(uvdata *obj, uvReadContext *iter) {
     int k,l,index=0,j,time_index=0;
 
     j = obj->n_baselines[time_index];
@@ -333,7 +334,7 @@ void addGroupRow(uvdata *obj, uviterator *iter) {
     obj->v[time_index][j] = iter->grp_par[1]*iter->pscal[1] + iter->pzero[1];
     obj->w[time_index][j] = iter->grp_par[2]*iter->pscal[2] + iter->pzero[2];
 
-    if (debug) fprintf(stdout,"Adding vis. (u,v,w): %g,%g,%g. Bl: %f. Time: %f. N_baselines: %d\n",
+    if (debug>1) fprintf(stdout,"Adding vis. (u,v,w): %g,%g,%g. Bl: %f. Time: %f. N_baselines: %d\n",
                 obj->u[time_index][j], obj->v[time_index][j], obj->w[time_index][j], obj->baseline[time_index][j],
                 iter->grp_par[4],j);
 
@@ -353,12 +354,12 @@ void addGroupRow(uvdata *obj, uviterator *iter) {
  ! PURPOSE:   get the next chunk of time from an open uvfits file and fill uvdata structure.
  !            requires prior call to readUVFITSInitIterator
  ! ARGUMENTS: obj: data structure returned by InitIterator for resulting data
- !            iter: a uviterator iterator context structure
+ !            iter: a uvReadContext iterator context structure
  ! RETURNS:   integer. 0 success, nonzero error. Returns CFITSIO error codes if a CFITSIO error
  !            occurred. returns -1 for malloc failure.
  !            return code 1 means normal completion end of file
 ******************************/
-int readUVFITSnextIter(uvdata *obj, uviterator *iter) {
+int readUVFITSnextIter(uvdata *obj, uvReadContext *iter) {
   int grp_row_size,status=0,done=0;
   int max_bl,n_bl=0;
   float currtime=FLT_MAX;
@@ -379,7 +380,7 @@ int readUVFITSnextIter(uvdata *obj, uviterator *iter) {
       return status;
     }
 
-    if (debug) fprintf(stdout,"Read group %d of %d. Time: %f\n",iter->grp_index+1,iter->gcount,iter->grp_par[4]);
+    if (debug > 1) fprintf(stdout,"Read group %d of %d. Time: %f\n",iter->grp_index+1,iter->gcount,iter->grp_par[4]);
 
     /* if the time changes, we're done for this chunk */
     if (currtime != iter->grp_par[4] && currtime != FLT_MAX) {
@@ -420,8 +421,29 @@ int readUVFITSnextIter(uvdata *obj, uviterator *iter) {
 
 
 /******************************
+ ! NAME:      readUVFITSCloseIter
+ ! PURPOSE:   close the FITS file and free the iterator structure
+ ! ARGUMENTS: iter: pointer to pointer data struct
+ ! RETURNS:   integer. 0 success, nonzero error. Returns CFITSIO error codes for a CFITSIO error
+******************************/
+int readUVFITSCloseIter(uvReadContext *iter) {
+  int status=0;
+
+  /* tidy up */
+  fits_close_file(iter->fptr, &status);            /* close the file */
+  fits_report_error(stderr, status);  /* print out any error messages */
+
+  if (iter->grp_par != NULL) free(iter->grp_par);
+  if (iter->grp_row != NULL) free(iter->grp_row);
+  free(iter);
+  return status;
+}
+
+
+/******************************
  ! NAME:      readUVFITS
  ! PURPOSE:   read an entire UVFITS file and create/populate a uvdata data structure
+ !            NOTE this method is deprecated since it uses a LOT of memory. Use the iterator instead.
  ! ARGUMENTS: filename: name of UVFITS file to read
  !            data: pointer to pointer data struct. The struct will be allocated by this function.
  ! RETURNS:   integer. 0 success, nonzero error. Returns CFITSIO error codes if a CFITSIO error
@@ -544,16 +566,6 @@ int readUVFITS(char *filename, uvdata **data) {
     fprintf(stderr,"readUVFITS: no malloc for big arrays\n");
     status = -1; goto EXIT;
   }
-
-  /* for reasons I don't understand, it doesn't work to only read a section
-     of this file at a time. So read the whole lot... */
-/*  fits_read_img(fptr,TFLOAT,1,grp_row_size*gcount,NULL,grp_row,NULL,&status);
-  if (status != 0) {
-    fprintf(stderr,"readUVFITS: error reading data %d. status: %d\n",i,status);
-    status = -1; goto EXIT;
-  }
-  if (debug) printf("Read %d items from the group row\n",grp_row_size*gcount);
-*/
 
   /* copy data into data structure. We know how many groups there are, but we don't know
      how many different baselines or time units there are. The data must be ordered by increasing
@@ -695,18 +707,18 @@ int readUVFITS(char *filename, uvdata **data) {
 
 /********************************
  ! NAME:      writeUVFITS
- ! PURPOSE:   write a UVFITS file
+ ! PURPOSE:   write a UVFITS file (old method where all data is known up front - deprecated)
+ !            This function is now just a wrapper for the new iterator method.
  ! ARGUMENTS: filename: name of output file (will be created)
  !            data: pointer to uvdata struct that contains the data
  ! RETURNS:   integer: 0 success, nonzero failure. returns CFITSIO errors in the case of a CFITSIO error.
 *********************************/
 int writeUVFITS(char *filename, uvdata *data) {
-  void *vfptr=NULL;
   int status=0,i;
-  double jd_day_trunc;
+  uvWriteContext *iter;
 
   /* set up the iterator */
-  status= writeUVFITSiterator(filename, data, &vfptr, &jd_day_trunc);
+  status= writeUVFITSiterator(filename, data, &iter);
   if (status) return status;
 
   /* write the acutal UV data to the main array.
@@ -715,7 +727,7 @@ int writeUVFITS(char *filename, uvdata *data) {
      pols and baselines */
   for (i=0; i<data->n_vis; i++) {
     /*    fprintf(stderr,"doing vis set %d of %d. There are %d baselines\n",i+1,data->n_vis,data->n_baselines);*/
-    status = writeUVinstant(vfptr, data, data->date[i]-jd_day_trunc,i);
+    status = writeUVinstant(iter, data, data->date[i]-(iter->jd_day_trunc),i);
     if (status) {
         fprintf(stderr,"ERROR: code %d when writing time instant %d\n",status,i);
         exit(EXIT_FAILURE);
@@ -723,7 +735,7 @@ int writeUVFITS(char *filename, uvdata *data) {
   }
 
   /* write other stuff at the end like antenna table etc and close the file */  
-  status = writeUVFITSfinalise(vfptr, data);
+  status = writeUVFITSfinalise(iter, data);
   return status;
 }
 
@@ -733,9 +745,11 @@ int writeUVFITS(char *filename, uvdata *data) {
  ! ARGUMENTS: filename: an open fits file.
  !            data: uvdata struct with existing data.
  !            vfptr: resulting pointer to fitsfile in void format
+ !            requires most observation info, expect the actual data, to be existing already in the uvdata including:
+ !            n_pol, n_freq, source name ra dec, dates, pol types and freq info.
  ! RETURNS:   integer. 0 success.
  **************************/
-int writeUVFITSiterator(char *filename, uvdata *data, void **vfptr, double *jd_day_trunc) {
+int writeUVFITSiterator(char *filename, uvdata *data, uvWriteContext **iter) {
 
   fitsfile *fptr;
   FILE *fp;
@@ -759,6 +773,14 @@ int writeUVFITSiterator(char *filename, uvdata *data, void **vfptr, double *jd_d
     fprintf(stderr,"There are no baselines.\n");
     return 1;
   }
+  if (filename==NULL || filename[0]=='\0') {
+    fprintf(stderr,"writeUVFITSiterator: empty file name\n");
+    return 1;
+  }
+
+  /* create the iterator context */
+  *iter = calloc(1,sizeof(uvWriteContext));
+  assert(*iter !=NULL);
 
   /* open the file after checking to see if it already exists and clobbering */
   if ((fp=fopen(filename,"r"))!=NULL) {
@@ -770,17 +792,19 @@ int writeUVFITSiterator(char *filename, uvdata *data, void **vfptr, double *jd_d
     fits_report_error(stderr, status);
     return 1;
   }
+  (*iter)->fptr=fptr;
   /* set up for writing fits "random groups". There is one group for each baseline
      of visibilities per time sample including all pols and channels. The group consists of:
      1- the (N_GRP_PARAMS) preamble of: U,V,W (nanoseconds),baseline (see below), time offset (days)
      2- the vis data as real,imag,weight for pol1, real,imag,weight for pol2 etc
      for each pol, then repeated for each freq channel */
-  /* using this function creates the keywords PCOUNT=5,GROUPS=T and GCOUNT=n_vis*data->n_baselines */
-  fits_write_grphdr(fptr,TRUE,FLOAT_IMG,NAXIS,naxes,N_GRP_PARAMS,data->n_vis*data->n_baselines[0],TRUE,&status);
+  /* using this function creates the keywords PCOUNT=5,GROUPS=T and GCOUNT=data->n_baselines.
+     GCOUNT must be incremented for each new write? */
+  fits_write_grphdr(fptr,TRUE,FLOAT_IMG,NAXIS,naxes,N_GRP_PARAMS,data->n_baselines[0],TRUE,&status);
 
   /* Write a keyword; must pass pointers to values */
   fits_update_key(fptr,TSTRING, "OBJECT", data->source->name, NULL, &status);
-  dtemp = data->source->ra*15.0;
+  dtemp = data->source->ra*15.0;    // FITS uses degrees for all angles
   fits_update_key(fptr,TDOUBLE, "OBSRA", &dtemp, NULL, &status);
   fits_update_key(fptr,TDOUBLE, "OBSDEC", &(data->source->dec), NULL, &status);
   fits_update_key(fptr,TSTRING, "TELESCOP", "MWA" , NULL, &status);
@@ -796,7 +820,7 @@ int writeUVFITSiterator(char *filename, uvdata *data, void **vfptr, double *jd_d
      this truncated start-of-jd time. JDs start at 12:00h on a day. */
   JD_to_Cal(data->date[0],&year,&mon,&day); /* get year, month, day for this JD */
   Cal_to_JD(year,mon,day,&jd_day);          /* gets the JD for the start of this day */
-  *jd_day_trunc = ((int)jd_day)+0.5;         /* truncate */
+  (*iter)->jd_day_trunc = ((int)jd_day)+0.5;         /* truncate */
   sprintf(tempstr,"%d-%02d-%02dT00:00:00.0",year,mon,day);
   fits_update_key(fptr,TSTRING, "DATE-OBS", tempstr , NULL, &status);
 
@@ -814,7 +838,7 @@ int writeUVFITSiterator(char *filename, uvdata *data, void **vfptr, double *jd_d
   }
   /* except the PZERO for the date, which must match the OBS-DATE in Julian Days
      the following relies on the tempstr from previous loop. */
-  fits_update_key(fptr,TDOUBLE,tempstr,jd_day_trunc, NULL, &status);
+  fits_update_key(fptr,TDOUBLE,tempstr,&((*iter)->jd_day_trunc), NULL, &status);
 
   /* write the coord system keywords CRVAL, CRPIX, CDELT, CTYPE.*/
   temp=1.0;
@@ -854,15 +878,14 @@ int writeUVFITSiterator(char *filename, uvdata *data, void **vfptr, double *jd_d
   fits_update_key(fptr,TFLOAT,"CRPIX4",&temp , NULL, &status);
 
   /* specific updates for RA/DEC */
-  temp = data->source->ra*15; fits_update_key(fptr,TFLOAT,"CRVAL5",&temp,NULL,&status);
-  temp = data->source->dec;   fits_update_key(fptr,TFLOAT,"CRVAL6",&temp,NULL,&status);
+  temp = data->source->ra*15;
+  fits_update_key(fptr,TFLOAT,"CRVAL5",&temp,NULL,&status);
+  temp = data->source->dec;
+  fits_update_key(fptr,TFLOAT,"CRVAL6",&temp,NULL,&status);
 
   /* write the HISTORY AIPS WTSCAL item which seems to be required */
   fits_write_history(fptr,"AIPS WTSCAL =  1.0",&status);
   fits_write_comment(fptr,"written by the UV FITS writer of RBW.",&status);
-
-  // return fitsfile pointer;
-  *vfptr = (void *)fptr;
 
   return EXIT_SUCCESS;
 }
@@ -870,25 +893,31 @@ int writeUVFITSiterator(char *filename, uvdata *data, void **vfptr, double *jd_d
 
 /**************************
  ! NAME:      writeUVFITSfinalise
- ! PURPOSE:   write antenna tables etc at end of uvfits file and close up.
+ ! PURPOSE:   write antenna tables etc at end of uvfits file and close up
+ !            after writing a uvfits file with the iterator process
  ! ARGUMENTS: vfptr: an open fits file (as a void pointer)
  !            data: uvdata struct with existing data.
  ! RETURNS:   integer. 0 success.
  **************************/
-int writeUVFITSfinalise(void *vfptr, uvdata *data) {
+int writeUVFITSfinalise(uvWriteContext *iter, uvdata *data) {
   int status=0;
-  fitsfile *fptr;
 
-  fptr = (fitsfile *)vfptr;
+  if(debug) {
+    fprintf(stdout,"Finalising and writing antenna table\n");
+    fflush(stdout);
+  }
+
   /* create and write the antenna table */
-  status = writeAntennaData(fptr, data);
+  status = writeAntennaData(iter->fptr, data);
   if (status !=0) {
     fprintf(stderr,"ERROR: writeAntennaData failed with status %d\n",status);
   }
 
   /* tidy up */
-  fits_close_file(fptr, &status);            /* close the file */
+  fits_close_file(iter->fptr, &status);            /* close the file */
   fits_report_error(stderr, status);  /* print out any error messages */
+
+  free(iter);
 
   return status;
 }
@@ -896,29 +925,29 @@ int writeUVFITSfinalise(void *vfptr, uvdata *data) {
 
 /**************************
  ! NAME:      writeUVinstant
- ! PURPOSE:   write one time instant of uv data into the UVFITS file.
+ ! PURPOSE:   write one time instant of uv data into the UVFITS file. Requires prior call to writeUVFITSiterator
  ! ARGUMENTS: fptr: an open fits file.
  !            data: uvdata struct with existing data.
  !            n_elements: number of items in a group for a time instant
- !            i: time index of data
+ !            i: time index of data in uvdata array. This should normally be zero.
  ! RETURNS:   integer. 0 success.
  **************************/
-int writeUVinstant(void *vfptr, uvdata *data, double jd_frac, int i) {
-    fitsfile *fptr;
-    static long ngroups=1;
+int writeUVinstant(uvWriteContext *iter, uvdata *data, double jd_frac, int i) {
     double *u_ptr, *v_ptr, *w_ptr;
     float  *vis_ptr, *wt_ptr;
     float *array=NULL;
     int nelements,status=0;
     int l,j,k;
-
-    fptr = vfptr;   // this is basically to avoid having to include fitsio.h in uvfits.h 
+    char msg[80];
 
     /* sanity checks */
     if (data->n_pol <1 || data->n_freq < 1 || data->n_baselines[i] < 1) {
         fprintf(stderr,"ERROR: npols %d, nfreqs %d and n_baselines %d all must be > 0 at time index %d\n",data->n_pol, data->n_freq, data->n_baselines[i],i);
         return EXIT_FAILURE;
-    }   
+    } 
+
+    if (debug) fprintf(stdout,"writeUVinstant: jd: %f, scan: %d. So far ntimes %ld, ngroups %ld\n",
+                        jd_frac,i,iter->ntimes, iter->ngroups);
 
     /* magic number 3 here matches naxes[1] from above. */
     nelements = 3*data->n_pol*data->n_freq*data->n_baselines[i];
@@ -951,11 +980,15 @@ int writeUVinstant(void *vfptr, uvdata *data, double jd_frac, int i) {
       }
       /* Write each vis batch as a "random group" including 5 extra params at the front */
       /* the starting index must be 1, not 0.  fortran style. also for the vis index */
-      fits_write_grppar_flt(fptr,ngroups,1,3*data->n_pol*data->n_freq+N_GRP_PARAMS, array, &status);
+      fits_write_grppar_flt(iter->fptr,(iter->ngroups)+1,1,3*data->n_pol*data->n_freq+N_GRP_PARAMS, array, &status);
       /*      fprintf(stderr,"write group number: %d\n",i*data->n_baselines+l+1);*/
+      fits_report_error(stderr, status);  /* print out any error messages */
       if (status) return status;
-      ngroups++;
+      (iter->ngroups)++;
     }
+    sprintf(msg,"%ld timesteps, %d baselines",++(iter->ntimes),data->n_baselines[i]);
+    fits_update_key(iter->fptr, TLONG, "GCOUNT", &(iter->ngroups), NULL, &status);
+    fits_report_error(stderr, status);  /* print out any error messages */
     free(array);
     return 0;
 }
