@@ -40,8 +40,8 @@ void parse_cmdline(const int argc,char * const argv[]) {
 
 int main(int argc, char *argv[]) {
     int res=0,chunk=0,i;
-    uvdata *data_old,*data_new;
-    uviterator *iter;
+    uvdata *data_new;
+    uvReadContext *iter;
 
     fpd = stderr;
     if (argc < 2) usage();
@@ -66,6 +66,7 @@ int main(int argc, char *argv[]) {
     while ((res=readUVFITSnextIter(data_new,iter)) ==0) {
         fprintf(stdout,"Chunk %d. Time: %f. baselines: %d\n",chunk++,data_new->date[0],data_new->n_baselines[0]);
     }
+    readUVFITSCloseIter(iter);
 
     /* print a few vis values */
     for (i=0; i<10; i++) {
@@ -79,6 +80,8 @@ int main(int argc, char *argv[]) {
             fprintf(stdout,"\n");
         }
     }
+
+    freeUVFITSdata(data_new);
 
     return 0;
 }
