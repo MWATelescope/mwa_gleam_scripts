@@ -586,6 +586,7 @@ int readScan(FILE *fp_ac, FILE *fp_cc,int scan_count, Header *header, InpConfig 
     // date and n_baselines should already be allocated
     assert(uvdata->date != NULL);
     assert(uvdata->n_baselines[0] > 0);
+    uvdata->n_vis=1;
     uvdata->visdata=calloc(1,sizeof(double *));
     uvdata->weightdata=calloc(1,sizeof(double *));
     uvdata->u=calloc(1,sizeof(double *));
