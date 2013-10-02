@@ -111,17 +111,16 @@ double arr_lat_rad=MWA_LAT*(M_PI/180.0),arr_lon_rad=MWA_LON*(M_PI/180.0),height=
 /************************
 ************************/
 int main(const int argc, char * const argv[]) {
-  void *vfptr = NULL;
   const char optstring[] = "vldS:a:c:o:I:H:A:F:f:";
   FILE *fpin_ac=NULL,*fpin_cc=NULL;
   int i,scan=0,res=0;
   Header header;
   InpConfig inputs;
-  uvdata data;
-  array_data arraydat;
-  source_table source;
+  uvdata *data;
+  array_data *arraydat;
+  source_table *source;
   ant_table *antennas;
-  double jd_day_trunc;
+  uvWriteContext *iter=NULL;
 
   fpd=stderr;
 
@@ -129,15 +128,15 @@ int main(const int argc, char * const argv[]) {
   parse_cmdline(argc,argv,optstring);
 
   /* initialise some values for the UV data array and antennas*/
+  data = calloc(1,sizeof(uvdata));
+  source = calloc(1,sizeof(source_table));
+  arraydat = calloc(1,sizeof(array_data));
   antennas = calloc(MAX_ANT,sizeof(ant_table));
-  if(antennas==NULL) {
-    fprintf(stderr,"no malloc for antenans\n");
-    exit(1);
-  }
-  data.antennas = antennas;
-  data.array    = &arraydat;
-  data.source   = &source;
-  initData(&data);
+  assert(antennas!=NULL && source!=NULL && arraydat!=NULL && data !=NULL);
+  data->antennas = antennas;
+  data->array    = arraydat;
+  data->source   = source;
+  initData(data);
 
   /* get the mapping of inputs to anntena numbers and polarisations */
   if ((res = readInputConfig(configfilename, &inputs)) != 0) {
@@ -145,7 +144,7 @@ int main(const int argc, char * const argv[]) {
   }
 
   /* get the number of antennas and their locations relative to the centre of the array */
-  if ((res = readArray(stationfilename, arr_lat_rad, antennas,&arraydat.n_ant)) != 0) {
+  if ((res = readArray(stationfilename, arr_lat_rad, antennas,&(arraydat->n_ant))) != 0) {
       fprintf(stderr,"readArray failed with code %d. exiting\n",res);
   }
 
@@ -156,7 +155,7 @@ int main(const int argc, char * const argv[]) {
     exit(1);
   }
 
-  checkInputs(&header,&data,&inputs);
+  checkInputs(&header,data,&inputs);
 
   /* open input files */
   if (header.corr_type!='A' && (fpin_cc=fopen(crosscor_filename,"r"))==NULL) {
@@ -169,11 +168,11 @@ int main(const int argc, char * const argv[]) {
   }
 
   /* assign vals to output data structure from inputs */
-  res = applyHeader(&header, &data);
+  res = applyHeader(&header, data);
 
   /* populate antenna info */
-  if (debug) fprintf(fpd,"there are %d antennas\n",arraydat.n_ant);
-  for (i=0; i<arraydat.n_ant; i++){
+  if (debug) fprintf(fpd,"there are %d antennas\n",arraydat->n_ant);
+  for (i=0; i<arraydat->n_ant; i++){
     //sprintf(antennas[i].name,"ANT%03d",i+1);
     // FIXME: update this for correct pol type
     sprintf(antennas[i].pol_typeA,"X");
@@ -186,11 +185,11 @@ int main(const int argc, char * const argv[]) {
   }
 
   /* assign XYZ positions of the array for the site. */
-  Geodetic2XYZ(arr_lat_rad,arr_lon_rad,height,&(arraydat.xyz_pos[0]),&(arraydat.xyz_pos[1]),&(arraydat.xyz_pos[2]));
+  Geodetic2XYZ(arr_lat_rad,arr_lon_rad,height,&(arraydat->xyz_pos[0]),&(arraydat->xyz_pos[1]),&(arraydat->xyz_pos[2]));
   if (debug) fprintf(fpd,"converted array location to XYZ\n");
 
   /* open the iterator for writing. Need to have set the date in  */
-  res = writeUVFITSiterator(outfilename, &data, &vfptr, &jd_day_trunc);
+  res = writeUVFITSiterator(outfilename, data, &iter);
   if (res!=0) {
     fprintf(stderr,"writeUVFITSiterator returned %d.\n",res);
     return res;
@@ -199,12 +198,12 @@ int main(const int argc, char * const argv[]) {
 
   /* read each scan, populating the data structure. */
   scan=0;
-  while ((res = readScan(fpin_ac,fpin_cc,scan, &header, &inputs, &data))==0) {
+  while ((res = readScan(fpin_ac,fpin_cc,scan, &header, &inputs, data))==0) {
     int status;
 
     if (flagfilename != NULL) {
       if (debug) fprintf(fpd,"Applying flags...\n");
-      res = applyFlagsFile(flagfilename,&data);
+      res = applyFlagsFile(flagfilename,data);
       if(res!=0) {
         fprintf(stderr,"Problems in applyFlagsFile. exiting\n");
         exit(1);
@@ -212,7 +211,7 @@ int main(const int argc, char * const argv[]) {
     }
 
     /* write this chunk of data to the output file */
-    status = writeUVinstant(vfptr, &data, data.date[0]-jd_day_trunc,0);
+    status = writeUVinstant(iter, data, data->date[0]-iter->jd_day_trunc,0);
     if (status) {
         fprintf(stderr,"ERROR: code %d when writing time instant %d\n",status,i);
         exit(EXIT_FAILURE);
@@ -235,7 +234,7 @@ int main(const int argc, char * const argv[]) {
 
   if (do_flag) {
     if (debug) fprintf(fpd,"Auto flagging...\n");
-    res = autoFlag(&data,5.0,AUTOFLAG_N_NEIGHBOURS);
+    res = autoFlag(data,5.0,AUTOFLAG_N_NEIGHBOURS);
     if(res!=0) {
       fprintf(stderr,"Problems in autoflag. exiting\n");
       exit(1);
@@ -243,11 +242,14 @@ int main(const int argc, char * const argv[]) {
   }
 
   /* finish up and write the antenna table */
-  writeUVFITSfinalise(vfptr, &data);
+  writeUVFITSfinalise(iter, data);
 
   if(debug) fprintf(fpd,"finished writing UVFITS file\n");
   if(fpin_ac !=NULL) fclose(fpin_ac);
   if(fpin_cc !=NULL) fclose(fpin_cc);
+
+  freeUVFITSdata(data);
+
   return 0;
 }
 
@@ -809,8 +811,6 @@ int readScan(FILE *fp_ac, FILE *fp_cc,int scan_count, Header *header, InpConfig 
     }
 
   }
-  /* successfully read a time chunk. increase vis counter in data */
-  uvdata->n_vis++;
   if (visdata != NULL) free(visdata);
   return 0;
 }
@@ -1176,7 +1176,7 @@ int readHeader(char *header_filename, Header *header) {
 void initData(uvdata *data) {
   data->date = calloc(1,sizeof(double));
   data->n_pol=0;
-  data->n_baselines=calloc(1,sizeof(int));
+  data->n_baselines = calloc(1,sizeof(int));
   data->n_freq=0;
   data->n_vis=0;
   data->cent_freq=0.0;
