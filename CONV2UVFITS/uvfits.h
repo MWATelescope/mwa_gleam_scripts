@@ -49,6 +49,13 @@ typedef struct _array_table {
 
 
 /* see notes on iterator mode below for how this data structure is used in that case */
+/* this data structure reflects the old way the code was originally written where all data
+   was read or written in a single chunk- hence was all in memory at the same time.
+   The new iterator methods use this same structure, but only with 1 time step of data.
+   Hence, if this all looks more complicated than it need to be, that is because it stays
+   backwards compatible even though some of these arrays don't need to be arrays any more, 
+   just single numbers.
+*/
 typedef struct _uvdata {
   int  n_pol;
   int  pol_type;        /* index to signal what kind of data: 1: Stokes, -1: Circ, -5: Linear */
@@ -74,33 +81,37 @@ typedef struct _uvdata {
   double **w;
 } uvdata;
 
+/* context data structure for iterative reading of UVFITS files */
 typedef struct {
   int pcount,gcount,grp_index;
   float pscal[3],pzero[3];  // for u,v,w
   double base_date;         // date in PZERO5 which is the JD of the obs.
   float *grp_par, *grp_row;
   void *fptr;
-} uviterator;
+} uvReadContext;
+
+/* context data structure for iterative writing of UVFITS files */
+typedef struct {
+  void *fptr;
+  long ngroups,ntimes;
+  double jd_day_trunc;
+} uvWriteContext;
 
 /* public function prototypes */
-int writeUVFITS(char *fname, uvdata *data);
-int writeUVinstant(void *fptr, uvdata *data, double jd_frac, int i);
-int writeUVFITSfinalise(void *vfptr, uvdata *data);
-int writeUVFITSiterator(char *filename, uvdata *data, void **vfptr, double *jd_day_trunc);
-void printUVData(uvdata *data, FILE *fp);
-void JD_to_Cal(double jd, int *year, int *month, int *day);
-void JD_get_GSTIA0(double jd, double *GSTIA0);
-void Cal_to_JD(int year, int month, int day, double *jd);
-void uvfitsSetDebugLevel(int in_debug);
-void freeUVFITSdata(uvdata *data);
-void printAntennaData(uvdata *data,FILE *fp);
-void EncodeBaseline(int b1, int b2, float *result);
-void DecodeBaseline(float blcode, int *b1, int *b2);
-void Geodetic2XYZ(double lat_rad, double lon_rad, double height_meters, double *X, double *Y, double *Z);
+int writeUVFITS(char *fname, uvdata *data); // old method - deprecated.
+/* iterator mode API:
+  In this mode, writeUVFITSiterator is called to set up the iterative method of writing 
+  the data which uses much less memory. writeUVinstant is then use to write a single time
+  instant of data. Finally, writeUVFITSfinalise is called to write the antenna table and close up
+*/
+int writeUVFITSiterator(char *filename, uvdata *data, uvWriteContext **iter);
+int writeUVinstant(uvWriteContext *iter, uvdata *data, double jd_frac, int i);
+int writeUVFITSfinalise(uvWriteContext *iter, uvdata *data);
+
 void ENH2XYZ_absolute(double E,double N, double H, double lat_rad, double lon_rad, double *X, double *Y, double *Z);
 void ENH2XYZ_local(double E,double N, double H, double lat, double *X, double *Y, double *Z);
 /* reading API */
-int readUVFITS(char *fname, uvdata **data);
+int readUVFITS(char *fname, uvdata **data); // old method - deprecated
 
 /* iterator mode API:
    In this mode, the uvfits file is opened once and read many times, once for each time chunk
@@ -114,6 +125,19 @@ int readUVFITS(char *fname, uvdata **data);
    In this case, the uvdata data structure only contains a single time instant (n_vis=1), so all the arrays of arrays
    have only 1 element in them and they all should be accessed via array index 0.
 */
-int readUVFITSInitIterator(char *filename, uvdata **data, uviterator **iterator);
-int readUVFITSnextIter(uvdata *obj, uviterator *iter);
+int readUVFITSInitIterator(char *filename, uvdata **data, uvReadContext **iterator);
+int readUVFITSnextIter(uvdata *obj, uvReadContext *iter);
+int readUVFITSCloseIter(uvReadContext *iter);
+
+/* utilities */
+void printUVData(uvdata *data, FILE *fp);
+void JD_to_Cal(double jd, int *year, int *month, int *day);
+void JD_get_GSTIA0(double jd, double *GSTIA0);
+void Cal_to_JD(int year, int month, int day, double *jd);
+void uvfitsSetDebugLevel(int in_debug);
+void freeUVFITSdata(uvdata *data);
+void printAntennaData(uvdata *data,FILE *fp);
+void EncodeBaseline(int b1, int b2, float *result);
+void DecodeBaseline(float blcode, int *b1, int *b2);
+void Geodetic2XYZ(double lat_rad, double lon_rad, double height_meters, double *X, double *Y, double *Z);
 
