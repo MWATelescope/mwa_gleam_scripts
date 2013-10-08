@@ -256,7 +256,7 @@ class FusionConnector():
         mitstr=outstr[0]
         print '\n'
         print mitstr
-        fmatch = re.compile('eor-[0-9]{2}.mit.edu: [0-9]{1,2}')
+        fmatch = re.compile('eor-[0-9]{2}.mit.edu [0-9]{1,2}')
         matches=fmatch.findall(mitstr)
         nmatch=len(matches)
         print 'matches:'
@@ -264,8 +264,7 @@ class FusionConnector():
         for match in matches:
             nmatch = re.compile(' [0-9]{1,2}')
             nn=nmatch.search(match)
-            nmit=int(match[nn.start()+1:nn.end()])
-            nmit=nmit+int(match)
+            nmit+=int(match[nn.start()+1:nn.end()])
         if(nmatch==0):
             emit=0
         print ncur
@@ -343,7 +342,7 @@ class FusionConnector():
         
         nupdate = 0
         nnew =0
-        udpaterows=[]
+        updaterows=[]
         for row in rows:
             #if the obsid is not in the fusion rows than get date, get number of files at MIT and Curtin
 
