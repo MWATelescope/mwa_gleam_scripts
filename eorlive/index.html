@@ -210,6 +210,8 @@
     var xhr=createXHR()
     xhr.onreadystatechange=function()
     {
+    if(xhr.status==200 && xhr.readyState==4)
+    {
     document.getElementById("LastObsUpdate").innerHTML=xhr.responseText;
     }
     };
@@ -304,8 +306,8 @@
 			 var refresh4=window.setInterval("getG9()",60000);
 			  var refresh5=window.setInterval("currentObs()",15000);
 			  var refresh6=window.setInterval("refreshBeam()",60000);
-			  var refresh7=window.setInterval("getDayTableUpdate()",3600000)
-			  var refresh8=window.setInterval("getObsTableUpdate()",3600000)
+			  var refresh7=window.setInterval("getDayTableUpdate()",6000)
+			  var refresh8=window.setInterval("getObsTableUpdate()",6000)
   </script>
 </head>
 
