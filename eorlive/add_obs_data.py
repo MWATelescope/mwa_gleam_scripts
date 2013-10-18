@@ -147,30 +147,29 @@ class FusionConnector():
         #iterate through all obserations at MIT, check obsid in data base to see if observation is G0009
 
     def get_mit_download_time(self):
-        request=urllib2.Request(url='http://eor-02.mit.edu:7777/QUERY?query=files_list&format=list')
-        request_open=urllib2.urlopen(request)
-        response=request_open.read()
-        request_open.close()
-        lineiterator=iter(response.splitlines())
-        #iterate through all obserations at MIT, check obsid in data base to see if observation is G0009
-        #if it is, add total observation seconds to observation time
-        p=re.compile('/[0-9]{10}_')
-        id_list=[]
-        for line in lineiterator:
-            m=p.search(line)
-            if(m):
-                obsid=int(line[m.start()+1:m.end()-1])
-                if(not(obsid in id_list)):
-                    id_list.append(obsid)
-                    id_list.sort()
         #now iterate through obsid list check if data data is G0009 and find observation time
         tottime=0.
+        #build a dictionary
         rows_g9 = self.send_eor_query('select starttime, stoptime, projectid from mwa_setting where projectid=\'G0009\'')
         for row in rows_g9:
-            if(row[0] in id_list):
-                    tottime+=(row[1]-row[0])
-            
-
+            conn=psycopg2.connect(database='ngas',user='ngas_ro',host='eor-02.mit.edu',password='ngas$ro')
+            obsid=str(int(row[0]))
+            print obsid
+            cur=conn.cursor()
+            cur.execute("SELECT file_id,file_version,ngas_files.disk_id,ngas_disks.host_id FROM ngas_files INNER JOIN ngas_disks ON ngas_files.disk_id = ngas_disks.disk_id where ngas_files.file_id LIKE %s",['%'+str(obsid)+'%'])
+            rows=cur.fetchall()
+            #check for duplicates
+            file_list=[]
+            for frow in rows:
+                if(not(frow[0] in file_list)):
+                    file_list.append(frow[0])
+            print len(rows)
+            print len(file_list)
+            print tottime
+            nfiles=self.send_eor_query('select count(*) from (select observation_num from data_files where observation_num='+str(obsid)+') as foo;')[0][0]
+            print nfiles
+            if(nfiles>0):
+                tottime+=float(len(file_list))/float(nfiles)*(row[1]-row[0])
         return tottime/3600.
     
     def get_fail_rates(self):
@@ -343,11 +342,23 @@ class FusionConnector():
         nupdate = 0
         nnew =0
         updaterows=[]
+        #remove duplicates
+        used_ids = []
+        mm=0
+        for obsid in fusion_obsids:
+            if(not(obsid in used_ids)):
+                used_ids.append(obsid)
+            else:
+                query = 'DELETE FROM %s WHERE ROWID = \'%s\''%(obstable_id,fusion_rowids[mm])
+                response=self.send_fusion_query('POST',query,{'Content-Length':0})
+                print response.status, response.reason
+            mm=mm+1
+
+            
+            
         for row in rows:
             #if the obsid is not in the fusion rows than get date, get number of files at MIT and Curtin
-
-            if(not(int(row[0]) in fusion_obsids)):
-
+            if(not(int(row[0]) in fusion_obsids) and not(int(row[0]) in used_ids)):
                 obsdate=self.send_eor_query('select timestamp_gps('+str(row[0])+')')
                 #find number of files at MRO
                 nmro=self.send_eor_query('select count(*) from (select observation_num from data_files where observation_num='+str(int(row[0]))+') as foo;')[0][0]
@@ -357,7 +368,7 @@ class FusionConnector():
                 print 'Error MIT:' + str(emit)
                 print 'number Curtin: '+str(ncur)
                 print 'Error Curtin: '+str(ecur)
-
+                
                 query = 'INSERT INTO %s (ObsDate,ObsID,ObsName,Dec,MROData,CurtinData,MITData,MIT_Error,Curtin_Error,Duration) VALUES (\'%s\',%s,\'%s\',%s,%s,%s,%s,%s,%s,%s)'%(obstable_id,obsdate[0][0].isoformat(),str(row[0]),str(row[1]),str(row[4]),str(nmro),str(ncur),str(nmit),str(emit),str(ecur),str(int(row[3])-int(row[2])))
                 response=self.send_fusion_query('POST',query,{'Content-Length':0})
                 print response.status,response.reason
@@ -401,14 +412,7 @@ class FusionConnector():
                     response=self.send_fusion_query('POST',query,{'Content-Length':0})
                     print response.status,response.reason
             return (nnew,nupdate)
-                
-                
-        
-        
-            
-            
-            
-        #first, get a list of files 
+#first, get a list of files 
         '''
         query = 'DELETE FROM %s'%(obstable_id)
         self.send_fusion_query('POST',query,{'Content-Length':0})
