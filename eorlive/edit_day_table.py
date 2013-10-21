@@ -46,7 +46,7 @@ def get_hours(day_list):
                 hours_uvfits+=float(row['duration'])
         if(row['data_paw']==row['data_mro']):
             hours_paw+=float(row['duration'])
-    return (hours_eor0/3600.,hours_eor1/3600.,hours_eor2/3600.,hours_mro/3600.,hours_paw/3600.,hours_mit/3600.,hours_uvfits/3600.)
+    return (round(hours_eor0/3600.,2),round(hours_eor1/3600.,2),round(hours_eor2/3600.,2),round(hours_mro/3600.,2),round(hours_paw/3600.,2),round(hours_mit/3600.,2),round(hours_uvfits/3600.,2))
 
 
 def get_band(obs_name):

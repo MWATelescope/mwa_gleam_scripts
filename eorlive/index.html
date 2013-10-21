@@ -189,7 +189,37 @@
     xhr.open("GET","G9DayCount.php",true);
     xhr.send();
     }
+    
 
+    function getDayTableUpdate()
+    {
+    var xhr=createXHR()
+    xhr.onreadystatechange=function()
+    {
+    if(xhr.status==200 && xhr.readyState==4)
+    {
+    document.getElementById("LastDayUpdate").innerHTML=xhr.responseText;
+    }
+    };
+    xhr.open("GET","daytable.dat",true);
+    xhr.send();
+    }
+
+    function getObsTableUpdate()
+    {
+    var xhr=createXHR()
+    xhr.onreadystatechange=function()
+    {
+    if(xhr.status==200 && xhr.readyState==4)
+    {
+    document.getElementById("LastObsUpdate").innerHTML=xhr.responseText;
+    }
+    };
+    xhr.open("GET","obstable.dat",true);
+    xhr.send();
+    }
+
+    
     function getG9()
     {
     var xhr=createXHR()
@@ -265,6 +295,8 @@
 			  getNextObs();
 			  getG9Day();
 			  getG9();
+			  getDayTableUpdate();
+			  getObsTableUpdate();
 			  }
 			  window.onload=init();
 			 google.setOnLoadCallback(loadLog);
@@ -273,7 +305,9 @@
 			 var refresh3=window.setInterval("getG9Day()",60000);
 			 var refresh4=window.setInterval("getG9()",60000);
 			  var refresh5=window.setInterval("currentObs()",15000);
-			  var resresh6=window.setInterval("refreshBeam()",60000);
+			  var refresh6=window.setInterval("refreshBeam()",60000);
+			  var refresh7=window.setInterval("getDayTableUpdate()",6000)
+			  var refresh8=window.setInterval("getObsTableUpdate()",6000)
   </script>
 </head>
 
@@ -287,6 +321,8 @@
 <tr> <td id="timeBoston" class="time">Loading...</td><td id="timePhoenix" class="time">Loading... </td> <td id="timeSeattle" class="time">Loading...</td><td id="timeSydney" class="time">Loading...</td><td id="timePerth" class="time">Loading...</td><td class="time" id="timeBangalore">Loading...</td><td class="time" id="timeUTC">Loading...</td></tr>
 </table>
 
+
+
 <table>
 <tr><th colspan="4">Useful Links</th></tr>
 <tr><td><a
@@ -297,6 +333,13 @@ href="http://mro.mwa128t.org/burst/live/">Tile Total Power</a></td><td><a
 href="https://www.google.com/fusiontables/DataSource?docid=1poo8vJn8FHcwuZ0OlF-IGpOY5krFvOH-dSZIyPc"> Table of G0009
 Observations and their Locations</a></td><td><a href="http://telemetry.mwa128t.org">Autocorrelations</a></td></tr>
 </table>
+
+<table>
+<tr><th>Last Update of Day Table </th><th>Last Update of the Observations Table</th></tr>
+<tr><td id="LastDayUpdate"></td><td id="LastObsUpdate"></td></tr>
+</table>
+
+
 <table>
 <tr><td id="beamimage"><img src='current_beam.png'></td></tr>
 </table>
@@ -306,6 +349,9 @@ Observations and their Locations</a></td><td><a href="http://telemetry.mwa128t.o
 <tr><th>Last</th><td id="lastobsid1">Loading...</td><td id="lastobsname1">Loading...</td><td id="lastobsproj">Loading...</td><td id="lastobsfiles1">Loading...</td><td id="lastobsdate1">Loading...</td></tr>
 <tr><th>2nd Last</th></td><td id="lastobsid2">Loading...</td><td id="lastobsname2">Loading...</td><td id="lastobs2proj">Loading...</td><td id="lastobsfiles2">Loading...</td><td id="lastobsdate2">Loading...</td></tr>
 </table>
+
+
+
 
 <table>
 <tr>

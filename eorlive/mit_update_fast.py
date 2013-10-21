@@ -1,4 +1,7 @@
 #!/usr/bin/env python
+
+
+
 from add_obs_data import *
 import numpy,time
 
@@ -18,6 +21,7 @@ def l2(num,numlist):
     
 
 def update_mit_counts(fconn):
+        """
     request=urllib2.Request(url='http://eor-02.mit.edu:7777/QUERY?query=files_list&format=list')
     request_open=urllib2.urlopen(request)
     response=request_open.read()
@@ -44,25 +48,35 @@ def update_mit_counts(fconn):
             else:
                 obs_dict[str(obsnum)]=[gpunum]
     #now update mit counts
-    query = 'SELECT ObsID,MITData,MROData,ROWID FROM %s'%(obstable_id) 
-    response=fconn.send_fusion_query('GET',query,{})
-    response = json.loads(response.read())
-    fusionrows=response['rows']
-    numSuccess=0
-    for row in fusionrows:
-        print row[1], row[2]
-        if(not(int(row[1])==int(row[2]))):
-            if(str(row[0]) in obs_dict.keys()):#if the observation has any files at mit
-                print sorted(obs_dict[str(row[0])])
-                print row[0], len(obs_dict[str(row[0])])
-                query='UPDATE %s \n SET MITData=%s\nWHERE ROWID=\'%s\''%(obstable_id,str(len(obs_dict[str(row[0])])),str(row[3]))
+    """
+        query = 'SELECT ObsID,MITData,MROData,ROWID FROM %s'%(obstable_id) 
+        response=fconn.send_fusion_query('GET',query,{})
+        response = json.loads(response.read())
+        fusionrows=response['rows']
+        numSuccess=0
+    
+        for row in fusionrows:
+            if(not(int(row[1])==int(row[2]))):
+                print row[1], row[2]
+                conn=psycopg2.connect(database='ngas',user='ngas_ro',host='eor-02.mit.edu',password='ngas$ro')
+                obsid=str(int(row[0]))
+                print obsid
+                cur=conn.cursor()
+                cur.execute("SELECT file_id,file_version,ngas_files.disk_id,ngas_disks.host_id FROM ngas_files INNER JOIN ngas_disks ON ngas_files.disk_id = ngas_disks.disk_id where ngas_files.file_id LIKE %s",['%'+str(obsid)+'%'])
+                rows=cur.fetchall()
+                file_list=[]
+                for frow in rows:
+                    if(not(frow[0] in file_list)):
+                        file_list.append(frow[0])
+                print len(file_list)
+                query='UPDATE %s \n SET MITData=%s\nWHERE ROWID=\'%s\''%(obstable_id,str(len(file_list)),str(row[3]))
                 response=fconn.send_fusion_query('POST',query,{'Content-Length':0})
                 print response.status, response.reason
                 if(int(response.status)==200):
                     numSuccess=numSuccess+1
-    f = open(logfile,'a')
-    f.write(datetime.now().isoformat(' ')+' : '+'sucessfully ran update with '+str(numSuccess)+' good entries \n')
-    f.close()
+                f = open(logfile,'a')
+                f.write(datetime.now().isoformat(' ')+' : '+'sucessfully ran update with '+str(numSuccess)+' good entries \n')
+                f.close()
 
 if __name__=='__main__':
     if(not(os.path.isfile(fusionname))):
