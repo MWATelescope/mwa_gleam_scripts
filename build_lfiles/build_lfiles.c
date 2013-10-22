@@ -316,7 +316,7 @@ int main(int argc, char **argv) {
         if (debug) fprintf(fpd,"Start HDU: %d, stop HDU: %d\n",ihdu,stophdu);
 
         /* if we're time averaging, check that an integer number of averages will go into output */
-        if ((num_hdus_in_file[0]-1)%tscrunch_factor != 0) {
+        if ((num_hdus_in_file[0]-primary)%tscrunch_factor != 0) {
             fprintf(stderr,"WARNING: There are %d time steps in file and time averaging of %d steps requested.\n",num_hdus_in_file[0]-1,tscrunch_factor);
             fprintf(stderr,"\tThis will truncate data from the output\n");
         }
@@ -443,14 +443,10 @@ int main(int argc, char **argv) {
 
 
                     float complex *ptr = cuda_matrix_h + (ifile * naxes[1] * nvis);
+                    // use fits_read_img so that this will also work transparently for compressed data
                     if (fits_read_img(fptr[ifile],TFLOAT,fpixel,npixels,&nullval,(float *)ptr,&anynull,&status)) {
                         printerror(status);
                     }
-                        //
-                        // now need to read in the relevant part of the image
-                        //
-                        //
-
                 }
             }
 
