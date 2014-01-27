@@ -42,6 +42,7 @@ static int writeFQData(fitsfile *fptr, uvdata *data);
 void printHeader(fitsfile *fptr);
 int readAntennaTable(fitsfile *fptr,uvdata *obj);
 int writeSourceData(fitsfile *fptr, uvdata *data);
+int readFQTable(fitsfile *fptr,uvdata *obj);
 
 /* private global vars */
 static int debug=1;
@@ -107,6 +108,10 @@ int readUVFITSOpenInit(char *filename, uvdata **data, fitsfile **outfptr) {
     fprintf(stderr,"readUVFITS: status %d after get img params\n",status);
     return status;
   }
+  if (naxis > 7) {
+    fprintf(stderr,"ERROR: NAXIS is %d. Extra image dimensions aren't supported yet\n",(int)naxis);
+    return -1;
+  }
 
   /* basic stuff seems to be in order, allocate space for data structure (not visibilites yet) */
   *data = calloc(1,sizeof(uvdata));
@@ -129,9 +134,17 @@ int readUVFITSOpenInit(char *filename, uvdata **data, fitsfile **outfptr) {
     fprintf(stderr,"readUVFITS: no malloc for source table\n");
     return -1;
   }
-  obj->n_pol = naxes[2];    // copy across number of pols and freqs
-  obj->n_freq = naxes[3];
-  obj->n_IF = 1;
+  obj->n_pol = naxes[2];    // copy across number of pols
+  obj->n_freq = naxes[3];   // copy across number of freqs
+  obj->n_IF = 1;            // set the number of IFs
+  if (naxis==7) {
+    // extra image axis means there are multiple IFs to support
+    obj->n_IF = naxes[4];
+    if (obj->n_IF < 1 || obj->n_IF > 1024) {    // 1024 is arbitrary here. Just a sanity limit
+        fprintf(stderr,"ERROR: bad number of IFs: %d\n",(int)obj->n_IF);
+        return -1;
+    }
+  }
 
   /* examine headers and read the antenna table */
   for(i=1;i<=num_hdu; i++) {
@@ -152,6 +165,12 @@ int readUVFITSOpenInit(char *filename, uvdata **data, fitsfile **outfptr) {
     if (status == 0 && strncmp(temp,"AIPS AN",7)==0) {
         if(debug) printf("AN table is in HDU %d\n",i);
         status = readAntennaTable(fptr,obj);
+        if (status) return status;
+    }
+    if (status == 0 && strncmp(temp,"AIPS FQ",7)==0) {
+        if(debug) printf("FQ table is in HDU %d\n",i);
+        status = readFQTable(fptr,obj);
+        if (status) return status;
     }
     /* clear errors from trying to read keywords that possibly aren't there */
     fits_clear_errmsg();
@@ -291,6 +310,8 @@ int readUVFITSInitIterator(char *filename, uvdata **data, uvReadContext **iterat
     }
     if (strncmp("DEC",typedesc,3)==0) {
     }
+    if (strncmp("IF",typedesc,2)==0) {
+    }
   }
   /* allocate space for visibility data. In iterator mode, we only keep one timestep (n_vis=1), so the
      arrays of pointers in the uvdata structure are overkill but it doesn't hurt */
@@ -343,7 +364,8 @@ int readUVFITSInitIterator(char *filename, uvdata **data, uvReadContext **iterat
  ! RETURNS:   void
 ******************************/
 void addGroupRow(uvdata *obj, uvReadContext *iter) {
-    int k,l,index=0,j,time_index=0;
+    int k,l,m,index=0,j,time_index=0;
+    long out_ind;
 
     j = obj->n_baselines[time_index];
     obj->baseline[time_index][j] = iter->grp_par[3];
@@ -356,11 +378,15 @@ void addGroupRow(uvdata *obj, uvReadContext *iter) {
                 obj->u[time_index][j], obj->v[time_index][j], obj->w[time_index][j], obj->baseline[time_index][j],
                 iter->grp_par[4],j);
 
-    for(k=0; k<obj->n_freq; k++) {
-        for(l=0; l< obj->n_pol; l++) {
-          obj->visdata[time_index][(j*obj->n_freq*obj->n_pol+k*obj->n_pol + l)*2+0] = iter->grp_row[index++];   // real
-          obj->visdata[time_index][(j*obj->n_freq*obj->n_pol+k*obj->n_pol + l)*2+1] = iter->grp_row[index++];   // imag
-          obj->weightdata[time_index][j*obj->n_freq*obj->n_pol+k*obj->n_pol + l] = iter->grp_row[index++];      // weight
+    for(m=0; m<obj->n_IF; m++) {
+        for(k=0; k<obj->n_freq; k++) {
+            for(l=0; l< obj->n_pol; l++) {
+//                out_ind = (j*obj->n_freq*obj->n_pol + k*obj->n_pol + l);
+                out_ind = l + obj->n_pol*(k + obj->n_freq*(j + obj->n_IF*m));       // include multiple IFs
+                obj->visdata[time_index][out_ind*2+0] = iter->grp_row[index++];   // real
+                obj->visdata[time_index][out_ind*2+1] = iter->grp_row[index++];   // imag
+                obj->weightdata[time_index][out_ind]  = iter->grp_row[index++];   // weight
+            }
         }
     }
     obj->n_baselines[time_index]++;
@@ -385,7 +411,7 @@ int readUVFITSnextIter(uvdata *obj, uvReadContext *iter) {
  
   fptr = (fitsfile *)iter->fptr;
   max_bl = obj->array->n_ant*(obj->array->n_ant + 1)/2;
-  grp_row_size = 3*(obj->n_pol)*(obj->n_freq); // 3*npols*nfreqs
+  grp_row_size = 3*(obj->n_pol)*(obj->n_freq)*(obj->n_IF); // 3*npols*nfreqs*n_ifs
 
   obj->n_baselines[0]=0;  // this is a new time, so reset the number of baselines for this time before adding new data
 
@@ -1480,6 +1506,7 @@ int readAntennaTable(fitsfile *fptr,uvdata *obj) {
 void freeUVFITSdata(uvdata *data) {
   int i;
 
+  if (data->fq != NULL) free(data->fq);
   if (data->date !=NULL) free(data->date);
   if (data->antennas!=NULL) free(data->antennas);
   if (data->array !=NULL) free(data->array);
@@ -1566,6 +1593,98 @@ int writeFQData(fitsfile *fptr, uvdata *data) {
         fits_write_col_int(fptr,5,i+1,1,1,&(data->fq[i].sideband), &status); /* SIDEBAND */
     }
 
+    return status;
+}
+
+/**************************
+ ! NAME:      readFQTable
+ ! PURPOSE:   read the IF FQ data from the table "AIPS FQ"
+ ! ARGUMENTS: fptr: pointer to open FITS file.
+ !            obj: pointer to existing uvdata struct. Assumes no existing fq array.
+ ! RETURNS:   integer: 0 for success. returns CFITSIO error codes or -1 for memory allocation problems.
+ **************************/
+int readFQTable(fitsfile *fptr,uvdata *obj) {
+    int status=0,ncols,i,j,curr_col, num_IF=0;
+    long nrows;
+    int NUM_COLS = 5;
+    char *col_names[] = {"FRQSEL", "IF FREQ", "CH WIDTH", "TOTAL BANDWIDTH", "SIDEBAND"};
+
+    /* get the properties of the table */
+    fits_get_num_rows(fptr, &nrows, &status);
+    fits_get_num_cols(fptr, &ncols, &status);
+    if (status !=0) {
+        fprintf(stderr,"readFQTable: status %d reading number of rows/cols\n",status);
+        goto EXIT;
+    }
+    if (debug) printf("FQ table has %d rows, %d columns\n",(int)nrows,ncols);
+    if (nrows != obj->n_IF) {
+        fprintf(stderr,"ERROR: mismatch between number of IFs in primary HDU axes (%d) and FQ table (%d)\n",obj->n_IF,(int)nrows);
+        return -1;
+    }
+
+    /* make space for fqtable struct and an array of antenna structs */
+    if(obj->fq != NULL)
+        fprintf(stderr,"readFQTable WARNING: existing fq array will be overwritten and lost. This is a memory leak.\n");
+
+    obj->fq = calloc(nrows,sizeof(fq_table));
+    if (obj->fq==NULL) {
+        fprintf(stderr,"readFQTable: no malloc for fqtable\n");
+        status=-1; goto EXIT;
+    }
+
+    /* load the NO_IF parameter */
+    fits_read_key(fptr,TINT,"NO_IF",&num_IF,NULL,&status);
+    if (status != 0) {
+        fprintf(stderr,"readFQTable: status %d reading NO_IF\n",status);
+        goto EXIT;
+    }
+    // Check the number of rows matches the IFs already read, and the IF parameter matches also
+    if(nrows != obj->n_IF || num_IF != obj->n_IF) {
+        fprintf(stderr,
+                "readFQTable: ERROR: n_ows in IF table or NO_IF value does not match number of IFs in main data\n");
+        status=-1; goto EXIT;
+    }
+   
+    // Check for the existence of the necessary columns
+    for(i=0; i<NUM_COLS; i++) {
+        curr_col = 0;
+        fits_get_colnum(fptr,CASEINSEN, col_names[i], &curr_col, &status);
+        if (curr_col==0 || status !=0) {
+            fprintf(stderr,"readFQTable: no %s column in FQ table\n", col_names[i]);
+            goto EXIT;
+        }
+    
+        // Read the data out of each row
+        for (j=0; j<nrows; j++) {
+            if(i==1) {
+                fits_read_col_dbl(fptr, curr_col,j+1, 1, 1, 0.0, &(obj->fq[j].freq), NULL, &status);
+                if (debug) printf("FQ%d, %s: %lf\n", j+1, col_names[i], obj->fq[j].freq);
+            }
+            else if(i==2) {
+                fits_read_col_flt(fptr, curr_col,j+1, 1, 1, 0.0, &(obj->fq[j].chbw), NULL, &status);
+                if (debug) printf("FQ%d, %s: %f\n", j+1, col_names[i], obj->fq[j].chbw);
+            }
+            else if(i==3) {
+                fits_read_col_flt(fptr, curr_col,j+1, 1, 1, 0.0, &(obj->fq[j].bandwidth), NULL, &status);
+                if (debug) printf("FQ%d, %s: %f\n", j+1, col_names[i], obj->fq[j].bandwidth);
+            }
+            else if(i==4) {
+                fits_read_col_int(fptr, curr_col,j+1, 1, 1, 0.0, &(obj->fq[j].sideband), NULL, &status);
+                if (debug) printf("FQ%d, %s: %d\n", j+1, col_names[i], obj->fq[j].sideband);
+            }
+
+            if (status !=0) {
+                fprintf(stderr,"readFQTable: status %d reading column for %s\n",status, col_names[i]);
+            }
+        }
+    }
+
+    // Convert back to absolute frequencies (in file as relative)
+    for(i=0; i<obj->n_IF; i++) {
+        obj->fq[i].freq = obj->fq[i].freq - obj->fq[i].bandwidth/2 + obj->cent_freq;
+    }
+
+EXIT:
     return status;
 }
 
