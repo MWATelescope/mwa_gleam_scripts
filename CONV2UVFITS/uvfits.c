@@ -3,8 +3,27 @@
  !         utilities for writing/reading UVFITS files in AIPS/MIRIAD format
  !         Author: Randall Wayth. Sep, 2006.
  !         Feb, 2007. Added uvfits reader.
-For the FITS-IDI format, see: http://www.aips.nrao.edu/FITS-IDI.html
+ !         2013: Updates for interator mode operation (single timestep to conserve memory)
+ !         2014: Re-sync with RTS version, including multiple IF support originally by Stew Gleadow
+ !              Note that multi-IF support is inherently limited to the same number of polarisations
+ !              and same pol type etc in the data as discussed in the memo.
+ !  The reference for the AIPS uvfits format is AIPS Memo 117. This code was meant to
+ !  implement a subset of that for single IF, single source, single pointing data
+ !  and has been tested with Miriad, AIPS and CASA.
+ !  Note: this is not FITS-IDI.
+ !  For the FITS-IDI format, see: http://www.aips.nrao.edu/FITS-IDI.html
  ************************************/
+
+/* a note about sign conventions etc:
+  The de-facto standard for UVFITS files follows the AIPS convention:
+  - a baseline is defined as location(ant1)-location(ant2) where the antenna indices are such that ant2 > ant1
+  - using this definition of a baseline, a visibility (for a point source) is V(u,v) = I*exp(-2*pi*(ul+vm))
+  - this means that if a baseline is defined as (ant2-ant1),
+    then the exponent in the exponential must be +2pi, not -2pi
+
+  This writer does NOT do any reformatting of data to/from the de-facto standard. It is up to the user of this
+  code to encode/decode visibilities as appropriate before the reader/writer is called.
+*/
 
 #include <stdio.h>
 #include <string.h>
@@ -15,19 +34,17 @@ For the FITS-IDI format, see: http://www.aips.nrao.edu/FITS-IDI.html
 #include "slalib.h"
 #include "uvfits.h"
 
-#define NAXIS 6
-#define N_CTYPES 4
-#define N_GRP_PARAMS 5
 #define MAX_CSIZE 8
 
 /* private function prototypes */
 static int writeAntennaData(fitsfile *fptr, uvdata *data);
+static int writeFQData(fitsfile *fptr, uvdata *data);
 void printHeader(fitsfile *fptr);
 int readAntennaTable(fitsfile *fptr,uvdata *obj);
 int writeSourceData(fitsfile *fptr, uvdata *data);
 
 /* private global vars */
-static int debug=0;
+static int debug=1;
 
 /******************************
  ! NAME:      uvfitsSetDebugLevel(
@@ -114,6 +131,7 @@ int readUVFITSOpenInit(char *filename, uvdata **data, fitsfile **outfptr) {
   }
   obj->n_pol = naxes[2];    // copy across number of pols and freqs
   obj->n_freq = naxes[3];
+  obj->n_IF = 1;
 
   /* examine headers and read the antenna table */
   for(i=1;i<=num_hdu; i++) {
@@ -754,20 +772,46 @@ int writeUVFITSiterator(char *filename, uvdata *data, uvWriteContext **iter) {
   fitsfile *fptr;
   FILE *fp;
   int status=0;
-  long naxes[NAXIS],i;
+  long naxes[7],i;
+  long naxis=6,n_grp_params=5,n_ctypes=4;   // set defaults for single IF data
   float temp;
-  char *ctypes[N_CTYPES] = {"STOKES","FREQ","RA","DEC"},tempstr[40];
-  char *params[N_GRP_PARAMS] = {"UU","VV","WW","BASELINE","DATE"};
+  char tempstr[40],*ctypes[5];
+  char *ctypes_multiIF[5] = {"STOKES","FREQ","IF","RA","DEC"};
+  char *params[6] = {"UU","VV","WW","BASELINE","DATE","FREQSEL"};
   int mon=0,day=0,year=0;
   double jd_day,dtemp=0;
 
+  /* create the iterator context */
+  *iter = calloc(1,sizeof(uvWriteContext));
+  assert(*iter !=NULL);
+
   /* set up for cfitsio interface */
-  naxes[0] = 0;
-  naxes[1] = 3;
-  naxes[2] = data->n_pol;
-  naxes[3] = data->n_freq;
-  naxes[4] = 1;
-  naxes[5] = 1;
+  if (data->n_IF ==0) data->n_IF =1;    // sanity check
+  // If this is multi-IF data, adjust arrays sizes
+  if (data->n_IF > 1) {
+    naxis=7;
+    n_grp_params=6;
+    n_ctypes=5;
+  }
+  (*iter)->n_grp_params = n_grp_params;
+
+  /* here we set the dimensions of the random group data. We exclude the FQ table index if there
+     is only 1 IF to prevent writing redundant indices of 0 in the data and follow miriad's format */
+  i=0;
+  naxes[i++] = 0;     // indicates this is random group data
+  naxes[i++] = 3;     // 
+  naxes[i++] = data->n_pol;
+  naxes[i++] = data->n_freq;
+  if (data->n_IF > 1) naxes[i++] = data->n_IF;
+  naxes[i++] = 1;
+  naxes[i++] = 1;
+
+  /* set the CTYPE names depending on whether this is multi-IF or not 
+     don't use the "IF" keyword for single IF */
+  for (i=0; i< 5; i++) ctypes[i] = ctypes_multiIF[i];   // default, copy all over in place
+  if (data->n_IF < 2) {
+    for (i=2; i< 4; i++) ctypes[i] = ctypes_multiIF[i+1];   // move RA and DEC up one place to remove "IF"
+  }
 
   if (data->n_baselines[0] <1) {
     fprintf(stderr,"There are no baselines.\n");
@@ -777,10 +821,6 @@ int writeUVFITSiterator(char *filename, uvdata *data, uvWriteContext **iter) {
     fprintf(stderr,"writeUVFITSiterator: empty file name\n");
     return 1;
   }
-
-  /* create the iterator context */
-  *iter = calloc(1,sizeof(uvWriteContext));
-  assert(*iter !=NULL);
 
   /* open the file after checking to see if it already exists and clobbering */
   if ((fp=fopen(filename,"r"))!=NULL) {
@@ -797,10 +837,10 @@ int writeUVFITSiterator(char *filename, uvdata *data, uvWriteContext **iter) {
      of visibilities per time sample including all pols and channels. The group consists of:
      1- the (N_GRP_PARAMS) preamble of: U,V,W (nanoseconds),baseline (see below), time offset (days)
      2- the vis data as real,imag,weight for pol1, real,imag,weight for pol2 etc
-     for each pol, then repeated for each freq channel */
-  /* using this function creates the keywords PCOUNT=5,GROUPS=T and GCOUNT=data->n_baselines.
-     GCOUNT must be incremented for each new write? */
-  fits_write_grphdr(fptr,TRUE,FLOAT_IMG,NAXIS,naxes,N_GRP_PARAMS,data->n_baselines[0],TRUE,&status);
+     for each pol, then repeated for each freq channel.
+     optionally another block of vis data for channels in the Nth IF for multi-IF data */
+  /* using this function with a single IF creates the keywords PCOUNT=5,GROUPS=T and GCOUNT=data->n_baselines. */
+  fits_write_grphdr(fptr,TRUE,FLOAT_IMG,naxis,naxes,n_grp_params,data->n_baselines[0],TRUE,&status);
 
   /* Write a keyword; must pass pointers to values */
   fits_update_key(fptr,TSTRING, "OBJECT", data->source->name, NULL, &status);
@@ -814,6 +854,8 @@ int writeUVFITSiterator(char *filename, uvdata *data, uvWriteContext **iter) {
   /* the following is a fix for an AIPS bug. Technically, shouldn't need it */
   temp=1.0;
   fits_update_key(fptr,TFLOAT, "BSCALE", &temp, NULL, &status);
+  temp=0.0;
+//  fits_update_key(fptr,TFLOAT, "BZERO", &temp, NULL, &status);
 
   /* get the JD of the first obs. Then truncate the time within the day.
      The times associated with the visibilities are then increments to
@@ -825,8 +867,8 @@ int writeUVFITSiterator(char *filename, uvdata *data, uvWriteContext **iter) {
   fits_update_key(fptr,TSTRING, "DATE-OBS", tempstr , NULL, &status);
 
   /* UV parameters */
-  /* this sets the UU,VV,WW,BASELINE and DATE header params */
-  for (i=0; i<N_GRP_PARAMS; i++) {
+  /* this sets the UU,VV,WW,BASELINE, DATE and optionally FREQSEL header params */
+  for (i=0; i<n_grp_params; i++) {
     sprintf(tempstr,"PTYPE%d",(int)i+1);
     fits_update_key(fptr,TSTRING, tempstr, params[i] , NULL, &status);
     sprintf(tempstr,"PSCAL%d",(int)i+1);
@@ -841,15 +883,15 @@ int writeUVFITSiterator(char *filename, uvdata *data, uvWriteContext **iter) {
   fits_update_key(fptr,TDOUBLE,tempstr,&((*iter)->jd_day_trunc), NULL, &status);
 
   /* write the coord system keywords CRVAL, CRPIX, CDELT, CTYPE.*/
+  // CTYPE2 is always fixed as below for uvfits data 
   temp=1.0;
   fits_update_key(fptr,TFLOAT, "CRVAL2", &temp , NULL, &status);
   fits_update_key(fptr,TFLOAT, "CRPIX2", &temp , NULL, &status);
   fits_update_key(fptr,TFLOAT, "CDELT2", &temp , NULL, &status);
   fits_update_key(fptr,TSTRING,"CTYPE2", "COMPLEX" , NULL, &status);
 
-  for (i=0; i<N_CTYPES; i++){
-    /* this fills in the CRVAL etc arrays with some generic values, then
-       specific cases are updated below. */
+  for (i=0; i<n_ctypes; i++){
+    /* this fills in the CRVAL etc arrays with some generic values, then specific cases are updated below. */
     sprintf(tempstr,"CTYPE%d",(int)i+3);
     fits_update_key(fptr,TSTRING, tempstr, ctypes[i] , NULL, &status);
     sprintf(tempstr,"CRVAL%d",(int)i+3);
@@ -913,6 +955,18 @@ int writeUVFITSfinalise(uvWriteContext *iter, uvdata *data) {
     fprintf(stderr,"ERROR: writeAntennaData failed with status %d\n",status);
   }
 
+  /* if this is multi-IF data, create and write the FQ table */
+  if (data->n_IF > 1) {
+    if(debug) {
+      fprintf(stdout,"Writing FQ table\n");
+      fflush(stdout);
+    }
+    status=writeFQData(iter->fptr, data);
+    if (status !=0) {
+      fprintf(stderr,"ERROR: writeAntennaData failed with status %d\n",status);
+    }
+  }
+
   /* tidy up */
   fits_close_file(iter->fptr, &status);            /* close the file */
   fits_report_error(stderr, status);  /* print out any error messages */
@@ -937,7 +991,7 @@ int writeUVinstant(uvWriteContext *iter, uvdata *data, double jd_frac, int i) {
     float  *vis_ptr, *wt_ptr;
     float *array=NULL;
     int nelements,status=0;
-    int l,j,k;
+    int l,j,k,m;
     char msg[80];
 
     /* sanity checks */
@@ -950,10 +1004,10 @@ int writeUVinstant(uvWriteContext *iter, uvdata *data, double jd_frac, int i) {
                         jd_frac,i,iter->ntimes, iter->ngroups);
 
     /* magic number 3 here matches naxes[1] from above. */
-    nelements = 3*data->n_pol*data->n_freq*data->n_baselines[i];
-    array = malloc((nelements+N_GRP_PARAMS)*sizeof(float));
+    nelements = 3*data->n_pol*data->n_freq*data->n_IF;
+    array = malloc((nelements+iter->n_grp_params)*sizeof(float));
     if(array==NULL) {
-        fprintf(stderr,"writeUVinstant: no malloc\n");
+        fprintf(stderr,"writeUVinstant: no malloc for %ld floats\n",nelements+iter->n_grp_params);
         exit(EXIT_FAILURE);
     }
 
@@ -963,6 +1017,8 @@ int writeUVinstant(uvWriteContext *iter, uvdata *data, double jd_frac, int i) {
     vis_ptr = data->visdata[i];
     wt_ptr = data->weightdata[i];
     for(l=0; l<data->n_baselines[i]; l++) {
+      long out_ind,inp_ind;
+
       array[0] = u_ptr[l];
       array[1] = v_ptr[l];
       array[2] = w_ptr[l];
@@ -971,16 +1027,24 @@ int writeUVinstant(uvWriteContext *iter, uvdata *data, double jd_frac, int i) {
       /* last, the time offset */
       array[4] = jd_frac;
 
-      for (j=0; j<data->n_freq; j++){
-        for (k=0; k<data->n_pol; k++) {
-            array[(j*data->n_pol*3)+(k*3)  +N_GRP_PARAMS] = vis_ptr[(l*data->n_freq*data->n_pol+j*data->n_pol+k)*2  ];   /* real part */
-            array[(j*data->n_pol*3)+(k*3)+1+N_GRP_PARAMS] = vis_ptr[(l*data->n_freq*data->n_pol+j*data->n_pol+k)*2+1]; /* imag part */
-            array[(j*data->n_pol*3)+(k*3)+2+N_GRP_PARAMS] = wt_ptr[l*data->n_freq*data->n_pol+j*data->n_pol+k];  /* weight */
+      for (m=0; m<data->n_IF; m++){
+        for (j=0; j<data->n_freq; j++){
+          for (k=0; k<data->n_pol; k++) {
+//              inp_ind = l*data->n_freq*data->n_pol + j*data->n_pol + k;
+//              out_ind = (j*data->n_pol*3)+(k*3) + iter->n_grp_params;
+              inp_ind = k + data->n_pol*(j + data->n_freq*(m + data->n_IF*l));  // include IF index
+                // we write 1 baseline at a time, so no l index for output
+              out_ind = 3*(k+ data->n_pol*(j + data->n_freq*(m))) + iter->n_grp_params; 
+
+              array[out_ind  ] = vis_ptr[(inp_ind)*2  ];    /* real part */
+              array[out_ind+1] = vis_ptr[(inp_ind)*2+1];    /* imag part */
+              array[out_ind+2] = wt_ptr[inp_ind];           /* weight */
+          }
         }
       }
-      /* Write each vis batch as a "random group" including 5 extra params at the front */
+      /* Write each vis batch as a "random group" including n_grp_params extra params at the front */
       /* the starting index must be 1, not 0.  fortran style. also for the vis index */
-      fits_write_grppar_flt(iter->fptr,(iter->ngroups)+1,1,3*data->n_pol*data->n_freq+N_GRP_PARAMS, array, &status);
+      fits_write_grppar_flt(iter->fptr,(iter->ngroups)+1,1,nelements + iter->n_grp_params, array, &status);
       /*      fprintf(stderr,"write group number: %d\n",i*data->n_baselines+l+1);*/
       fits_report_error(stderr, status);  /* print out any error messages */
       if (status) return status;
@@ -1026,8 +1090,7 @@ int writeAntennaData(fitsfile *fptr, uvdata *data) {
 
   if (debug) fprintf(stdout,"Writing antenna table\n");
 
-  /* convert JD date to Calendar date. I don't think
-     sub-day accuracy is needed here. */
+  /* convert JD date to Calendar date. I don't think sub-day accuracy is needed here. */
   JD_to_Cal(data->date[0],&year,&mon,&day);
 
   /* create a new binary table */
@@ -1090,6 +1153,10 @@ int writeAntennaData(fitsfile *fptr, uvdata *data) {
     fits_write_col_str(fptr,9,i+1,1,1,&ptemp,&status);  /* POLTYB */
     fits_write_col_flt(fptr,10,i+1,1,1,&(data->antennas[i].pol_angleB),&status); /*POLAB */
     fits_write_col_flt(fptr,11,i+1,1,1,&(data->antennas[i].pol_calB),&status); /*POL calB */
+  }
+  if (status) {
+    fprintf(stderr,"Problems writing the AN table\n");
+    fits_report_error(stderr,status);
   }
   return status;
 }
@@ -1459,6 +1526,49 @@ void DecodeBaseline(float blcode, int *b1, int *b2) {
     *b1 = (blcode - *b2)/256;
   }
 }
+
+
+/**************************
+ ! NAME:      writeFQData
+ ! PURPOSE:   write the frequency ("FQ") table in the UVFITS file.
+ ! ARGUMENTS: fptr: an open fits file.
+ !            data: uvdata struct with existing data.
+ ! RETURNS:   integer. 0 success.
+ **************************/
+int writeFQData(fitsfile *fptr, uvdata *data) {
+    double f;
+    int status=0,i, id;
+    int NUM_COLS = 5;
+    char *col_names[] = {"FRQSEL", "IF FREQ", "CH WIDTH", "TOTAL BANDWIDTH", "SIDEBAND"};
+    char *col_format[] = {"1I","1D","1E","1E","1I"};
+    char *col_units[] = {"","Hz","Hz","Hz",""};
+
+    /* create a new binary table */
+    fits_create_tbl(fptr,BINARY_TBL,0, NUM_COLS ,col_names, col_format,col_units,"AIPS FQ", &status);
+
+    /* write table header info: just the number of IFs */
+    fits_update_key(fptr,TINT,"NO_IF", &(data->n_IF), NULL, &status);
+
+    // write data row by row. CFITSIO automatically adjusts the size of the table
+    // Array index is used to create the identifier (index+1 so starts at 1 not 0)
+    // Arg order: fptr, col#, first row, first elem, num elems, value, status
+    // Value is passed as an address, as uses arrays for multiple row writing
+    for(i=0; i<data->n_IF; i++) {
+        // Changed from centre of entire IF to just centre of first channel
+        f = data->fq[i].freq + data->fq[i].chbw/2 - data->cent_freq;
+        //printf("if #%d, f=%f\n", (i+1), f);
+        id = 1;//i+1;
+
+        fits_write_col_int(fptr,1,i+1,1,1,&(id),&status); /* FRQSEL */
+        fits_write_col_dbl(fptr,2,i+1,1,1,&(f), &status); /* IF FREQ */
+        fits_write_col_flt(fptr,3,i+1,1,1,&(data->fq[i].chbw), &status); /* CH WIDTH */
+        fits_write_col_flt(fptr,4,i+1,1,1,&(data->fq[i].bandwidth), &status); /* TOTAL BANDWIDTH */
+        fits_write_col_int(fptr,5,i+1,1,1,&(data->fq[i].sideband), &status); /* SIDEBAND */
+    }
+
+    return status;
+}
+
 
 /***************************
   convert Geodetic lat/lon/height to XYZ coords

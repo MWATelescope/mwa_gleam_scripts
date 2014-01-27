@@ -67,6 +67,7 @@ int main(int argc, char *argv[]) {
         fprintf(stdout,"Chunk %d. Time: %f. baselines: %d\n",chunk++,data_new->date[0],data_new->n_baselines[0]);
     }
     readUVFITSCloseIter(iter);
+    if (res < 0) exit(res);
 
     /* print a few vis values */
     for (i=0; i<10; i++) {
