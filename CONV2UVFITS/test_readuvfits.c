@@ -65,10 +65,10 @@ int main(int argc, char *argv[]) {
     if (res !=0) {
         fprintf(stderr,"readUVFITSInitIterator failed with error %d\n",res);
     }
-    if (debug) fprintf(fpd,"n_vis: %d, n_pol: %d\n",data_new->n_vis,data_new->n_pol);
+    if (debug) fprintf(fpd,"n_vis: %d, n_pol: %d, gcount: %d\n",data_new->n_vis,data_new->n_pol, iter->gcount);
     fflush(stdout);
     while ((res=readUVFITSnextIter(data_new,iter)) ==0) {
-        fprintf(stdout,"Chunk %d. Time: %f. baselines: %d\n",chunk++,data_new->date[0],data_new->n_baselines[0]);
+        fprintf(stdout,"Chunk %d. Time: %f. baselines: %d, grp_index: %d\n",chunk++,data_new->date[0],data_new->n_baselines[0],iter->grp_index);
     }
     if (res != 1) {
         fprintf(stderr,"readUVFITSnextIter returned %d\n",res);
