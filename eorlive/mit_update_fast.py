@@ -58,7 +58,7 @@ def update_mit_counts(fconn):
         for row in fusionrows:
             if(not(int(row[1])==int(row[2]))):
                 print row[1], row[2]
-                conn=psycopg2.connect(database='ngas',user='ngas_ro',host='eor-02.mit.edu',password='ngas$ro')
+                conn=psycopg2.connect(database='ngas',user='ngas_ro',host='ngas.mit.edu',password='ngas$ro')
                 obsid=str(int(row[0]))
                 print obsid
                 cur=conn.cursor()

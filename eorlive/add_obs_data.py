@@ -2,7 +2,8 @@
 import urllib2,urllib,simplejson,sys,httplib,json,pickle,psycopg2,os,traceback,re,subprocess,time
 from mwapy.ephem_utils import GPSseconds_now
 from datetime import datetime
-n_d = 20 
+import numpy as np
+n_d = 2 
 update_d_all=False
 fusionname='/nfs/blank/h4215/aaronew/MWA_Tools/eorlive/FConn.p'
 client_id='1059126630788.apps.googleusercontent.com'
@@ -19,7 +20,7 @@ dbname='mwa'
 user='mwa'
 password='BowTie'
 logfile='/nfs/blank/h4215/aaronew/MWA_Tools/eorlive/FusionConnect.log'
-int_min="20"
+int_min="240"
 
 def write_fail_log(message):
     nowtime=datetime.now()
@@ -152,7 +153,7 @@ class FusionConnector():
         #build a dictionary
         rows_g9 = self.send_eor_query('select starttime, stoptime, projectid from mwa_setting where projectid=\'G0009\'')
         for row in rows_g9:
-            conn=psycopg2.connect(database='ngas',user='ngas_ro',host='eor-02.mit.edu',password='ngas$ro')
+            conn=psycopg2.connect(database='ngas',user='ngas_ro',host='ngas.mit.edu',password='ngas$ro')
             obsid=str(int(row[0]))
             print obsid
             cur=conn.cursor()
@@ -413,43 +414,23 @@ class FusionConnector():
                     print response.status,response.reason
             return (nnew,nupdate)
 #first, get a list of files 
-        '''
-        query = 'DELETE FROM %s'%(obstable_id)
-        self.send_fusion_query('POST',query,{'Content-Length':0})
-        for line in lineiterator:
-            filelist.append(line)
-        for row in rows:
-            obsnum=row[0]
-            obsdate=self.send_eor_query('select timestamp_gps('+str(row[0])+')')
-            dates.append(obsdate[0])
-            durations.append(row[3]-row[2])
-            names.append(row[2])
-            #find number of files
-            files=self.send_eor_query('select count(*) from (select observation_num from data_files where observation_num='+str(obsnum)+') as foo;')
-            mrofiles.append(files[0])
-            #now get mit files
-            p=re.compile('/[0-9]{10}_')
-            fcount=0
-            for line in filelist:
-                m=p.search(line)
-                if(m):
-                    obsid=int(line[m.start()+1:m.end()-1])
-                    if(obsid==int(obsnum)):
-                        fcount+=1
-                        lstr = str(fcount)+' : '+str(line)
-                        print lstr
-                        self.write_log(lstr)
-            mitfiles.append(fcount)
-            print obsdate[0]
-            query = 'INSERT INTO %s (ObsDate,ObsID,MROData,MITData,Duration) VALUES (\'%s\',%s,%s,%s,%s)'%(obstable_id,obsdate[0][0].isoformat(),str(obsnum),str(int(files[0][0])),str(fcount),str(row[3]-row[2]))
-            #now drop table at 
-            self.write_log('sending: '+query)
-            self.send_fusion_query('POST',query,{'Content-Length':0})
-            '''
+
 
 
     def insert_data(self):     
         fail_rates=self.get_fail_rates()
+        query = 'SELECT Duration FROM %s WHERE UVFITS_Files=1'%(obstable_id)
+        response=self.send_fusion_query('GET',query,{})
+       # print response.status,response.reason
+        response=json.loads(response.read())
+        response=response['rows']
+        print response
+        for mm in range(len(response)):
+            response[mm]=float(response[mm][0])
+        response=np.array(response)
+        print response
+        uvtime=round(np.sum(response)/3600,4)
+
         hours_at_mit=self.get_mit_download_time()
         nowtime=GPSseconds_now()
         rows=self.send_eor_query('select starttime, stoptime from mwa_setting where projectid=\'G0009\' and stoptime<'+str(nowtime))
@@ -467,6 +448,7 @@ class FusionConnector():
         fmt = '%Y-%m-%d %H:%M:%S'
         #update all of the derivative entries retroactively 
         if(update_d_all):
+            print 'This should not be happening!'
             query = 'SELECT Hours_Scheduled,Hours_Observed,Hours_At_MIT,ROWID,Date FROM %s ORDER BY Date ASC'%(self.tableid)
             response=self.send_fusion_query('GET',query,{})#get all rows
             print response.status,response.reason
@@ -487,7 +469,7 @@ class FusionConnector():
                 response=self.send_fusion_query('POST',query,{'Content-Length':0})
                 print mm
                 print response.status,response.reason
-        #get the pervious number of hours to compute dhours/dt
+        #get the previous number of hours to compute dhours/dt
         query = 'SELECT Hours_Scheduled,Hours_Observed,Hours_At_MIT,Date FROM %s ORDER BY Date DESC LIMIT 20'%(self.tableid)
         response=self.send_fusion_query('GET',query,{})
         response = json.loads(response.read())
@@ -497,17 +479,14 @@ class FusionConnector():
         dmit = fusionrow[n_d-1][2]
         dt=datetime.strptime(fusionrow[n_d-1][3][:19],fmt)
         dt = (datetime.now()-dt).seconds/3600.
-        
         nowtime=datetime.utcnow()
+        #get the total number of hours converted to uvfits
         #convert to hours/min
-        print str(dmit) + ' ' + str(hours_at_mit)
         dsched = round((totschhours-dsched)/dt,4)
         dobs = round((totobshours-dobs)/dt,4)
         dmit = round((hours_at_mit-dmit)/dt,4)
-        print dmit
-        print dobs
-        print dsched
-        query='INSERT INTO %s (Date,Hours_Observed,Hours_Scheduled,Hours_At_MIT,RxFail1,RxFail2,RxFail3,RxFail4,RxFail5,RxFail6,RxFail7,RxFail8,RxFail9,RxFail10,RxFail11,RxFail12,RxFail13,RxFail14,RxFail15,RxFail16,D_Hours_Observed,D_Hours_Scheduled,D_Hours_At_MIT) VALUES (\'%s\',%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)'%(self.tableid,nowtime.isoformat(' '),str(totobshours),str(totschhours),str(hours_at_mit),str(fail_rates[0]),str(fail_rates[1]),str(fail_rates[2]),str(fail_rates[3]),str(fail_rates[4]),str(fail_rates[5]),str(fail_rates[6]),str(fail_rates[7]),str(fail_rates[8]),str(fail_rates[9]),str(fail_rates[10]),str(fail_rates[11]),str(fail_rates[12]),str(fail_rates[13]),str(fail_rates[14]),str(fail_rates[15]),str(dsched),str(dobs),str(dmit))
+        
+        query='INSERT INTO %s (Date,Hours_Observed,Hours_Scheduled,Hours_At_MIT,RxFail1,RxFail2,RxFail3,RxFail4,RxFail5,RxFail6,RxFail7,RxFail8,RxFail9,RxFail10,RxFail11,RxFail12,RxFail13,RxFail14,RxFail15,RxFail16,D_Hours_Observed,D_Hours_Scheduled,D_Hours_At_MIT,Hours_UVFITS) VALUES (\'%s\',%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)'%(self.tableid,nowtime.isoformat(' '),str(totobshours),str(totschhours),str(hours_at_mit),str(fail_rates[0]),str(fail_rates[1]),str(fail_rates[2]),str(fail_rates[3]),str(fail_rates[4]),str(fail_rates[5]),str(fail_rates[6]),str(fail_rates[7]),str(fail_rates[8]),str(fail_rates[9]),str(fail_rates[10]),str(fail_rates[11]),str(fail_rates[12]),str(fail_rates[13]),str(fail_rates[14]),str(fail_rates[15]),str(dsched),str(dobs),str(dmit),str(uvtime))
         self.send_fusion_query('POST',query,{'Content-Length':0})
 
         

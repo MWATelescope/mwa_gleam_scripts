@@ -35,6 +35,9 @@ void parse_cmdline(const int argc,char * const argv[]) {
               usage(argv[0]);
         }
     }
+    if (infilename==NULL) {
+        usage(argv[0]);
+    }
 }
 
 
@@ -62,17 +65,24 @@ int main(int argc, char *argv[]) {
     if (res !=0) {
         fprintf(stderr,"readUVFITSInitIterator failed with error %d\n",res);
     }
+    if (debug) fprintf(fpd,"n_vis: %d, n_pol: %d\n",data_new->n_vis,data_new->n_pol);
     fflush(stdout);
     while ((res=readUVFITSnextIter(data_new,iter)) ==0) {
         fprintf(stdout,"Chunk %d. Time: %f. baselines: %d\n",chunk++,data_new->date[0],data_new->n_baselines[0]);
     }
+    if (res != 1) {
+        fprintf(stderr,"readUVFITSnextIter returned %d\n",res);
+        exit(1);
+    }
     readUVFITSCloseIter(iter);
     if (res < 0) exit(res);
+
+    if (debug) fprintf(fpd,"There are %d baselines\n",data_new->n_baselines[0]);
 
     /* print a few vis values */
     for (i=0; i<10; i++) {
         int f,p;
-        fprintf(stdout,"u,v,w: %g,%g,%g. Baseline: %f.\n",data_new->u[0][0],data_new->v[0][0],data_new->w[0][0],data_new->baseline[0][0]);
+        fprintf(stdout,"u,v,w: %g,%g,%g. Baseline: %f.\n",data_new->u[0][i],data_new->v[0][i],data_new->w[0][i],data_new->baseline[0][i]);
         for (f=0; f<data_new->n_freq; f++) {
             fprintf(stdout,"Freq %g ",data_new->cent_freq +data_new->freq_delta*(f-data_new->n_freq/2));
             for(p=0; p<data_new->n_pol; p++) {
