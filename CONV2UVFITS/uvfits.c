@@ -903,8 +903,8 @@ int writeUVFITSiterator(char *filename, uvdata *data, uvWriteContext **iter) {
     dtemp = data->source->ra*15.0;    // FITS uses degrees for all angles
     fits_update_key(fptr,TDOUBLE, "OBSRA", &dtemp, NULL, &status);
     fits_update_key(fptr,TDOUBLE, "OBSDEC", &(data->source->dec), NULL, &status);
-    fits_update_key(fptr,TSTRING, "TELESCOP", "MWA" , NULL, &status);
-    fits_update_key(fptr,TSTRING, "INSTRUME", "128T" , NULL, &status);
+    fits_update_key(fptr,TSTRING, "TELESCOP", data->array->name, NULL, &status);
+    fits_update_key(fptr,TSTRING, "INSTRUME", data->array->instrument , NULL, &status);
     temp=2000.0;
     fits_update_key(fptr,TFLOAT, "EPOCH", &temp, NULL, &status);
     /* the following is a fix for an AIPS bug. Technically, shouldn't need it */

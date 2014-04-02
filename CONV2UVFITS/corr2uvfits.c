@@ -27,6 +27,7 @@ $Date: 2011-10-18 22:53:40 +0800 (Tue, 18 Oct 2011) $:    Date of last commit
 #define MWA_HGT 377               // Array altitude. meters above sea level
 #define EARTH_RAD 6378100.0       // meters
 #define SIZ_PRODNAME 8            // size of char array with text type of pol products.
+#define SIZ_TELNAME  8            // size of char with text for telescope and instrument names
 #define VLIGHT 299792458.0        // speed of light. m/s
 #define AUTOFLAG_N_NEIGHBOURS 3   // number of neighbours to use to form a median for channel flagging.
 #define VEL_FACTOR  1.204         // the velocity factor of electic fields in RG-6 like coax.
@@ -51,6 +52,8 @@ typedef struct _header {
     float   ref_second;
     char    field_name[SIZE_SOURCE_NAME+1];
     char    pol_products[SIZ_PRODNAME+1];
+    char    telescope[SIZ_TELNAME+1];
+    char    instrument[SIZ_TELNAME+1];
 } Header;
 
 typedef struct {
@@ -1076,6 +1079,9 @@ int readHeader(char *header_filename, Header *header) {
     header->ref_minute=0;
     header->ref_second=0;
     memset(header->field_name,0,SIZE_SOURCE_NAME+1);
+    strcpy(header->telescope,"MWA");
+    header->telescope[SIZ_TELNAME]='\0';
+    header->instrument[SIZ_TELNAME]='\0';
     header->invert_freq = 0;    // correlators have now been fixed
     header->conjugate = 0;      // just in case.
     header->geom_correct = 1;   // default, stop the fringes
@@ -1087,6 +1093,8 @@ int readHeader(char *header_filename, Header *header) {
             fprintf(stderr,"WARNING: failed to make 2 conversions on line: %s\n",line);
         }
         if (strncmp(key,"FIELDNAME",MAX_LINE)==0) strncpy(header->field_name,value,SIZE_SOURCE_NAME);
+        if (strncmp(key,"TELESCOPE",MAX_LINE)==0) strncpy(header->telescope,value,SIZ_TELNAME);
+        if (strncmp(key,"INSTRUMENT",MAX_LINE)==0) strncpy(header->instrument,value,SIZ_TELNAME);
         if (strncmp(key,"N_SCANS",MAX_LINE)==0) header->n_scans = atoi(value);
         if (strncmp(key,"N_INPUTS",MAX_LINE)==0) header->n_inputs = atoi(value);
         if (strncmp(key,"N_CHANS",MAX_LINE)==0) header->n_chans = atoi(value);
@@ -1122,26 +1130,26 @@ int readHeader(char *header_filename, Header *header) {
         header->n_scans=1;
         fprintf(stderr,"WARNING: N_SCANS unspecified. Assuming: %d\n",header->n_scans);
     }
-    if(header->field_name[0] == '\0') strcpy(header->field_name,"TEST_32T");
+    if(header->field_name[0] == '\0') strcpy(header->field_name,"unknown");
     if (header->n_inputs==0) {
-        header->n_inputs=16;
-        fprintf(stderr,"WARNING: N_INPUTS unspecified. Assuming: %d\n",header->n_inputs);
+        fprintf(stderr,"ERROR: N_INPUTS unspecified.\n");
+        return EXIT_FAILURE;
     }
     if (header->n_chans==0) {
-        header->n_chans=128;
-        fprintf(stderr,"WARNING: N_CHANS unspecified. Assuming: %d\n",header->n_chans);
+        fprintf(stderr,"ERROR: N_CHANS unspecified. \n");
+        return EXIT_FAILURE;
     }
     if (header->corr_type=='N') {
         header->corr_type='B';
         fprintf(stderr,"WARNING: CORRTYPE unspecified. Assuming: %c\n",header->corr_type);
     }
     if (header->integration_time==0) {
-        header->integration_time=10.0;
-        fprintf(stderr,"WARNING: INT_TIME unspecified. Assuming: %g seconds\n",header->integration_time);
+        fprintf(stderr,"ERROR: INT_TIME unspecified.\n");
+        return EXIT_FAILURE;
     }
     if (header->bandwidth==0) {
-        header->bandwidth=1.28;
-        fprintf(stderr,"WARNING: BANDWIDTH unspecified. Assuming: %g MHz\n",header->bandwidth);
+        fprintf(stderr,"ERROR: BANDWIDTH unspecified.\n");
+        return EXIT_FAILURE;
     }
     if (header->cent_freq==0) {
         fprintf(stderr,"ERROR: FREQCENT unspecified. There is no default.\n");
@@ -1190,7 +1198,7 @@ void initData(uvdata *data) {
   data->visdata=NULL;
   data->pol_type=1;    /* default is Stokes pol products */
   data->array->n_ant=0;
-  strcpy(data->array->name,"MWA");
+  strcpy(data->array->name,"UNKNOWN");
 }
 
 
@@ -1204,6 +1212,8 @@ int applyHeader(Header *header, uvdata *data) {
   data->n_freq = header->n_chans;
   data->cent_freq = header->cent_freq*1e6;
   data->freq_delta = header->bandwidth/(header->n_chans)*1e6*(header->invert_freq ? -1.0: 1.0);
+  strncpy(data->array->name,header->telescope,SIZ_TELNAME);
+  strncpy(data->array->instrument,header->instrument,SIZ_TELNAME);
 
   /* discover how many pol products there are */
   createPolIndex(header->pol_products, pol_index);
