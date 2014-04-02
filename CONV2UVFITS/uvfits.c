@@ -43,6 +43,8 @@ void printHeader(fitsfile *fptr);
 int readAntennaTable(fitsfile *fptr,uvdata *obj);
 int writeSourceData(fitsfile *fptr, uvdata *data);
 int readFQTable(fitsfile *fptr,uvdata *obj);
+int readUVFITSOpenInit(char *filename, uvdata **data, fitsfile **outfptr);
+void addGroupRow(uvdata *obj, uvReadContext *iter);
 
 /* private global vars */
 static int debug=0;
@@ -1002,6 +1004,11 @@ int writeUVFITSfinalise(uvWriteContext *iter, uvdata *data) {
       fflush(stdout);
     }
 
+    if (iter==NULL || iter->fptr==NULL) {
+        fprintf(stderr,"writeUVFITSfinalise ERROR: invalid uvWriteContext structure\n");
+        return EXIT_FAILURE;
+    }
+
     /* create and write the antenna table */
     status = writeAntennaData(iter->fptr, data);
     if (status !=0) {
@@ -1049,19 +1056,24 @@ int writeUVinstant(uvWriteContext *iter, uvdata *data, double jd_frac, int i) {
 
     /* sanity checks */
     if (data->n_pol <1 || data->n_freq < 1 || data->n_baselines[i] < 1) {
-        fprintf(stderr,"ERROR: npols %d, nfreqs %d and n_baselines %d all must be > 0 at time index %d\n",
-                        data->n_pol, data->n_freq, data->n_baselines[i],i);
+        fprintf(stderr,"%s ERROR: npols %d, nfreqs %d and n_baselines %d all must be > 0 at time index %d\n",
+                        __func__,data->n_pol, data->n_freq, data->n_baselines[i],i);
+        return EXIT_FAILURE;
+    }
+    if (iter->fptr==NULL || iter->n_grp_params==0) {
+        fprintf(stderr,"%s ERROR: uvWriteContext is invalid\n",__func__);
         return EXIT_FAILURE;
     }
 
-    if (debug) fprintf(stdout,"writeUVinstant: jd: %f, scan: %d. So far ntimes %ld, ngroups %ld\n",
-                        jd_frac,i,iter->ntimes, iter->ngroups);
+    if (debug) fprintf(stdout,"%s: jd: %f, scan: %d, n_grp_params: %d. So far ntimes %ld, ngroups %ld\n",__func__,
+                        jd_frac,i,(int) iter->n_grp_params, iter->ntimes, iter->ngroups);
 
     /* magic number 3 here matches naxes[1] from above. */
     nelements = 3*data->n_pol*data->n_freq*data->n_IF;
+    assert(nelements > 0);
     array = malloc((nelements+iter->n_grp_params)*sizeof(float));
     if(array==NULL) {
-        fprintf(stderr,"writeUVinstant: no malloc for %ld floats\n",nelements+iter->n_grp_params);
+        fprintf(stderr,"%s: no malloc for %ld floats\n",__func__,nelements+iter->n_grp_params);
         exit(EXIT_FAILURE);
     }
 
@@ -1558,7 +1570,7 @@ void freeUVFITSdata(uvdata *data) {
 
 
 /* encode the baseline. Use the miriad convention to handle more than 255 antennas (up to 2048).
-   this is backwards compatible with the standard UVFITS convention */
+   this is backwards compatible with the standard UVFITS convention. Antenna indices start at 1 */
 void EncodeBaseline(int b1, int b2, float *result) {
   if (b2 > 255) {
     *result = b1*2048 + b2 + 65536;
