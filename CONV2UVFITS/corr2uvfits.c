@@ -777,7 +777,7 @@ int readScan(FILE *fp_ac, FILE *fp_cc,int scan_count, Header *header, InpConfig 
         /* populate the visibility arrays */
         for(chan_ind=0; chan_ind<uvdata->n_freq; chan_ind++) {
             double freq,lambda;
-            complex vis,phase=1.0;
+            float complex vis,phase=1.0;
 
             /* calc wavelen for this channel in meters. header freqs are in MHz*/
             freq = (header->cent_freq + (header->invert_freq? -1.0:1.0)*(chan_ind - uvdata->n_freq/2.0)/uvdata->n_freq*header->bandwidth);
