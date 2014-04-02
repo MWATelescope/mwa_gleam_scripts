@@ -505,7 +505,7 @@ int readUVFITS(char *filename, uvdata **data) {
     fitsfile *fptr=NULL;
     int i,j,k,l,status=0,retcode=0,grp_row_size=0,index=0;
     int pcount,gcount,num_bl=0,time_index=0,bl_index=0;
-    int date_pindex=4,uscale_pindex=0,vscale_pindex=1,wscale_pindex=2,fscale_pindex=5,freq_cindex=4;
+    int date_pindex=4,uscale_pindex=0,vscale_pindex=1,wscale_pindex=2,freq_cindex=4;
     int if_cindex=3;
     char temp[84];
     char *ptype[MAX_CSIZE],*ctype[MAX_CSIZE];
@@ -575,7 +575,8 @@ int readUVFITS(char *filename, uvdata **data) {
             wscale_pindex = i;
         }
         if (strncmp("FREQSEL",ptype[i],7)==0) {
-            fscale_pindex = i;
+        /* FIXME: this is unfinished for the multi IF case */
+//            fscale_pindex = i;
         }
 
         if(debug) fprintf(stdout,"PZERO%d: %f, PSCAL%d: %g, PTYPE%d: %s\n",i+1,pzero[i],i+1,pscal[i],i+1,ptype[i]);
