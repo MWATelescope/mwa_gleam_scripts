@@ -43,6 +43,8 @@ void printHeader(fitsfile *fptr);
 int readAntennaTable(fitsfile *fptr,uvdata *obj);
 int writeSourceData(fitsfile *fptr, uvdata *data);
 int readFQTable(fitsfile *fptr,uvdata *obj);
+int readUVFITSOpenInit(char *filename, uvdata **data, fitsfile **outfptr);
+void addGroupRow(uvdata *obj, uvReadContext *iter);
 
 /* private global vars */
 static int debug=0;
@@ -503,7 +505,7 @@ int readUVFITS(char *filename, uvdata **data) {
     fitsfile *fptr=NULL;
     int i,j,k,l,status=0,retcode=0,grp_row_size=0,index=0;
     int pcount,gcount,num_bl=0,time_index=0,bl_index=0;
-    int date_pindex=4,uscale_pindex=0,vscale_pindex=1,wscale_pindex=2,fscale_pindex=5,freq_cindex=4;
+    int date_pindex=4,uscale_pindex=0,vscale_pindex=1,wscale_pindex=2,freq_cindex=4;
     int if_cindex=3;
     char temp[84];
     char *ptype[MAX_CSIZE],*ctype[MAX_CSIZE];
@@ -573,7 +575,8 @@ int readUVFITS(char *filename, uvdata **data) {
             wscale_pindex = i;
         }
         if (strncmp("FREQSEL",ptype[i],7)==0) {
-            fscale_pindex = i;
+        /* FIXME: this is unfinished for the multi IF case */
+//            fscale_pindex = i;
         }
 
         if(debug) fprintf(stdout,"PZERO%d: %f, PSCAL%d: %g, PTYPE%d: %s\n",i+1,pzero[i],i+1,pscal[i],i+1,ptype[i]);
@@ -900,8 +903,8 @@ int writeUVFITSiterator(char *filename, uvdata *data, uvWriteContext **iter) {
     dtemp = data->source->ra*15.0;    // FITS uses degrees for all angles
     fits_update_key(fptr,TDOUBLE, "OBSRA", &dtemp, NULL, &status);
     fits_update_key(fptr,TDOUBLE, "OBSDEC", &(data->source->dec), NULL, &status);
-    fits_update_key(fptr,TSTRING, "TELESCOP", "MWA" , NULL, &status);
-    fits_update_key(fptr,TSTRING, "INSTRUME", "128T" , NULL, &status);
+    fits_update_key(fptr,TSTRING, "TELESCOP", data->array->name, NULL, &status);
+    fits_update_key(fptr,TSTRING, "INSTRUME", data->array->instrument , NULL, &status);
     temp=2000.0;
     fits_update_key(fptr,TFLOAT, "EPOCH", &temp, NULL, &status);
     /* the following is a fix for an AIPS bug. Technically, shouldn't need it */
@@ -1002,6 +1005,11 @@ int writeUVFITSfinalise(uvWriteContext *iter, uvdata *data) {
       fflush(stdout);
     }
 
+    if (iter==NULL || iter->fptr==NULL) {
+        fprintf(stderr,"writeUVFITSfinalise ERROR: invalid uvWriteContext structure\n");
+        return EXIT_FAILURE;
+    }
+
     /* create and write the antenna table */
     status = writeAntennaData(iter->fptr, data);
     if (status !=0) {
@@ -1049,19 +1057,24 @@ int writeUVinstant(uvWriteContext *iter, uvdata *data, double jd_frac, int i) {
 
     /* sanity checks */
     if (data->n_pol <1 || data->n_freq < 1 || data->n_baselines[i] < 1) {
-        fprintf(stderr,"ERROR: npols %d, nfreqs %d and n_baselines %d all must be > 0 at time index %d\n",
-                        data->n_pol, data->n_freq, data->n_baselines[i],i);
+        fprintf(stderr,"%s ERROR: npols %d, nfreqs %d and n_baselines %d all must be > 0 at time index %d\n",
+                        __func__,data->n_pol, data->n_freq, data->n_baselines[i],i);
+        return EXIT_FAILURE;
+    }
+    if (iter->fptr==NULL || iter->n_grp_params==0) {
+        fprintf(stderr,"%s ERROR: uvWriteContext is invalid\n",__func__);
         return EXIT_FAILURE;
     }
 
-    if (debug) fprintf(stdout,"writeUVinstant: jd: %f, scan: %d. So far ntimes %ld, ngroups %ld\n",
-                        jd_frac,i,iter->ntimes, iter->ngroups);
+    if (debug) fprintf(stdout,"%s: jd: %f, scan: %d, n_grp_params: %d. So far ntimes %ld, ngroups %ld\n",__func__,
+                        jd_frac,i,(int) iter->n_grp_params, iter->ntimes, iter->ngroups);
 
     /* magic number 3 here matches naxes[1] from above. */
     nelements = 3*data->n_pol*data->n_freq*data->n_IF;
+    assert(nelements > 0);
     array = malloc((nelements+iter->n_grp_params)*sizeof(float));
     if(array==NULL) {
-        fprintf(stderr,"writeUVinstant: no malloc for %ld floats\n",nelements+iter->n_grp_params);
+        fprintf(stderr,"%s: no malloc for %ld floats\n",__func__,nelements+iter->n_grp_params);
         exit(EXIT_FAILURE);
     }
 
@@ -1558,7 +1571,7 @@ void freeUVFITSdata(uvdata *data) {
 
 
 /* encode the baseline. Use the miriad convention to handle more than 255 antennas (up to 2048).
-   this is backwards compatible with the standard UVFITS convention */
+   this is backwards compatible with the standard UVFITS convention. Antenna indices start at 1 */
 void EncodeBaseline(int b1, int b2, float *result) {
   if (b2 > 255) {
     *result = b1*2048 + b2 + 65536;
