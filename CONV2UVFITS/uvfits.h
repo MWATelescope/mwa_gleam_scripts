@@ -49,7 +49,8 @@ typedef struct _source_table {
 typedef struct _array_table {
     int   n_ant;
     double xyz_pos[3];    /* the X,Y,Z coord of the array in conventional radio astronomy units */
-    char  name[16];
+    char  name[16];       /* name of the telescope (turns into TELESCOP keyword in fits file */
+    char  instrument[16]; /* name of the instrument (turns into the INSTRUME keyword in fits file */
 } array_data;
 
 typedef struct _fq_table {
