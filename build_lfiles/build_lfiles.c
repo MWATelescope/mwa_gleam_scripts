@@ -298,13 +298,13 @@ int main(int argc, char **argv) {
             }
         }
 
-        if (mode == 0) primary = 0;
-        ihdu += primary;    // the data starts in header ihdu.
-        stophdu = ihdu + nseconds-1;
         /* find out how many HDUs are in each file if we don't want them all */
         status = getHDUsInfo(nfiles,fptr,num_hdus_in_file,datadims);
         if (status) exit(EXIT_FAILURE);
 
+        if (mode == 0) primary = 0;
+        ihdu += primary;    // the data starts in header ihdu.
+        stophdu = ihdu + nseconds-1;
         /* check that there are the same number of HDUs in each file and only extract the amount of time
         that there is actually data for */
         for (ifile=0; ifile < nfiles; ifile++) {
