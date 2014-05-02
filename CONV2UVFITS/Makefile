@@ -11,9 +11,9 @@ SRCDIR=CONV2UVFITS
 
 all: $(TARGETS)
 
-corr2uvfits: corr2uvfits.c uvfits.c libsla.a
+corr2uvfits: corr2uvfits.c convutils.c convutils.h uvfits.c uvfits.h libsla.a
 	ranlib libsla.a
-	cc $(CFLAGS) $(INCS) $(CFITSIO_INCS) -o corr2uvfits corr2uvfits.c uvfits.c $(CFITSIO_LIBS) -lcfitsio -lsla -lm
+	cc $(CFLAGS) $(INCS) $(CFITSIO_INCS) -o corr2uvfits corr2uvfits.c convutils.c uvfits.c $(CFITSIO_LIBS) -lcfitsio -lsla -lm
 
 test_readuvfits: test_readuvfits.c uvfits.c libsla.a
 	ranlib libsla.a
