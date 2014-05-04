@@ -67,8 +67,8 @@ int main(const int argc, char * const argv[]) {
   arraydat = calloc(1,sizeof(array_data));
   antennas = calloc(MAX_ANT,sizeof(ant_table));
   assert(antennas!=NULL && source!=NULL && arraydat!=NULL && data !=NULL);
-  data->antennas = antennas;
   data->array    = arraydat;
+  data->array->antennas = antennas;
   data->source   = source;
   initData(data);
 
@@ -195,6 +195,8 @@ int readScan(FILE *fp_ac, FILE *fp_cc,int scan_count, Header *header, InpConfig 
   static int bl_ind_lookup[MAX_ANT][MAX_ANT], init=0;
   static float vis_weight=1.0;
   static double date_zero=0.0;  // time of zeroth scan
+
+  array_data *array;    /*convenience pointer */
   double ha=0,mjd,lmst,ra_app,dec_app;
   double ant_u[MAX_ANT],ant_v[MAX_ANT],ant_w[MAX_ANT]; //u,v,w for each antenna, in meters
   double u,v,w,cable_delay=0;
@@ -204,6 +206,8 @@ int readScan(FILE *fp_ac, FILE *fp_cc,int scan_count, Header *header, InpConfig 
   int i,inp1,inp2,ant1,ant2,pol1,pol2,bl_index=0,visindex,pol_ind,chan_ind,n_read;
   int temp,baseline_reverse,scan=0;
   float *visdata=NULL;
+
+  array = uvdata->array;
 
   /* allocate space to read binary correlation data. Size is complex float * n_channels */
   visdata = calloc(2*uvdata->n_freq,sizeof(float));
@@ -341,11 +345,11 @@ int readScan(FILE *fp_ac, FILE *fp_cc,int scan_count, Header *header, InpConfig 
     fprintf(fpd,"ha, ha2000 (radians): %f %f\n",ha,ha2000);
   }
   /* calc u,v,w at phase center and reference for all antennas relative to center of array */
-  for(i=0; i<uvdata->array->n_ant; i++) {
+  for(i=0; i<array->n_ant; i++) {
     // double x,y,z;   /* moved to front of this function (Aug. 12, 2011) */
-      x = uvdata->antennas[i].xyz_pos[0];
-      y = uvdata->antennas[i].xyz_pos[1];
-      z = uvdata->antennas[i].xyz_pos[2];
+      x = array->antennas[i].xyz_pos[0];
+      y = array->antennas[i].xyz_pos[1];
+      z = array->antennas[i].xyz_pos[2];
       /* value of lmst at current epoch - will be changed to effective value in J2000 system 
        * 
        * To do this, need to precess "ra, dec" (in quotes on purpose) of array center

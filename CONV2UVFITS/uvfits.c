@@ -40,7 +40,7 @@
 static int writeAntennaData(fitsfile *fptr, uvdata *data);
 static int writeFQData(fitsfile *fptr, uvdata *data);
 void printHeader(fitsfile *fptr);
-int readAntennaTable(fitsfile *fptr,uvdata *obj);
+int readAntennaTable(fitsfile *fptr,array_data *array);
 int writeSourceData(fitsfile *fptr, uvdata *data);
 int readFQTable(fitsfile *fptr,uvdata *obj);
 int readUVFITSOpenInit(char *filename, uvdata **data, fitsfile **outfptr);
@@ -130,7 +130,7 @@ int readUVFITSOpenInit(char *filename, uvdata **data, fitsfile **outfptr) {
     obj->w=NULL;
     obj->n_baselines=NULL;
     obj->source = calloc(1,sizeof(source_table)); /* no source table yet... */
-    obj->array = NULL; /* array table created in readAntennaTable */
+    obj->array = calloc(1,sizeof(array_data)); /* data filled in in readAntennaTable */
     obj->date = calloc(1,sizeof(double));
     if (obj->source==NULL || obj->date==NULL) {
         fprintf(stderr,"readUVFITSOpenInit: no malloc for source table\n");
@@ -166,7 +166,7 @@ int readUVFITSOpenInit(char *filename, uvdata **data, fitsfile **outfptr) {
         fits_read_key(fptr,TSTRING,"EXTNAME",temp,NULL,&status);
         if (status == 0 && strncmp(temp,"AIPS AN",7)==0) {
             if(debug) printf("AN table is in HDU %d\n",i);
-            status = readAntennaTable(fptr,obj);
+            status = readAntennaTable(fptr,obj->array);
             if (status) return status;
         }
         if (status == 0 && strncmp(temp,"AIPS FQ",7)==0) {
@@ -1145,6 +1145,7 @@ int writeSourceData(fitsfile *fptr, uvdata *data) {
  **************************/
 int writeAntennaData(fitsfile *fptr, uvdata *data) {
 
+    array_data *array;
     int status=0,i,itemp=0,year,mon,day;
     double temp=0,mjd;
     char *ptemp;
@@ -1156,6 +1157,8 @@ int writeAntennaData(fitsfile *fptr, uvdata *data) {
     char tempstr[80];
 
     if (debug) fprintf(stdout,"Writing antenna table\n");
+
+    array = data->array;
 
     /* convert JD date to Calendar date. I don't think sub-day accuracy is needed here. */
     JD_to_Cal(data->date[0],&year,&mon,&day);
@@ -1204,22 +1207,22 @@ int writeAntennaData(fitsfile *fptr, uvdata *data) {
     }
 
     /* write data row by row. CFITSIO automatically adjusts the size of the table */
-    for(i=0; i<data->array->n_ant; i++) {
-        ptemp = data->antennas[i].name; /* need this to get a **char in the next line */
+    for(i=0; i < array->n_ant; i++) {
+        ptemp = array->antennas[i].name; /* need this to get a **char in the next line */
         fits_write_col(fptr,TSTRING,1,i+1,1,1,&ptemp, &status);  /* ANNAME */
-        fits_write_col_dbl(fptr,2,i+1,1,3,data->antennas[i].xyz_pos, &status); /* STABXYZ */
+        fits_write_col_dbl(fptr,2,i+1,1,3,array->antennas[i].xyz_pos, &status); /* STABXYZ */
         itemp = i+1;
         fits_write_col_int(fptr,3,i+1,1,1,&itemp,&status);  /* NOSTA */
-        itemp = data->antennas[i].mount_type;
+        itemp = array->antennas[i].mount_type;
         fits_write_col_int(fptr,4,i+1,1,1,&itemp,&status);  /* MNTSTA */
-        ptemp = data->antennas[i].pol_typeA;
+        ptemp = array->antennas[i].pol_typeA;
         fits_write_col_str(fptr,6,i+1,1,1,&ptemp,&status);  /* POLTYA */
-        fits_write_col_flt(fptr,7,i+1,1,1,&(data->antennas[i].pol_angleA),&status); /* POLAA */
-        fits_write_col_flt(fptr,8,i+1,1,1,&(data->antennas[i].pol_calA),&status); /* POL calA */
-        ptemp = data->antennas[i].pol_typeB;
+        fits_write_col_flt(fptr,7,i+1,1,1,&(array->antennas[i].pol_angleA),&status); /* POLAA */
+        fits_write_col_flt(fptr,8,i+1,1,1,&(array->antennas[i].pol_calA),&status); /* POL calA */
+        ptemp = array->antennas[i].pol_typeB;
         fits_write_col_str(fptr,9,i+1,1,1,&ptemp,&status);  /* POLTYB */
-        fits_write_col_flt(fptr,10,i+1,1,1,&(data->antennas[i].pol_angleB),&status); /*POLAB */
-        fits_write_col_flt(fptr,11,i+1,1,1,&(data->antennas[i].pol_calB),&status); /*POL calB */
+        fits_write_col_flt(fptr,10,i+1,1,1,&(array->antennas[i].pol_angleB),&status); /*POLAB */
+        fits_write_col_flt(fptr,11,i+1,1,1,&(array->antennas[i].pol_calB),&status); /*POL calB */
     }
     if (status) {
         fprintf(stderr,"Problems writing the AN table\n");
@@ -1319,15 +1322,15 @@ void printUVData(uvdata *data,FILE *fp) {
  !            fp: open file pointer. can be "stderr" or "stdout".
  ! RETURNS:   void
  **************************/
-void printAntennaData(uvdata *data,FILE *fp) {
+void printAntennaData(array_data *array,FILE *fp) {
     int i;
 
-    fprintf(fp,"Array X,Y,Z: %.10g,%.10g,%.10g\n",data->array->xyz_pos[0],data->array->xyz_pos[1],data->array->xyz_pos[2]);
-    for (i=0; i< data->array->n_ant; i++) {
+    fprintf(fp,"Array X,Y,Z: %.10g,%.10g,%.10g\n",array->xyz_pos[0],array->xyz_pos[1],array->xyz_pos[2]);
+    for (i=0; i< array->n_ant; i++) {
         fprintf(fp,"Index: %d, Name: %s, id: %d, XYZ: (%g,%g,%g), Mount: %d\n",
-	        i,data->antennas[i].name, data->antennas[i].station_num, data->antennas[i].xyz_pos[0],
-	        data->antennas[i].xyz_pos[1],data->antennas[i].xyz_pos[2],
-	        data->antennas[i].mount_type);
+	        i,array->antennas[i].name, array->antennas[i].station_num, array->antennas[i].xyz_pos[0],
+	        array->antennas[i].xyz_pos[1],array->antennas[i].xyz_pos[2],
+	        array->antennas[i].mount_type);
     }
 }
 
@@ -1360,7 +1363,7 @@ void printHeader(fitsfile *fptr) {
  !            obj: pointer to existing uvdata struct. Assumes no existing antenna/array data in the struct.
  ! RETURNS:   integer: 0 for success. returns CFITSIO error codes or -1 for memory allocation problems.
  **************************/
-int readAntennaTable(fitsfile *fptr,uvdata *obj) {
+int readAntennaTable(fitsfile *fptr,array_data *array) {
     int status=0,ncols,i,curr_col;
     long nrows;
     char **str_names=NULL;
@@ -1375,22 +1378,25 @@ int readAntennaTable(fitsfile *fptr,uvdata *obj) {
     if (debug) printf("AN table has %d rows, %d columns\n",(int)nrows,ncols);
 
     /* make space for 'array' struct and an array of antenna structs */
-    if (obj->array==NULL) obj->array = calloc(1,sizeof(array_data));
-    if(obj->antennas != NULL) {
+    if (array==NULL) {
+        fprintf(stderr,"array is NULL. You forgot to malloc it\n");
+        return 1;
+    }
+    if(array->antennas != NULL) {
         fprintf(stderr,"readAntennaTable WARNING: existing antennas array will be overwritten and lost. This is a memory leak.\n");
     }
-    obj->antennas = calloc(nrows,sizeof(ant_table));
+    array->antennas = calloc(nrows,sizeof(ant_table));
     str_names = calloc(nrows+1,sizeof(char *));
-    if (obj->array==NULL || obj->antennas==NULL || str_names==NULL) {
+    if (array->antennas==NULL || str_names==NULL) {
         fprintf(stderr,"readAntennaTable: no malloc\n");
         status = -1; goto EXIT;
     }
-    obj->array->n_ant = nrows;
+    array->n_ant = nrows;
 
     /* load the array X,Y,Z location */
-    fits_read_key(fptr,TDOUBLE,"ARRAYX",&(obj->array->xyz_pos[0]),NULL,&status);
-    fits_read_key(fptr,TDOUBLE,"ARRAYY",&(obj->array->xyz_pos[1]),NULL,&status);
-    fits_read_key(fptr,TDOUBLE,"ARRAYZ",&(obj->array->xyz_pos[2]),NULL,&status);
+    fits_read_key(fptr,TDOUBLE,"ARRAYX",&(array->xyz_pos[0]),NULL,&status);
+    fits_read_key(fptr,TDOUBLE,"ARRAYY",&(array->xyz_pos[1]),NULL,&status);
+    fits_read_key(fptr,TDOUBLE,"ARRAYZ",&(array->xyz_pos[2]),NULL,&status);
     if (status != 0) {
         fprintf(stderr,"readAntennaTable: status %d reading array XYZ\n",status);
         goto EXIT;
@@ -1399,7 +1405,7 @@ int readAntennaTable(fitsfile *fptr,uvdata *obj) {
     /* get ANNAME */
     /* create pointers to the start of the antenna name arrays as required by CFITSIO */
     for(i=0;i<nrows; i++) {
-        str_names[i] = obj->antennas[i].name;
+        str_names[i] = array->antennas[i].name;
     }
     curr_col = 0;
     fits_get_colnum(fptr,CASEINSEN, "ANNAME", &curr_col, &status);
@@ -1409,7 +1415,7 @@ int readAntennaTable(fitsfile *fptr,uvdata *obj) {
     }
 
     fits_read_col_str(fptr, curr_col ,1, 1, nrows, NULL, str_names, NULL, &status);
-    if (debug)  for (i=0; i<nrows; i++) printf("Antenna %d name: %s\n",i+1,obj->antennas[i].name);
+    if (debug)  for (i=0; i<nrows; i++) printf("Antenna %d name: %s\n",i+1,array->antennas[i].name);
     if (status !=0) {
         fprintf(stderr,"readAntennaTable: status %d reading column ANNAME\n",status);
     }
@@ -1423,9 +1429,9 @@ int readAntennaTable(fitsfile *fptr,uvdata *obj) {
     }
 
     for (i=0; i<nrows; i++) {
-        fits_read_col_dbl(fptr, curr_col ,i+1, 1, 3, 0.0, obj->antennas[i].xyz_pos, NULL, &status);
-        if (debug) printf("Antenna %d pos: %f,%f,%f\n",i+1,obj->antennas[i].xyz_pos[0],
-                         obj->antennas[i].xyz_pos[1],obj->antennas[i].xyz_pos[2]);
+        fits_read_col_dbl(fptr, curr_col ,i+1, 1, 3, 0.0, array->antennas[i].xyz_pos, NULL, &status);
+        if (debug) printf("Antenna %d pos: %f,%f,%f\n",i+1,array->antennas[i].xyz_pos[0],
+                         array->antennas[i].xyz_pos[1],array->antennas[i].xyz_pos[2]);
         if (status !=0) {
             fprintf(stderr,"readAntennaTable: status %d reading column for STABXYZ\n",status);
         }
@@ -1440,8 +1446,8 @@ int readAntennaTable(fitsfile *fptr,uvdata *obj) {
     }
 
     for (i=0; i<nrows; i++) {
-        fits_read_col_int(fptr, curr_col ,i+1, 1, 1, 0, &(obj->antennas[i].station_num), NULL, &status);
-        if (debug) printf("Antenna %d num: %d\n",i+1,obj->antennas[i].station_num);
+        fits_read_col_int(fptr, curr_col ,i+1, 1, 1, 0, &(array->antennas[i].station_num), NULL, &status);
+        if (debug) printf("Antenna %d num: %d\n",i+1,array->antennas[i].station_num);
         if (status !=0) {
             fprintf(stderr,"readAntennaTable: status %d reading column for NOSTA\n",status);
         }
@@ -1456,8 +1462,8 @@ int readAntennaTable(fitsfile *fptr,uvdata *obj) {
     }
 
     for (i=0; i<nrows; i++) {
-        fits_read_col_int(fptr, curr_col ,i+1, 1, 1, 0, &(obj->antennas[i].mount_type), NULL, &status);
-        if (debug) printf("Antenna %d mount type: %d\n",i+1,obj->antennas[i].mount_type);
+        fits_read_col_int(fptr, curr_col ,i+1, 1, 1, 0, &(array->antennas[i].mount_type), NULL, &status);
+        if (debug) printf("Antenna %d mount type: %d\n",i+1,array->antennas[i].mount_type);
         if (status !=0) {
             fprintf(stderr,"readAntennaTable: status %d reading column for MNTSTA\n",status);
         }
@@ -1466,7 +1472,7 @@ int readAntennaTable(fitsfile *fptr,uvdata *obj) {
     /* get POLTYA */
     /* create pointers to the start of the antenna name arrays as required by CFITSIO */
     for(i=0;i<nrows; i++) {
-        str_names[i] = obj->antennas[i].pol_typeA;
+        str_names[i] = array->antennas[i].pol_typeA;
     }
     curr_col = 0;
     fits_get_colnum(fptr,CASEINSEN, "POLTYA", &curr_col, &status);
@@ -1476,7 +1482,7 @@ int readAntennaTable(fitsfile *fptr,uvdata *obj) {
     }
 
     fits_read_col_str(fptr, curr_col ,1, 1, nrows, NULL, str_names, NULL, &status);
-    if (debug)  for (i=0; i<nrows; i++) printf("Antenna %d POLTYA: %s\n",i+1,obj->antennas[i].pol_typeA);
+    if (debug)  for (i=0; i<nrows; i++) printf("Antenna %d POLTYA: %s\n",i+1,array->antennas[i].pol_typeA);
     if (status !=0) {
         fprintf(stderr,"readAntennaTable: status %d reading column POLTYA\n",status);
     }
@@ -1484,7 +1490,7 @@ int readAntennaTable(fitsfile *fptr,uvdata *obj) {
     /* get POLTYB */
     /* create pointers to the start of the antenna name arrays as required by CFITSIO */
     for(i=0;i<nrows; i++) {
-        str_names[i] = obj->antennas[i].pol_typeB;
+        str_names[i] = array->antennas[i].pol_typeB;
     }
     curr_col = 0;
     fits_get_colnum(fptr,CASEINSEN, "POLTYB", &curr_col, &status);
@@ -1494,7 +1500,7 @@ int readAntennaTable(fitsfile *fptr,uvdata *obj) {
     }
 
     fits_read_col_str(fptr, curr_col ,1, 1, nrows, NULL, str_names, NULL, &status);
-    if (debug)  for (i=0; i<nrows; i++) printf("Antenna %d POLTYB: %s\n",i+1,obj->antennas[i].pol_typeB);
+    if (debug)  for (i=0; i<nrows; i++) printf("Antenna %d POLTYB: %s\n",i+1,array->antennas[i].pol_typeB);
     if (status !=0) {
         fprintf(stderr,"readAntennaTable: status %d reading column POLTYB\n",status);
     }
@@ -1508,8 +1514,8 @@ int readAntennaTable(fitsfile *fptr,uvdata *obj) {
     }
 
     for (i=0; i<nrows; i++) {
-        fits_read_col_flt(fptr, curr_col ,i+1, 1, 1, 0, &(obj->antennas[i].pol_angleA), NULL, &status);
-        if (debug) printf("Antenna %d pol angle A: %f\n",i+1,obj->antennas[i].pol_angleA);
+        fits_read_col_flt(fptr, curr_col ,i+1, 1, 1, 0, &(array->antennas[i].pol_angleA), NULL, &status);
+        if (debug) printf("Antenna %d pol angle A: %f\n",i+1,array->antennas[i].pol_angleA);
         if (status !=0) {
             fprintf(stderr,"readAntennaTable: status %d reading column for POLAA\n",status);
         }
@@ -1524,8 +1530,8 @@ int readAntennaTable(fitsfile *fptr,uvdata *obj) {
     }
 
     for (i=0; i<nrows; i++) {
-        fits_read_col_flt(fptr, curr_col ,i+1, 1, 1, 0, &(obj->antennas[i].pol_angleB), NULL, &status);
-        if (debug) printf("Antenna %d pol angle B: %f\n",i+1,obj->antennas[i].pol_angleB);
+        fits_read_col_flt(fptr, curr_col ,i+1, 1, 1, 0, &(array->antennas[i].pol_angleB), NULL, &status);
+        if (debug) printf("Antenna %d pol angle B: %f\n",i+1,array->antennas[i].pol_angleB);
         if (status !=0) {
             fprintf(stderr,"readAntennaTable: status %d reading column for POLAB\n",status);
         }
@@ -1548,7 +1554,7 @@ void freeUVFITSdata(uvdata *data) {
 
   if (data->fq != NULL) free(data->fq);
   if (data->date !=NULL) free(data->date);
-  if (data->antennas!=NULL) free(data->antennas);
+  if (data->array->antennas!=NULL) free(data->array->antennas);
   if (data->array !=NULL) free(data->array);
   if (data->source != NULL) free(data->source);
   if (data->n_baselines !=NULL) free(data->n_baselines);

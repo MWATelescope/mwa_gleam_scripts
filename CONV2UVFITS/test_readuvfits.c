@@ -12,9 +12,9 @@ char *infilename=NULL;
 int debug=0;
 FILE *fpd;
 
-void usage() {
+void usage(char * const argv[]) {
     fprintf(stderr,"Usage:\n");
-    fprintf(stderr,"test_readuvfits <options> -i inputfilename\n");
+    fprintf(stderr,"%s <options> -i inputfilename\n",argv[0]);
     fprintf(stderr,"\t-d debug_level (0=no debugging)\n");
     exit(0);
 }
@@ -32,11 +32,11 @@ void parse_cmdline(const int argc,char * const argv[]) {
             break;
           default:
               fprintf(stderr,"unknown option: %c\n",result);
-              usage(argv[0]);
+              usage(argv);
         }
     }
     if (infilename==NULL) {
-        usage(argv[0]);
+        usage(argv);
     }
 }
 
@@ -47,7 +47,7 @@ int main(int argc, char *argv[]) {
     uvReadContext *iter;
 
     fpd = stderr;
-    if (argc < 2) usage();
+    if (argc < 2) usage(argv);
     parse_cmdline(argc,argv);
 
     // set uvfits debugging output

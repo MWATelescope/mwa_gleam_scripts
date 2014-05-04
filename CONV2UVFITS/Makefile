@@ -5,7 +5,7 @@ CFITSIO_INCS=$(shell pkg-config --silence-errors --cflags cfitsio)
 CFITSIO_LIBS=$(shell pkg-config --silence-errors --libs cfitsio)
 INCS=$(shell python -c "if len('${INCLUDE}')>0:print ' '.join(['-I ' + s for s in '${INCLUDE}'.split(':')])") -L${CFITSLIB} -I${CFITSINC}
 
-TARGETS=corr2uvfits
+TARGETS=corr2uvfits test_readuvfits
 SRCDIR=CONV2UVFITS
 
 
