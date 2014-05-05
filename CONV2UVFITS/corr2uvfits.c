@@ -31,16 +31,17 @@ int applyHeader(Header *header, uvdata *data);
 void checkInputs(Header *header,uvdata *data,InpConfig *inputs);
 
 /* private global vars */
-int debug=0,do_flag=0,lock_pointing=0;
-int pol_index[4];
-FILE *fpd=NULL;
+static int bl_ind_lookup[MAX_ANT][MAX_ANT];
+static int debug=0,do_flag=0,lock_pointing=0;
+static int pol_index[4];
+static FILE *fpd=NULL;
 char *stationfilename="antenna_locations.txt",*outfilename=NULL;
 char *configfilename="instr_config.txt";
 char *header_filename="header.txt";
 char *crosscor_filename=NULL;
 char *autocorr_filename=NULL;
 char *flagfilename=NULL;
-double arr_lat_rad=MWA_LAT*(M_PI/180.0),arr_lon_rad=MWA_LON*(M_PI/180.0),height=MWA_HGT;
+static double arr_lat_rad=MWA_LAT*(M_PI/180.0),arr_lon_rad=MWA_LON*(M_PI/180.0),height=MWA_HGT;
 
 /************************
 ************************/
@@ -122,6 +123,9 @@ int main(const int argc, char * const argv[]) {
   Geodetic2XYZ(arr_lat_rad,arr_lon_rad,height,&(arraydat->xyz_pos[0]),&(arraydat->xyz_pos[1]),&(arraydat->xyz_pos[2]));
   if (debug) fprintf(fpd,"converted array location to XYZ\n");
 
+  /* create correlator->baseline mapping lookup table */
+  assert(makeBaselineLookup(&inputs, &header, data->array, bl_ind_lookup)==0);
+
   /* open the iterator for writing. Need to have set the date in  */
   res = writeUVFITSiterator(outfilename, data, &iter);
   if (res!=0) {
@@ -192,7 +196,7 @@ int main(const int argc, char * const argv[]) {
  ***************************/
 int readScan(FILE *fp_ac, FILE *fp_cc,int scan_count, Header *header, InpConfig *inps, uvdata *uvdata) {
 
-  static int bl_ind_lookup[MAX_ANT][MAX_ANT], init=0;
+  static int init=0;
   static float vis_weight=1.0;
   static double date_zero=0.0;  // time of zeroth scan
 
@@ -219,38 +223,6 @@ int readScan(FILE *fp_ac, FILE *fp_cc,int scan_count, Header *header, InpConfig 
   if (!init) {
     /* count the total number of antennas actually present in the data */
     if (debug) fprintf(fpd,"Init readscan.\n");
-
-    /* make a lookup table for which baseline corresponds to a correlation product */
-    if(header->corr_type=='A') {
-        /* autocorrelations only */
-        for(ant1=0; ant1 < uvdata->array->n_ant; ant1++) {
-          if (checkAntennaPresent(inps,ant1) == 0) continue;
-          if(debug) fprintf(fpd,"AUTO: bl %d is for ant %d\n",bl_index,ant1);
-          bl_ind_lookup[ant1][ant1] = bl_index++;
-      }
-    }
-    else if(header->corr_type=='C') {
-        /* this for cross correlations only */
-        for (ant1=0; ant1 < uvdata->array->n_ant-1; ant1++) {
-          if (checkAntennaPresent(inps,ant1) == 0) continue;
-            for(ant2=ant1+1; ant2 < uvdata->array->n_ant; ant2++) {
-              if (checkAntennaPresent(inps,ant2) == 0) continue;
-              if(debug) fprintf(fpd,"CROSS: bl %d is for ants %d-%d\n",bl_index,ant1,ant2);
-              bl_ind_lookup[ant1][ant2] = bl_index++;
-            }
-        }
-    }
-    else {
-        /* this for auto and cross correlations */
-        for (ant1=0; ant1 < uvdata->array->n_ant; ant1++) {
-          if (checkAntennaPresent(inps,ant1) == 0) continue;
-            for(ant2=ant1; ant2 < uvdata->array->n_ant; ant2++) {
-              if (checkAntennaPresent(inps,ant2) == 0) continue;
-              if(debug) fprintf(fpd,"BOTH: bl %d is for ants %d-%d\n",bl_index,ant1,ant2);
-              bl_ind_lookup[ant1][ant2] = bl_index++;
-            }
-        }
-    }
 
     /* increase size of arrays for the new scan */
     // date and n_baselines should already be allocated

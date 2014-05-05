@@ -777,3 +777,48 @@ void ha_dec_j2000(double rmat[3][3], double lmst, double lat_rad, double ra2000,
   *newlat = nwlat;
 }
 
+
+/**************************
+create a lookup table mapping baselines to correlation product index 
+***************************/
+int makeBaselineLookup(InpConfig *inps, Header *header, array_data *array, int bl_ind_lookup[MAX_ANT][MAX_ANT]) {
+    int ant1,ant2,bl_index=0;
+
+    assert(array != NULL);
+    assert(header != NULL);
+    assert(bl_ind_lookup != NULL);
+
+    /* make a lookup table for which baseline corresponds to a correlation product */
+    if(header->corr_type=='A') {
+        /* autocorrelations only */
+        for(ant1=0; ant1 < array->n_ant; ant1++) {
+          if (checkAntennaPresent(inps,ant1) == 0) continue;
+          if(debug) fprintf(fpd,"AUTO: bl %d is for ant %d\n",bl_index,ant1);
+          bl_ind_lookup[ant1][ant1] = bl_index++;
+      }
+    }
+    else if(header->corr_type=='C') {
+        /* this for cross correlations only */
+        for (ant1=0; ant1 < array->n_ant-1; ant1++) {
+          if (checkAntennaPresent(inps,ant1) == 0) continue;
+            for(ant2=ant1+1; ant2 < array->n_ant; ant2++) {
+              if (checkAntennaPresent(inps,ant2) == 0) continue;
+              if(debug) fprintf(fpd,"CROSS: bl %d is for ants %d-%d\n",bl_index,ant1,ant2);
+              bl_ind_lookup[ant1][ant2] = bl_index++;
+            }
+        }
+    }
+    else {
+        /* this for auto and cross correlations */
+        for (ant1=0; ant1 < array->n_ant; ant1++) {
+          if (checkAntennaPresent(inps,ant1) == 0) continue;
+            for(ant2=ant1; ant2 < array->n_ant; ant2++) {
+              if (checkAntennaPresent(inps,ant2) == 0) continue;
+              if(debug) fprintf(fpd,"BOTH: bl %d is for ants %d-%d\n",bl_index,ant1,ant2);
+              bl_ind_lookup[ant1][ant2] = bl_index++;
+            }
+        }
+    }
+    return 0;
+}
+
