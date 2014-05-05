@@ -51,6 +51,7 @@ typedef struct _array_table {
     double xyz_pos[3];    /* the X,Y,Z coord of the array in conventional radio astronomy units */
     char  name[16];       /* name of the telescope (turns into TELESCOP keyword in fits file */
     char  instrument[16]; /* name of the instrument (turns into the INSTRUME keyword in fits file */
+    ant_table *antennas;  /* a pointer to an array of ant_tables the size of the number of antennas */
 } array_data;
 
 typedef struct _fq_table {
@@ -80,7 +81,6 @@ typedef struct _uvdata {
     double *date;         /* Julian date. array the size of n_vis */
     int  *n_baselines;    /* array the size of n_vis. number of baselines for each scan. */
     source_table *source; /* a pointer to a source table */
-    ant_table *antennas;  /* a pointer to an array of ant_tables the size of the number of antennas */
     array_data *array;    /* a pointer to an array struct */
     float **visdata;      /* array the size of n_vis whose elements point to arrays of visibiliites
                              the size of n_pol*n_freq*n_baselines complex floats. The data are ordered so
@@ -149,7 +149,7 @@ void JD_get_GSTIA0(double jd, double *GSTIA0);
 void Cal_to_JD(int year, int month, int day, double *jd);
 void uvfitsSetDebugLevel(int in_debug);
 void freeUVFITSdata(uvdata *data);
-void printAntennaData(uvdata *data,FILE *fp);
+void printAntennaData(array_data *array,FILE *fp);
 void EncodeBaseline(int b1, int b2, float *result);
 void DecodeBaseline(float blcode, int *b1, int *b2);
 void Geodetic2XYZ(double lat_rad, double lon_rad, double height_meters, double *X, double *Y, double *Z);
