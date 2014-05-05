@@ -18,3 +18,4 @@ TIME      161300    # HHMMSS
 INVERT_FREQ 0   # 1 if the freq decreases with channel number
 CONJUGATE 0     # conjugate the raw data to fix sign convention problem if necessary
 GEOM_CORRECT 1  # apply geometric phase corrections when 1. Don't when 0
+POL_PRODS XXYYXYYX	# optional list of pol products. RRLLRLLR, II etc.

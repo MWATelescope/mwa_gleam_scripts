@@ -412,6 +412,8 @@ int readHeader(char *header_filename, Header *header) {
     header->invert_freq = 0;    // correlators have now been fixed
     header->conjugate = 0;      // just in case.
     header->geom_correct = 1;   // default, stop the fringes
+    header->pol_products[0] = '\0';
+    header->pol_products[SIZ_PRODNAME] = '\0';
     
     while((fgets(line,MAX_LINE-1,fp)) !=NULL) {
         if(line[0]=='\n' || line[0]=='#' || line[0]=='\0') continue; // skip blank/comment lines
@@ -422,6 +424,7 @@ int readHeader(char *header_filename, Header *header) {
         if (strncmp(key,"FIELDNAME",MAX_LINE)==0) strncpy(header->field_name,value,SIZE_SOURCE_NAME);
         if (strncmp(key,"TELESCOPE",MAX_LINE)==0) strncpy(header->telescope,value,SIZ_TELNAME);
         if (strncmp(key,"INSTRUMENT",MAX_LINE)==0) strncpy(header->instrument,value,SIZ_TELNAME);
+        if (strncmp(key,"POL_PRODS",MAX_LINE)==0) strncpy(header->pol_products,value,SIZ_PRODNAME);
         if (strncmp(key,"N_SCANS",MAX_LINE)==0) header->n_scans = atoi(value);
         if (strncmp(key,"N_INPUTS",MAX_LINE)==0) header->n_inputs = atoi(value);
         if (strncmp(key,"N_CHANS",MAX_LINE)==0) header->n_chans = atoi(value);
@@ -452,7 +455,7 @@ int readHeader(char *header_filename, Header *header) {
     }
 
     /* sanity checks and defaults */
-    strcpy(header->pol_products,"XXXYYXYY");
+    if (header->pol_products[0]=='\0') strcpy(header->pol_products,"XXXYYXYY");
     if (header->n_scans==0) {
         header->n_scans=1;
         fprintf(stderr,"WARNING: N_SCANS unspecified. Assuming: %d\n",header->n_scans);
