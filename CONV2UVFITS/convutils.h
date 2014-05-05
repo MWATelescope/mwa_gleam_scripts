@@ -78,5 +78,6 @@ void unitvecs_j2000(double rmat[3][3], double xhat[3], double yhat[3], double zh
 void ha_dec_j2000(double rmat[3][3], double lmst, double lat_rad, double ra2000,
                   double dec2000, double *newha, double *newlat, double *newlmst);
 int makeBaselineLookup(InpConfig *inps, Header *header, array_data *array, int bl_ind_lookup[MAX_ANT][MAX_ANT]);
+void setConvDebugLevel(int level);
 
 #endif

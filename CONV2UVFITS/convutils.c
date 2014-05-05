@@ -11,9 +11,19 @@
 
 int qsort_compar_float(const void *p1, const void *p2);
 
+/* use common debug file handle from main program */
+extern FILE *fpd;
+
 /* private globals */
 static int debug_flag=0,debug=0;
-extern FILE *fpd;
+
+void setConvDebugLevel(int level) {
+    debug=level;
+    if (debug>0) {
+        fprintf(fpd,"%s: New debug level %d\n",__FILE__,level);
+    }
+}
+
 
 /* comparison function for qsort in the autoflagger */
 int qsort_compar_float(const void *p1, const void *p2) {

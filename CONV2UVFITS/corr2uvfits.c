@@ -30,11 +30,13 @@ void initData(uvdata *data);
 int applyHeader(Header *header, uvdata *data);
 void checkInputs(Header *header,uvdata *data,InpConfig *inputs);
 
+/* allow convutils to use same file handle */
+FILE *fpd=NULL;
+
 /* private global vars */
 static int bl_ind_lookup[MAX_ANT][MAX_ANT];
 static int debug=0,do_flag=0,lock_pointing=0;
 static int pol_index[4];
-static FILE *fpd=NULL;
 char *stationfilename="antenna_locations.txt",*outfilename=NULL;
 char *configfilename="instr_config.txt";
 char *header_filename="header.txt";
@@ -61,6 +63,7 @@ int main(const int argc, char * const argv[]) {
 
   if(argc < 2) printusage(argv[0]);
   parse_cmdline(argc,argv,optstring);
+  setConvDebugLevel(debug);
 
   /* initialise some values for the UV data array and antennas*/
   data = calloc(1,sizeof(uvdata));
