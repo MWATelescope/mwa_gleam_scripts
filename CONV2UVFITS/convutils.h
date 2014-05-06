@@ -53,7 +53,7 @@ typedef struct {
 
 /* public function prototypes */
 int createPolIndex(char *polprods, int *index);
-int readArray(char *filename, double lat, ant_table *data, int *nants);
+int readArray(char *filename, double lat, double lon, array_data *array);
 int readHeader(char *filename, Header *header);
 int readInputConfig(char *filename, InpConfig *inp);
 void calcUVW(double ha,double dec,double x,double y,double z,double *u,double *v,double *w);
@@ -79,5 +79,6 @@ void ha_dec_j2000(double rmat[3][3], double lmst, double lat_rad, double ra2000,
                   double dec2000, double *newha, double *newlat, double *newlmst);
 int makeBaselineLookup(InpConfig *inps, Header *header, array_data *array, int bl_ind_lookup[MAX_ANT][MAX_ANT]);
 void setConvDebugLevel(int level);
+int calcAntPhases(double mjd, Header *header, array_data *array,double ant_u[], double ant_v[], double ant_w[]);
 
 #endif

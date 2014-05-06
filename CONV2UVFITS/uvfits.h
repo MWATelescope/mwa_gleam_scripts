@@ -52,6 +52,8 @@ typedef struct _array_table {
     char  name[16];       /* name of the telescope (turns into TELESCOP keyword in fits file */
     char  instrument[16]; /* name of the instrument (turns into the INSTRUME keyword in fits file */
     ant_table *antennas;  /* a pointer to an array of ant_tables the size of the number of antennas */
+    double arr_lon_rad;   /* array centre lon in radian */
+    double arr_lat_rad;   /* array centre lat in radian */
 } array_data;
 
 typedef struct _fq_table {
