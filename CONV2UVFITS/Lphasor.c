@@ -38,6 +38,7 @@ int doScan(FILE *fp_ac, FILE *fp_cc,FILE *fpout_ac, FILE *fpout_cc,int scan,Head
 void parse_cmdline(const int argc, char * const argv[], const char *optstring);
 int applyHeader(Header *header, uvdata *data);
 void checkInputs(Header *header,uvdata *data,InpConfig *inputs);
+void initData(uvdata *data);
 
 /* allow convutils to use same file handle */
 FILE *fpd=NULL;
@@ -83,6 +84,8 @@ int main(const int argc, char * const argv[]) {
   arraydat->antennas = antennas;
   arraydat->arr_lat_rad = options.arr_lat_rad;
   arraydat->arr_lon_rad = options.arr_lon_rad;
+  data->array = arraydat;
+  initData(data);
 
   /* get the mapping of inputs to anntena numbers and polarisations */
   if ((res = readInputConfig(options.configfilename, &inputs)) != 0) {
@@ -149,6 +152,7 @@ int main(const int argc, char * const argv[]) {
         exit(1);
       }
     }
+    scan++;
   }
   if(res < 0) {
       fprintf(stderr,"Problems in readScan(). exiting\n");
@@ -156,12 +160,6 @@ int main(const int argc, char * const argv[]) {
   }
 
   if (debug) fprintf(fpd,"Read %d time steps\n",scan);
-  if (abs(header.n_scans-scan) > 4) {
-    fprintf(stderr,"WARNING: expected to read %d scans, but actually read %d. Are you sure you have the correct number of freqs, inputs and timesteps? Carrying on and hoping for the best...\n",header.n_scans,scan);
-  }
-  else if (res > 0) {
-      fprintf(stderr,"WARNING: Wanted to read %d time steps, but actually read %d. Carrying on...\n",header.n_scans, scan);
-  }
 
   /* finish up  */
   if(fpin_ac !=NULL) fclose(fpin_ac);
@@ -215,12 +213,12 @@ int doScan(FILE *fp_ac, FILE *fp_cc,FILE *fpout_ac, FILE *fpout_cc,int scan_coun
   /* read all the data for this timestep */
   n_read = fread(cc_data,size_cc,1,fp_cc);
   if (n_read != 1) {
-    fprintf(stderr,"EOF: reading cross correlations. Wanted to read %d bytes.\n",(int) size_cc);
+    //fprintf(stderr,"EOF: reading cross correlations. Wanted to read %d bytes.\n",(int) size_cc);
     return 1;
   }
   n_read = fread(ac_data,size_ac,1,fp_ac);
   if (n_read != 1) {
-    fprintf(stderr,"EOF: reading auto correlations. Wanted to read %d bytes.\n",(int) size_ac);
+    //fprintf(stderr,"EOF: reading auto correlations. Wanted to read %d bytes.\n",(int) size_ac);
     return 1;
   }
 
@@ -382,9 +380,6 @@ int applyHeader(Header *header, uvdata *data) {
   data->date[0] = jdtime_base+0.5*(header->integration_time/86400.0);
   if (debug) fprintf(fpd,"JD time is %.2lf\n",jdtime_base);
 
-  memset(data->source->name,0,SIZE_SOURCE_NAME+1);
-  strncpy(data->source->name,header->field_name,SIZE_SOURCE_NAME);
-
   mjd = data->date[0] - 2400000.5;  // get Modified Julian date of scan.
   lmst = slaRanorm(slaGmst(mjd) + options.arr_lon_rad);  // local mean sidereal time, given array location
 
@@ -397,16 +392,6 @@ int applyHeader(Header *header, uvdata *data) {
     if (debug) fprintf(fpd,"Calculated RA_hrs: %g of field centre based on HA_hrs: %g and lmst_hrs: %g\n",
                         header->ra_hrs,header->ha_hrs_start,lmst*(12.0/M_PI));
   }
-
-  /* extract RA, DEC from header. Beware negative dec and negative zero bugs. */
-  data->source->ra  = header->ra_hrs;
-  data->source->dec = header->dec_degs;
-
-  /* calcualte the number of baselines, required to be constant for all data */
-  data->n_baselines[0] = (data->array->n_ant)*(data->array->n_ant+1)/2; //default: both auto and cross
-  if (header->corr_type=='A') data->n_baselines[0] = data->array->n_ant;
-  if (header->corr_type=='C') data->n_baselines[0] = data->array->n_ant*(data->array->n_ant-1)/2;
-  if (debug) fprintf(fpd,"Corr type %c, so there are %d baselines\n",header->corr_type,data->n_baselines[0]);
 
   return 0;
 }
@@ -446,4 +431,27 @@ void checkInputs(Header *header,uvdata *data,InpConfig *inputs) {
     }
 
 }
+
+
+/*******************************
+*********************************/
+void initData(uvdata *data) {
+  data->date = calloc(1,sizeof(double));
+  data->n_pol=0;
+  data->n_baselines = calloc(1,sizeof(int));
+  data->n_freq=0;
+  data->n_vis=0;
+  data->cent_freq=0.0;
+  data->freq_delta = 0.0;
+  data->u=NULL;
+  data->v=NULL;
+  data->w=NULL;
+  data->baseline=NULL;
+  data->weightdata=NULL;
+  data->visdata=NULL;
+  data->pol_type=1;    /* default is Stokes pol products */
+  data->array->n_ant=0;
+  strcpy(data->array->name,"UNKNOWN");
+}
+
 

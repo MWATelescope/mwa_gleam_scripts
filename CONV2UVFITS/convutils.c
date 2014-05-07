@@ -395,7 +395,7 @@ int readInputConfig(char *filename, InpConfig *inp) {
  ***************************/
 int readHeader(char *header_filename, Header *header) {
     FILE *fp=NULL;
-    char line[MAX_LINE],key[MAX_LINE],value[MAX_LINE];
+    char line[MAX_LINE],key[MAX_LINE],value[MAX_LINE],junk[MAX_LINE];
     
     if((fp=fopen(header_filename,"r"))==NULL) {
         fprintf(stderr,"ERROR: failed to open obs metadata file <%s>\n",header_filename);
@@ -432,7 +432,7 @@ int readHeader(char *header_filename, Header *header) {
     while((fgets(line,MAX_LINE-1,fp)) !=NULL) {
         if(line[0]=='\n' || line[0]=='#' || line[0]=='\0') continue; // skip blank/comment lines
 
-        if (sscanf(line,"%s %s",key,value) < 2) {
+        if (sscanf(line,"%s %s %s",key,value,junk) < 2) {
             fprintf(stderr,"WARNING: failed to make 2 conversions on line: %s\n",line);
         }
         if (strncmp(key,"FIELDNAME",MAX_LINE)==0) strncpy(header->field_name,value,SIZE_SOURCE_NAME);
@@ -956,7 +956,7 @@ int correctPhases(double mjd, Header *header, InpConfig *inps, array_data *array
     for(inp1=0; inp1 < header->n_inputs ; inp1++) {
         for(inp2=inp1; inp2 < header->n_inputs ; inp2++) {
             double w,cable_delay=0.0;
-            int pol_ind,ant1,ant2,bl_index,pol1,pol2;
+            int pol_ind=0,ant1,ant2,bl_index,pol1,pol2;
             float *visdata=NULL;
             float complex *cvis;
 
@@ -977,7 +977,7 @@ int correctPhases(double mjd, Header *header, InpConfig *inps, array_data *array
                 pol2=temp;
                 baseline_reverse=1;
             }
-            pol_ind = decodePolIndex(pol1, pol2);
+            if (debug) pol_ind = decodePolIndex(pol1, pol2);
             bl_index = bl_ind_lookup[ant1][ant2];
 
             /* cable delay: the goal is to *correct* for differential cable lengths. The inputs include a delta (offset)
@@ -988,6 +988,7 @@ int correctPhases(double mjd, Header *header, InpConfig *inps, array_data *array
            Hence we want to add the difference ant2-ant1 (in wavelengths) to phi to correct for the length difference.
             */
             cable_delay = (inps->cable_len_delta[inp2] - inps->cable_len_delta[inp1]);
+            if (baseline_reverse) cable_delay = -cable_delay;
 
             /* only process the appropriate correlations */
             if (header->corr_type=='A' && inp1!=inp2) continue;
@@ -1012,42 +1013,42 @@ int correctPhases(double mjd, Header *header, InpConfig *inps, array_data *array
  
             /* calc u,v,w for this baseline in meters */
             w=0.0;
-            if(ant1 != ant2) {
+            /* if not correcting for geometry, don't apply w */
+            if(header->geom_correct) {
                 //u = ant_u[ant1] - ant_u[ant2];
                 //v = ant_v[ant1] - ant_v[ant2];
                 w = ant_w[ant1] - ant_w[ant2];
             }
+            // add the cable delay term and 2pi here so that we don't have to add it many times in the loop below.
+            w = (w+cable_delay)*(-2.0*M_PI);
 
-            if (debug) {
+            if (debug>1) {
                 fprintf(fpd,"doing inps %d,%d. ants: %d,%d pols: %d,%d, polind: %d, bl_ind: %d, w (m): %g, delay (m): %g, blrev: %d\n",
                     inp1,inp2,ant1,ant2,pol1,pol2,pol_ind,bl_index,w,cable_delay,baseline_reverse);
-            }
-        
-            /* if not correcting for geometry, don't apply w */
-            if(!header->geom_correct) {
-                w = 0.0;
             }
 
             /* populate the visibility arrays */
             cvis = (float complex *) visdata;    /* cast this so we can use pointer arithmetic */
             for(chan_ind=0; chan_ind < header->n_chans; chan_ind++) {
-                float complex vis,phase=1.0;
+                float complex vis,phase;
 
                 if (inp1 != inp2) {
-                    phase = cexp(I*(-2.0*M_PI)*(w+cable_delay*(baseline_reverse? -1.0:1.0))*k[chan_ind]);
+                    phase = cexp(I*w*k[chan_ind]);
                     //vis = visdata[chan_ind*2] + I*(header->conjugate ? -visdata[chan_ind*2+1]: visdata[chan_ind*2+1]);
                     vis = header->conjugate ? conjf(cvis[chan_ind]) : cvis[chan_ind];
-
+/*
                     if(debug && chan_ind==header->n_chans/2) {
                         fprintf(fpd,"Chan %d, w: %g (wavelen), vis: %g,%g. ph: %g,%g. rot vis: %g,%g\n",
                                     chan_ind,w*k[chan_ind],creal(vis),cimag(vis),creal(phase),cimag(phase),
                                     creal(vis*phase),cimag(vis*phase));
                     }
-
+*/
                     // apply input-based flags if necessary
+/*
                     if ( (inps->inpFlag[inp1] || inps->inpFlag[inp2]) && vis_weight > 0) {
                         vis=0.0;
                     }
+*/
                     if (baseline_reverse) vis = conjf(vis);
                     cvis[chan_ind] = vis*phase; /* update the input data with the phase correction */
                 }
