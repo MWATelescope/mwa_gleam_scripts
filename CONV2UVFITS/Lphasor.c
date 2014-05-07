@@ -182,6 +182,7 @@ int doScan(FILE *fp_ac, FILE *fp_cc,FILE *fpout_ac, FILE *fpout_cc,int scan_coun
   static double date_zero=0.0;  // time of zeroth scan
 
   double mjd;
+  double ant_u[MAX_ANT],ant_v[MAX_ANT],ant_w[MAX_ANT]; //u,v,w for each antenna, in meters
   int res=0,n_read,scan=0;
   size_t size_ac, size_cc;
   float *ac_data=NULL;
@@ -232,7 +233,7 @@ int doScan(FILE *fp_ac, FILE *fp_cc,FILE *fpout_ac, FILE *fpout_cc,int scan_coun
   }
 
   /* apply geometric and/or cable length corrections to the visibilities */
-  res = correctPhases(mjd, header, inps, array, bl_ind_lookup, ac_data, cc_data);
+  res = correctPhases(mjd, header, inps, array, bl_ind_lookup, ac_data, cc_data, ant_u, ant_v, ant_w);
   if (res) return res;
 
   /* write the data back out again */

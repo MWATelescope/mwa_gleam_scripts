@@ -80,6 +80,6 @@ void ha_dec_j2000(double rmat[3][3], double lmst, double lat_rad, double ra2000,
 int makeBaselineLookup(InpConfig *inps, Header *header, array_data *array, int bl_ind_lookup[MAX_ANT][MAX_ANT]);
 void setConvDebugLevel(int level);
 int calcAntPhases(double mjd, Header *header, array_data *array,double ant_u[], double ant_v[], double ant_w[]);
-int correctPhases(double mjd, Header *header, InpConfig *inps, array_data *array, int bl_ind_lookup[MAX_ANT][MAX_ANT], float *ac_data, float complex *cc_data);
+int correctPhases(double mjd, Header *header, InpConfig *inps, array_data *array, int bl_ind_lookup[MAX_ANT][MAX_ANT], float *ac_data, float complex *cc_data,double ant_u[MAX_ANT],double ant_v[MAX_ANT],double ant_w[MAX_ANT]);
 
 #endif

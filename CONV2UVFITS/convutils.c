@@ -930,10 +930,9 @@ int calcAntPhases(double mjd, Header *header, array_data *array,double ant_u[], 
 Apply geometric and/or cable length corrections to the data. Handles various MWA and other
 oddities like sign errors and baseline antenna reversals.
 ************************/
-int correctPhases(double mjd, Header *header, InpConfig *inps, array_data *array, int bl_ind_lookup[MAX_ANT][MAX_ANT], float *ac_data, float complex *cc_data) {
+int correctPhases(double mjd, Header *header, InpConfig *inps, array_data *array, int bl_ind_lookup[MAX_ANT][MAX_ANT], float *ac_data, float complex *cc_data,double ant_u[MAX_ANT],double ant_v[MAX_ANT],double ant_w[MAX_ANT]) {
     int chan_ind, baseline_reverse=0, inp1, inp2, ac_chunk_index=0, cc_chunk_index=0,res=0;
     double *k=NULL;
-    double ant_u[MAX_ANT],ant_v[MAX_ANT],ant_w[MAX_ANT]; //u,v,w for each antenna, in meters
     float vis_weight=1.0;
 
     k  = malloc(sizeof(double)*header->n_chans);
@@ -1044,11 +1043,11 @@ int correctPhases(double mjd, Header *header, InpConfig *inps, array_data *array
                     }
 */
                     // apply input-based flags if necessary
-/*
+
                     if ( (inps->inpFlag[inp1] || inps->inpFlag[inp2]) && vis_weight > 0) {
                         vis=0.0;
                     }
-*/
+
                     if (baseline_reverse) vis = conjf(vis);
                     cvis[chan_ind] = vis*phase; /* update the input data with the phase correction */
                 }

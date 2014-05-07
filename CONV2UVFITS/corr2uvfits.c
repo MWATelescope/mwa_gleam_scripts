@@ -205,6 +205,7 @@ int readScan(FILE *fp_ac, FILE *fp_cc,int scan_count, Header *header, InpConfig 
 
   array_data *array;    /*convenience pointer */
   double mjd;
+  double ant_u[MAX_ANT],ant_v[MAX_ANT],ant_w[MAX_ANT]; //u,v,w for each antenna, in meters
   int res=0,chan_ind,n_read,inp1,inp2;
   int scan=0,ac_chunk_index=0,cc_chunk_index=0;
   size_t size_ac, size_cc;
@@ -225,7 +226,7 @@ int readScan(FILE *fp_ac, FILE *fp_cc,int scan_count, Header *header, InpConfig 
 
   if (!init) {
     /* count the total number of antennas actually present in the data */
-    if (debug) fprintf(fpd,"Init readscan.\n");
+    if (debug) fprintf(fpd,"Init %s.\n",__func__);
 
     /* increase size of arrays for the new scan */
     // date and n_baselines should already be allocated
@@ -240,7 +241,7 @@ int readScan(FILE *fp_ac, FILE *fp_cc,int scan_count, Header *header, InpConfig 
     uvdata->baseline = calloc(1,sizeof(float *));
 
     /* make space for the actual visibilities and weights */
-    if (debug) fprintf(fpd,"readScan: callocing array of %d floats\n",uvdata->n_baselines[scan]*uvdata->n_freq*uvdata->n_pol*2);
+    if (debug) fprintf(fpd,"%s: callocing array of %d floats\n",__func__,uvdata->n_baselines[scan]*uvdata->n_freq*uvdata->n_pol*2);
     uvdata->visdata[scan]    = calloc(uvdata->n_baselines[scan]*uvdata->n_freq*uvdata->n_pol*2,sizeof(float));
     uvdata->weightdata[scan] = calloc(uvdata->n_baselines[scan]*uvdata->n_freq*uvdata->n_pol  ,sizeof(float));
     uvdata->u[scan] = calloc(uvdata->n_baselines[scan],sizeof(double));
@@ -249,7 +250,7 @@ int readScan(FILE *fp_ac, FILE *fp_cc,int scan_count, Header *header, InpConfig 
     uvdata->baseline[scan] = calloc(uvdata->n_baselines[scan],sizeof(float));
     if(uvdata->visdata[scan]==NULL || uvdata->weightdata[scan]==NULL || uvdata->visdata[scan]==NULL
        || uvdata->visdata[scan]==NULL || uvdata->visdata[scan]==NULL || uvdata->baseline[scan]==NULL) {
-      fprintf(stderr,"readScan: no malloc for BIG arrays\n");
+      fprintf(stderr,"%s: no malloc for BIG arrays\n",__func__);
       exit(1);
     }
     /* set a weight for the visibilities based on integration time */
@@ -281,8 +282,8 @@ int readScan(FILE *fp_ac, FILE *fp_cc,int scan_count, Header *header, InpConfig 
     mjd = date_zero - 2400000.5;  // get Modified Julian date of scan.
   }
 
-    /* apply geometric and/or cable length corrections to the visibilities */
-  res = correctPhases(mjd, header, inps, array, bl_ind_lookup, ac_data, cc_data);
+  /* apply geometric and/or cable length corrections to the visibilities */
+  res = correctPhases(mjd, header, inps, array, bl_ind_lookup, ac_data, cc_data, ant_u, ant_v, ant_w);
   if (res) return res;
 
   /* copy out the phase rotated data into the uvfits data structure */
@@ -290,6 +291,7 @@ int readScan(FILE *fp_ac, FILE *fp_cc,int scan_count, Header *header, InpConfig 
     for(inp2=inp1; inp2 < header->n_inputs ; inp2++) {
         float complex *cvis;
         int ant1,ant2,pol1,pol2,pol_ind,bl_index;
+        double u,v,w;
 
         /* decode the inputs into antennas and pols */
         ant1 = inps->ant_index[inp1];
@@ -328,6 +330,22 @@ int readScan(FILE *fp_ac, FILE *fp_cc,int scan_count, Header *header, InpConfig 
 
         if (header->corr_type=='C' && ant1==ant2) continue;
 
+        /* calc u,v,w for this baseline in meters */
+        u=v=w=0.0;
+        if(ant1 != ant2) {
+            u = ant_u[ant1] - ant_u[ant2];
+            v = ant_v[ant1] - ant_v[ant2];
+            w = ant_w[ant1] - ant_w[ant2];
+        }
+
+        /* populate the baseline info. Antenna numbers start at 1 in UVFITS.  */
+        uvdata->baseline[scan][bl_index] = 0; // default: no baseline. useful to catch bugs.
+        EncodeBaseline(ant1+1, ant2+1, uvdata->baseline[scan]+bl_index);
+        /* arcane units of UVFITS require u,v,w in light-seconds */
+        uvdata->u[scan][bl_index] = u/VLIGHT;
+        uvdata->v[scan][bl_index] = v/VLIGHT;
+        uvdata->w[scan][bl_index] = w/VLIGHT;
+
         cvis = (float complex *)visdata;    /* cast this so we can use pointer arithmetic */
         for(chan_ind=0; chan_ind<uvdata->n_freq; chan_ind++) {
             int visindex;
@@ -357,7 +375,7 @@ int readScan(FILE *fp_ac, FILE *fp_cc,int scan_count, Header *header, InpConfig 
 
   /* sanity check */
   if (debug) {
-    fprintf(fpd,"At end of readScan. ac_chunk_index: %d, cc_chunk_index: %d\n", ac_chunk_index, cc_chunk_index);
+    fprintf(fpd,"At end of %s. ac_chunk_index: %d, cc_chunk_index: %d\n", __func__,ac_chunk_index, cc_chunk_index);
   }
 
   if (ac_data != NULL) free(ac_data);
