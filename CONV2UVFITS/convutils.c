@@ -11,9 +11,19 @@
 
 int qsort_compar_float(const void *p1, const void *p2);
 
+/* use common debug file handle from main program */
+extern FILE *fpd;
+
 /* private globals */
 static int debug_flag=0,debug=0;
-extern FILE *fpd;
+
+void setConvDebugLevel(int level) {
+    debug=level;
+    if (debug>0) {
+        fprintf(fpd,"%s: New debug level %d\n",__FILE__,level);
+    }
+}
+
 
 /* comparison function for qsort in the autoflagger */
 int qsort_compar_float(const void *p1, const void *p2) {
@@ -288,16 +298,21 @@ int applyFlagsFile(char *filename,uvdata *data) {
  file and populate the antenna positions in the
  data structure.
 *******************************/
-int readArray(char *filename, double lat_radian, ant_table *antennas, int *n_ants) {
+int readArray(char *filename, const double lat_radian, const double arr_lon_rad, array_data *array) {
   FILE *fp=NULL;
   char line[MAX_LINE];
   int index=0,nscan;
   double east=0,north=0,height=0;
+  ant_table *antennas;
 
   if( (fp=fopen(filename,"r"))==NULL) {
     fprintf(stderr,"ERROR: readArray: failed to open array file <%s>\n",filename);
     return 1;
   }
+
+  antennas = array->antennas;
+  array->arr_lat_rad = lat_radian;
+  array->arr_lon_rad = arr_lon_rad;
 
   /* scan through lines. convert east,north,height units to XYZ units */
   while((fgets(line,MAX_LINE-1,fp)) !=NULL) {
@@ -319,7 +334,7 @@ int readArray(char *filename, double lat_radian, ant_table *antennas, int *n_ant
         exit(1);
     }
   }
-  *n_ants = index;
+  array->n_ant = index;
   fclose(fp);
   return 0;
 }
@@ -412,6 +427,8 @@ int readHeader(char *header_filename, Header *header) {
     header->invert_freq = 0;    // correlators have now been fixed
     header->conjugate = 0;      // just in case.
     header->geom_correct = 1;   // default, stop the fringes
+    header->pol_products[0] = '\0';
+    header->pol_products[SIZ_PRODNAME] = '\0';
     
     while((fgets(line,MAX_LINE-1,fp)) !=NULL) {
         if(line[0]=='\n' || line[0]=='#' || line[0]=='\0') continue; // skip blank/comment lines
@@ -422,6 +439,7 @@ int readHeader(char *header_filename, Header *header) {
         if (strncmp(key,"FIELDNAME",MAX_LINE)==0) strncpy(header->field_name,value,SIZE_SOURCE_NAME);
         if (strncmp(key,"TELESCOPE",MAX_LINE)==0) strncpy(header->telescope,value,SIZ_TELNAME);
         if (strncmp(key,"INSTRUMENT",MAX_LINE)==0) strncpy(header->instrument,value,SIZ_TELNAME);
+        if (strncmp(key,"POL_PRODS",MAX_LINE)==0) strncpy(header->pol_products,value,SIZ_PRODNAME);
         if (strncmp(key,"N_SCANS",MAX_LINE)==0) header->n_scans = atoi(value);
         if (strncmp(key,"N_INPUTS",MAX_LINE)==0) header->n_inputs = atoi(value);
         if (strncmp(key,"N_CHANS",MAX_LINE)==0) header->n_chans = atoi(value);
@@ -452,7 +470,7 @@ int readHeader(char *header_filename, Header *header) {
     }
 
     /* sanity checks and defaults */
-    strcpy(header->pol_products,"XXXYYXYY");
+    if (header->pol_products[0]=='\0') strcpy(header->pol_products,"XXXYYXYY");
     if (header->n_scans==0) {
         header->n_scans=1;
         fprintf(stderr,"WARNING: N_SCANS unspecified. Assuming: %d\n",header->n_scans);
@@ -706,7 +724,6 @@ void stelaber(double eq, double mjd, double v1[3], double v2[3])
 
    slaMappa(eq,mjd,amprms);
 
-
 /* code from mapqk.c (w/ a few names changed): */
 
 /* Unpack scalar and vector parameters */
@@ -814,9 +831,96 @@ int makeBaselineLookup(InpConfig *inps, Header *header, array_data *array, int b
           if (checkAntennaPresent(inps,ant1) == 0) continue;
             for(ant2=ant1; ant2 < array->n_ant; ant2++) {
               if (checkAntennaPresent(inps,ant2) == 0) continue;
-              if(debug) fprintf(fpd,"BOTH: bl %d is for ants %d-%d\n",bl_index,ant1,ant2);
+              if(debug> 1) fprintf(fpd,"BOTH: bl %d is for ants %d-%d\n",bl_index,ant1,ant2);
               bl_ind_lookup[ant1][ant2] = bl_index++;
             }
+        }
+    }
+    return 0;
+}
+
+
+/*****************
+Calculate the phase of each antenna for a given time relative to the array centre.
+Applies precession and nutation corrections to calculate the correct u,v,w for
+mean (J2000) coords. The phase on the baseline is then just ant1-conj(ant2)
+*****************/
+int calcAntPhases(double mjd, Header *header, array_data *array,double ant_u[], double ant_v[], double ant_w[]) {
+    double ha,ra_app,dec_app,lmst,ra_aber,dec_aber,ha2000,lmst2000,newarrlat;
+    double rmatpr[3][3], rmattr[3][3];
+    double x,y,z,xprec, yprec, zprec,ant_u_ep, ant_v_ep, ant_w_ep;
+    int i;
+
+    lmst = slaRanorm(slaGmst(mjd) + array->arr_lon_rad);  // local mean sidereal time, given array location
+
+    /* convert mean RA/DEC of phase center to apparent for current observing time. This applies precession,
+     nutation, annual abberation. */
+    slaMap(header->ra_hrs*(M_PI/12.0), header->dec_degs*(M_PI/180.0), 0.0, 0.0, 0.0, 0.0, 2000.0, mjd, &ra_app, &dec_app);
+    if (debug) {
+        fprintf(fpd,"Mean coords (radian):               RA: %g, DEC: %g\n",header->ra_hrs*(M_PI/12.0),
+                      header->dec_degs*(M_PI/180.0));
+        fprintf(fpd,"Precessed apparent coords (radian): RA: %g, DEC: %g\n",ra_app,dec_app);
+    }
+    /* calc apparent HA of phase center, normalise to be between 0 and 2*pi */
+    ha = slaRanorm(lmst - ra_app);
+
+    /* I think this is correct - it does the calculations in the frame with current epoch
+    * and equinox, nutation, and aberrated star positions, i.e., the apparent geocentric
+    * frame of epoch. (AML)
+    */
+
+    if(debug) fprintf(fpd,"lmst: %g (radian). HA (calculated): %g (radian)\n",lmst,ha);
+
+    /* calc el,az of desired phase centre for debugging */
+    if (debug) {
+        double az,el;
+        slaDe2h(ha,dec_app,array->arr_lat_rad,&az,&el);
+        fprintf(fpd,"Phase cent ha/dec: %g,%g. az,el: %g,%g\n",ha,dec_app,az,el);
+    }
+
+    /* Compute the apparent direction of the phase center in the J2000 coordinate system */
+    aber_radec_rad(2000.0,mjd,header->ra_hrs*(M_PI/12.0),header->dec_degs*(M_PI/180.0), &ra_aber,&dec_aber);
+    if (debug) {
+        fprintf(fpd,"aber_radec_rad apparent coords (radian): RA: %g, DEC: %g\n",ra_aber,dec_aber);
+    }
+
+    /* Below, the routines "slaPrecl" and "slaPreces" do only a precession correction,
+     * i.e, they do NOT do corrections for aberration or nutation.
+     *
+     * We want to go from apparent coordinates at the observation epoch
+     * to J2000 coordinates which do not have the nutation or aberration corrections
+     * (and since the frame is J2000 no precession correction is needed).
+     */
+
+    // slaPrecl(slaEpj(mjd),2000.0,rmatpr);  /* 2000.0 = epoch of J2000 */
+    slaPrenut(2000.0,mjd,rmattr);
+    mat_transpose(rmattr,rmatpr);
+    /* rmatpr undoes precession and nutation corrections */
+    ha_dec_j2000(rmatpr,lmst,array->arr_lat_rad,ra_aber,dec_aber,&ha2000,&newarrlat,&lmst2000);
+
+    if (debug) {
+        fprintf(fpd,"Dec, dec_app, newarrlat (radians): %f %f %f\n", header->dec_degs*(M_PI/180.0),dec_app,newarrlat);
+        fprintf(fpd,"lmst, lmst2000 (radians): %f %f\n",lmst,lmst2000);
+        fprintf(fpd,"ha, ha2000 (radians): %f %f\n",ha,ha2000);
+    }
+    /* calc u,v,w at phase center and reference for all antennas relative to center of array */
+    for(i=0; i<array->n_ant; i++) {
+        // double x,y,z;   /* moved to front of this function (Aug. 12, 2011) */
+        x = array->antennas[i].xyz_pos[0];
+        y = array->antennas[i].xyz_pos[1];
+        z = array->antennas[i].xyz_pos[2];
+      /* value of lmst at current epoch - will be changed to effective value in J2000 system
+       *
+       * To do this, need to precess "ra, dec" (in quotes on purpose) of array center
+       * from value at current epoch
+       */
+        precXYZ(rmatpr,x,y,z,lmst,&xprec,&yprec,&zprec,lmst2000);
+        calcUVW(ha,dec_app,x,y,z,&ant_u_ep,&ant_v_ep,&ant_w_ep);
+        calcUVW(ha2000,dec_aber,xprec,yprec,zprec,ant_u+i,ant_v+i,ant_w+i);
+        if (debug) {
+        /* The w value should be the same in either reference frame. */
+            fprintf(fpd,"Ant: %d, u,v,w: %g,%g,%g.\n",i,ant_u[i],ant_v[i],ant_w[i]);
+            fprintf(fpd,"Ant at epoch: %d, u,v,w: %g,%g,%g.\n",i,ant_u_ep,ant_v_ep,ant_w_ep);
         }
     }
     return 0;
