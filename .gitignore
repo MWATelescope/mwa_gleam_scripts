@@ -27,5 +27,4 @@ casatasks/*-e
 /eorlive/FusionConnect.log
 *#*
 *.o
-*.c~
-*.py~
+*~

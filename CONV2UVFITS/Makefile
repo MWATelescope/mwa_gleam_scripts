@@ -13,7 +13,7 @@ ifneq ($(strip $(CFITSLIB)),)
 INCS += -L$(CFITSLIB)
 endif
 
-TARGETS=corr2uvfits test_readuvfits
+TARGETS=corr2uvfits Lphasor test_readuvfits
 SRCDIR=CONV2UVFITS
 
 
@@ -22,6 +22,10 @@ all: $(TARGETS)
 corr2uvfits: corr2uvfits.c convutils.c convutils.h uvfits.c uvfits.h libsla.a
 	ranlib libsla.a
 	cc $(CFLAGS) $(INCS) $(CFITSIO_INCS) -o corr2uvfits corr2uvfits.c convutils.c uvfits.c $(CFITSIO_LIBS) -lcfitsio -lsla -lm
+
+Lphasor: Lphasor.c convutils.c convutils.h libsla.a uvfits.c
+	ranlib libsla.a
+	cc $(CFLAGS) $(INCS) $(CFITSIO_INCS) -o Lphasor Lphasor.c convutils.c uvfits.c -lsla $(CFITSIO_LIBS) -lcfitsio -lm
 
 test_readuvfits: test_readuvfits.c uvfits.c libsla.a
 	ranlib libsla.a

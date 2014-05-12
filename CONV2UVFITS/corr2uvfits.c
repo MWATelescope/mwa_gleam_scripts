@@ -206,12 +206,10 @@ int readScan(FILE *fp_ac, FILE *fp_cc,int scan_count, Header *header, InpConfig 
   array_data *array;    /*convenience pointer */
   double mjd;
   double ant_u[MAX_ANT],ant_v[MAX_ANT],ant_w[MAX_ANT]; //u,v,w for each antenna, in meters
-  double u,v,w,cable_delay=0;
-  int res=0,inp1,inp2,ant1,ant2,pol1,pol2,bl_index=0,pol_ind,chan_ind,n_read;
-  int temp,baseline_reverse,scan=0,ac_chunk_index=0,cc_chunk_index=0;
+  int res=0,chan_ind,n_read,inp1,inp2;
+  int scan=0,ac_chunk_index=0,cc_chunk_index=0;
   size_t size_ac, size_cc;
   float *ac_data=NULL,*visdata=NULL;
-  double *k=NULL;
   float complex *cc_data=NULL;
 
   array = uvdata->array;
@@ -221,15 +219,14 @@ int readScan(FILE *fp_ac, FILE *fp_cc,int scan_count, Header *header, InpConfig 
     and n_inp*(n_inp-1)/2*nchan float complex cross correlations*/
   size_ac = uvdata->n_freq*header->n_inputs*sizeof(float);
   size_cc = uvdata->n_freq*header->n_inputs*(header->n_inputs-1)/2*sizeof(float complex);
-  k  = malloc(sizeof(double)*header->n_chans);
-  ac_data = malloc(size_ac);
-  cc_data = malloc(size_cc);
-  assert(ac_data!=NULL);
-  assert(cc_data!=NULL);
+  ac_data = calloc(1,size_ac);
+  cc_data = calloc(1,size_cc);
+  assert(ac_data != NULL);
+  assert(cc_data != NULL);
 
   if (!init) {
     /* count the total number of antennas actually present in the data */
-    if (debug) fprintf(fpd,"Init readscan.\n");
+    if (debug) fprintf(fpd,"Init %s.\n",__func__);
 
     /* increase size of arrays for the new scan */
     // date and n_baselines should already be allocated
@@ -244,7 +241,7 @@ int readScan(FILE *fp_ac, FILE *fp_cc,int scan_count, Header *header, InpConfig 
     uvdata->baseline = calloc(1,sizeof(float *));
 
     /* make space for the actual visibilities and weights */
-    if (debug) fprintf(fpd,"readScan: callocing array of %d floats\n",uvdata->n_baselines[scan]*uvdata->n_freq*uvdata->n_pol*2);
+    if (debug) fprintf(fpd,"%s: callocing array of %d floats\n",__func__,uvdata->n_baselines[scan]*uvdata->n_freq*uvdata->n_pol*2);
     uvdata->visdata[scan]    = calloc(uvdata->n_baselines[scan]*uvdata->n_freq*uvdata->n_pol*2,sizeof(float));
     uvdata->weightdata[scan] = calloc(uvdata->n_baselines[scan]*uvdata->n_freq*uvdata->n_pol  ,sizeof(float));
     uvdata->u[scan] = calloc(uvdata->n_baselines[scan],sizeof(double));
@@ -253,7 +250,7 @@ int readScan(FILE *fp_ac, FILE *fp_cc,int scan_count, Header *header, InpConfig 
     uvdata->baseline[scan] = calloc(uvdata->n_baselines[scan],sizeof(float));
     if(uvdata->visdata[scan]==NULL || uvdata->weightdata[scan]==NULL || uvdata->visdata[scan]==NULL
        || uvdata->visdata[scan]==NULL || uvdata->visdata[scan]==NULL || uvdata->baseline[scan]==NULL) {
-      fprintf(stderr,"readScan: no malloc for BIG arrays\n");
+      fprintf(stderr,"%s: no malloc for BIG arrays\n",__func__);
       exit(1);
     }
     /* set a weight for the visibilities based on integration time */
@@ -263,18 +260,6 @@ int readScan(FILE *fp_ac, FILE *fp_cc,int scan_count, Header *header, InpConfig 
 
     init=1;
   }
-  
-  /* set time of scan. Note that 1/2 scan time offset already accounted for in date[0]. */
-  if (scan_count > 0) uvdata->date[scan] = date_zero + scan_count*header->integration_time/86400.0;
-  mjd = uvdata->date[scan] - 2400000.5;  // get Modified Julian date of scan.
-
-  /* set default ha/dec from header, if HA was specified. Otherwise, it will be calculated below */
-  if (lock_pointing!=0) {   // special case for RTS output which wants a phase centre fixed at an az/el, not ra/dec
-    mjd = date_zero - 2400000.5;  // get Modified Julian date of scan.
-  }
-
-  res = calcAntPhases(mjd, header, array,ant_u, ant_v, ant_w);
-  if (res) return res;
 
   /* read all the data for this timestep */
   n_read = fread(cc_data,size_cc,1,fp_cc);
@@ -288,53 +273,50 @@ int readScan(FILE *fp_ac, FILE *fp_cc,int scan_count, Header *header, InpConfig 
     return 1;
   }
 
-  /* pre-calculate wavenumber for each channel */
-  for(chan_ind=0; chan_ind<uvdata->n_freq; chan_ind++) {
-    double freq;
+  /* set time of scan. Note that 1/2 scan time offset already accounted for in date[0]. */
+  if (scan_count > 0) uvdata->date[scan] = date_zero + scan_count*header->integration_time/86400.0;
+  mjd = uvdata->date[scan] - 2400000.5;  // get Modified Julian date of scan.
 
-    /* calc wavenumber for this cannel. header freqs are in MHz*/
-    freq = (header->cent_freq + (header->invert_freq? -1.0:1.0)*(chan_ind - header->n_chans/2.0)/header->n_chans*header->bandwidth);
-    k[chan_ind] = freq/(VLIGHT/1e6);
+  /* set default ha/dec from header, if HA was specified. Otherwise, it will be calculated below */
+  if (lock_pointing!=0) {   // special case for RTS output which wants a phase centre fixed at an az/el, not ra/dec
+    mjd = date_zero - 2400000.5;  // get Modified Julian date of scan.
   }
 
+  /* apply geometric and/or cable length corrections to the visibilities */
+  res = correctPhases(mjd, header, inps, array, bl_ind_lookup, ac_data, cc_data, ant_u, ant_v, ant_w);
+  if (res) return res;
+
+  /* copy out the phase rotated data into the uvfits data structure */
   for(inp1=0; inp1 < header->n_inputs ; inp1++) {
     for(inp2=inp1; inp2 < header->n_inputs ; inp2++) {
+        float complex *cvis;
+        int ant1,ant2,pol1,pol2,pol_ind,bl_index;
+        double u,v,w;
 
         /* decode the inputs into antennas and pols */
-        baseline_reverse=0;
         ant1 = inps->ant_index[inp1];
         ant2 = inps->ant_index[inp2];
         pol1 = inps->pol_index[inp1];
         pol2 = inps->pol_index[inp2];
         /* UVFITS by convention expects the index of ant2 to be greater than ant1, so swap if necessary */
         if (ant1>ant2) {
+            int temp;
             temp=ant1;
             ant1=ant2;
             ant2=temp;
             temp=pol1;
             pol1=pol2;
             pol2=temp;
-            baseline_reverse=1;
         }
         pol_ind = decodePolIndex(pol1, pol2);
         bl_index = bl_ind_lookup[ant1][ant2];
 
-        /* cable delay: the goal is to *correct* for differential cable lengths. The inputs include a delta (offset)
-           of cable length relative to some ideal length. (positive = longer than ideal)
-           Call the dot product of the baseline (ant2-ant1) and look direction 'phi'.
-           Then if ant1 has more delay than ant2, then this is like having phi be positive where
-           the visibility is V = Iexp(-j*2*pi*phi)
-           Hence we want to add the difference ant2-ant1 (in wavelengths) to phi to correct for the length difference.
-         */
-        cable_delay = (inps->cable_len_delta[inp2] - inps->cable_len_delta[inp1]);
-
         /* only process the appropriate correlations */
         if (header->corr_type=='A' && inp1!=inp2) continue;
         if (header->corr_type=='C' && inp1==inp2) continue;
-
         /* keep track of which chunk of channels we're up to in autos and crosses.
-            Use visdata as a sort of void pointer to pont to the start of the block
-            of channels. */
+        Use visdata as a sort of void pointer to point to the start of the block
+        of channels. */
         if (inp1 != inp2) {
             /* process a block of cross-correlations */
             visdata = (float *)(cc_data + header->n_chans*cc_chunk_index);
@@ -346,10 +328,8 @@ int readScan(FILE *fp_ac, FILE *fp_cc,int scan_count, Header *header, InpConfig 
             ac_chunk_index += 1;
         }
 
-         /* throw away cross correlations from different pols on the same antenna if we only want cross products */
-         /* we do this here to make sure that the data is read and the file advanced on to data we want */
         if (header->corr_type=='C' && ant1==ant2) continue;
- 
+
         /* calc u,v,w for this baseline in meters */
         u=v=w=0.0;
         if(ant1 != ant2) {
@@ -366,37 +346,13 @@ int readScan(FILE *fp_ac, FILE *fp_cc,int scan_count, Header *header, InpConfig 
         uvdata->v[scan][bl_index] = v/VLIGHT;
         uvdata->w[scan][bl_index] = w/VLIGHT;
 
-        if (debug) {
-            fprintf(fpd,"doing inps %d,%d. ants: %d,%d pols: %d,%d, polind: %d, bl_ind: %d, w (m): %g, delay (m): %g, blrev: %d\n",
-                    inp1,inp2,ant1,ant2,pol1,pol2,pol_ind,bl_index,w,cable_delay,baseline_reverse);
-        }
-        
-        /* if not correcting for geometry, don't apply w */
-        if(!header->geom_correct) {
-            w = 0.0;
-        }
-
-        /* populate the visibility arrays */
+        cvis = (float complex *)visdata;    /* cast this so we can use pointer arithmetic */
         for(chan_ind=0; chan_ind<uvdata->n_freq; chan_ind++) {
-            float complex vis,*cvis,phase=1.0;
             int visindex;
 
             visindex = bl_index*uvdata->n_pol*uvdata->n_freq + chan_ind*uvdata->n_pol + pol_ind;
 
             if (inp1 != inp2) {
-                phase = cexp(I*(-2.0*M_PI)*(w+cable_delay*(baseline_reverse? -1.0:1.0))*k[chan_ind]);
-                //vis = visdata[chan_ind*2] + I*(header->conjugate ? -visdata[chan_ind*2+1]: visdata[chan_ind*2+1]);
-                cvis = (float complex *)visdata;    /* cast this so we can use pointer arithmetic */
-                vis = header->conjugate ? conjf(cvis[chan_ind]) : cvis[chan_ind];
-
-                if(debug && chan_ind==uvdata->n_freq/2) {
-                    fprintf(fpd,"Chan %d, w: %g (wavelen), vis: %g,%g. ph: %g,%g. rot vis: %g,%g\n",
-                                    chan_ind,w*k[chan_ind],creal(vis),cimag(vis),creal(phase),cimag(phase),
-                                    creal(vis*phase),cimag(vis*phase));
-                }
-
-                if (baseline_reverse) vis = conjf(vis);
-                cvis[chan_ind] = vis*phase; /* update the input data with the phase correction */
 
                 /* cross correlation, use imaginary and real */
                 uvdata->visdata[scan][visindex*2   ] = crealf(cvis[chan_ind]);
@@ -416,23 +372,14 @@ int readScan(FILE *fp_ac, FILE *fp_cc,int scan_count, Header *header, InpConfig 
     }
   }
 
-  /* copy out the phase rotated data into the uvfits data structure */
-  for(inp1=0; inp1 < header->n_inputs ; inp1++) {
-    for(inp2=inp1; inp2 < header->n_inputs ; inp2++) {
-        for(chan_ind=0; chan_ind<uvdata->n_freq; chan_ind++) {
-        }
-    }
-  }
-
 
   /* sanity check */
   if (debug) {
-    fprintf(fpd,"At end of readScan. ac_chunk_index: %d, cc_chunk_index: %d\n", ac_chunk_index, cc_chunk_index);
+    fprintf(fpd,"At end of %s. ac_chunk_index: %d, cc_chunk_index: %d\n", __func__,ac_chunk_index, cc_chunk_index);
   }
 
   if (ac_data != NULL) free(ac_data);
   if (cc_data != NULL) free(cc_data);
-  if (k != NULL) free(k);
   return 0;
 }
 

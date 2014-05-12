@@ -395,7 +395,7 @@ int readInputConfig(char *filename, InpConfig *inp) {
  ***************************/
 int readHeader(char *header_filename, Header *header) {
     FILE *fp=NULL;
-    char line[MAX_LINE],key[MAX_LINE],value[MAX_LINE];
+    char line[MAX_LINE],key[MAX_LINE],value[MAX_LINE],junk[MAX_LINE];
     
     if((fp=fopen(header_filename,"r"))==NULL) {
         fprintf(stderr,"ERROR: failed to open obs metadata file <%s>\n",header_filename);
@@ -427,13 +427,12 @@ int readHeader(char *header_filename, Header *header) {
     header->invert_freq = 0;    // correlators have now been fixed
     header->conjugate = 0;      // just in case.
     header->geom_correct = 1;   // default, stop the fringes
-    header->pol_products[0] = '\0';
-    header->pol_products[SIZ_PRODNAME] = '\0';
-    
+    memset(header->pol_products,'\0',SIZ_PRODNAME+1);
+
     while((fgets(line,MAX_LINE-1,fp)) !=NULL) {
         if(line[0]=='\n' || line[0]=='#' || line[0]=='\0') continue; // skip blank/comment lines
 
-        if (sscanf(line,"%s %s",key,value) < 2) {
+        if (sscanf(line,"%s %s %s",key,value,junk) < 2) {
             fprintf(stderr,"WARNING: failed to make 2 conversions on line: %s\n",line);
         }
         if (strncmp(key,"FIELDNAME",MAX_LINE)==0) strncpy(header->field_name,value,SIZE_SOURCE_NAME);
@@ -923,6 +922,139 @@ int calcAntPhases(double mjd, Header *header, array_data *array,double ant_u[], 
             fprintf(fpd,"Ant at epoch: %d, u,v,w: %g,%g,%g.\n",i,ant_u_ep,ant_v_ep,ant_w_ep);
         }
     }
+    return 0;
+}
+
+
+/***********************
+Apply geometric and/or cable length corrections to the data. Handles various MWA and other
+oddities like sign errors and baseline antenna reversals.
+************************/
+int correctPhases(double mjd, Header *header, InpConfig *inps, array_data *array, int bl_ind_lookup[MAX_ANT][MAX_ANT], float *ac_data, float complex *cc_data,double ant_u[MAX_ANT],double ant_v[MAX_ANT],double ant_w[MAX_ANT]) {
+    int chan_ind, baseline_reverse=0, inp1, inp2, ac_chunk_index=0, cc_chunk_index=0,res=0;
+    double *k=NULL;
+    float vis_weight=1.0;
+
+    k  = malloc(sizeof(double)*header->n_chans);
+    assert(k != NULL);
+
+    if(header->integration_time > 0.0) vis_weight = header->integration_time;
+
+    res = calcAntPhases(mjd, header, array,ant_u, ant_v, ant_w);
+    if (res) return res;
+
+    /* pre-calculate wavenumber for each channel */
+    for(chan_ind=0; chan_ind<header->n_chans; chan_ind++) {
+        double freq;
+
+        /* calc wavenumber for this cannel. header freqs are in MHz*/
+        freq = (header->cent_freq + (header->invert_freq? -1.0:1.0)*(chan_ind - header->n_chans/2.0)/header->n_chans*header->bandwidth);
+        k[chan_ind] = freq/(VLIGHT/1e6);
+    }
+
+    for(inp1=0; inp1 < header->n_inputs ; inp1++) {
+        for(inp2=inp1; inp2 < header->n_inputs ; inp2++) {
+            double w,cable_delay=0.0;
+            int pol_ind=0,ant1,ant2,bl_index,pol1,pol2;
+            float *visdata=NULL;
+            float complex *cvis;
+
+            /* decode the inputs into antennas and pols */
+            baseline_reverse=0;
+            ant1 = inps->ant_index[inp1];
+            ant2 = inps->ant_index[inp2];
+            pol1 = inps->pol_index[inp1];
+            pol2 = inps->pol_index[inp2];
+            /* UVFITS by convention expects the index of ant2 to be greater than ant1, so swap if necessary */
+            if (ant1>ant2) {
+                int temp;
+                temp=ant1;
+                ant1=ant2;
+                ant2=temp;
+                temp=pol1;
+                pol1=pol2;
+                pol2=temp;
+                baseline_reverse=1;
+            }
+            if (debug) pol_ind = decodePolIndex(pol1, pol2);
+            bl_index = bl_ind_lookup[ant1][ant2];
+
+            /* cable delay: the goal is to *correct* for differential cable lengths. The inputs include a delta (offset)
+           of cable length relative to some ideal length. (positive = longer than ideal)
+           Call the dot product of the baseline (ant2-ant1) and look direction 'phi'.
+           Then if ant1 has more delay than ant2, then this is like having phi be positive where
+           the visibility is V = Iexp(-j*2*pi*phi)
+           Hence we want to add the difference ant2-ant1 (in wavelengths) to phi to correct for the length difference.
+            */
+            cable_delay = (inps->cable_len_delta[inp2] - inps->cable_len_delta[inp1]);
+            if (baseline_reverse) cable_delay = -cable_delay;
+
+            /* only process the appropriate correlations */
+            if (header->corr_type=='A' && inp1!=inp2) continue;
+            if (header->corr_type=='C' && inp1==inp2) continue;
+
+            /* keep track of which chunk of channels we're up to in autos and crosses.
+            Use visdata as a sort of void pointer to point to the start of the block
+            of channels. */
+            if (inp1 != inp2) {
+                /* process a block of cross-correlations */
+                visdata = (float *)(cc_data + header->n_chans*cc_chunk_index);
+                cc_chunk_index += 1;
+            }
+            else {
+                /* process a block of auto-correlations */
+                visdata = (ac_data + header->n_chans*ac_chunk_index);
+                ac_chunk_index += 1;
+            }
+
+            /* throw away cross correlations from different pols on the same antenna if we only want cross products */
+            if (header->corr_type=='C' && ant1==ant2) continue;
+ 
+            /* calc u,v,w for this baseline in meters */
+            w=0.0;
+            /* if not correcting for geometry, don't apply w */
+            if(header->geom_correct) {
+                //u = ant_u[ant1] - ant_u[ant2];
+                //v = ant_v[ant1] - ant_v[ant2];
+                w = ant_w[ant1] - ant_w[ant2];
+            }
+            // add the cable delay term and 2pi here so that we don't have to add it many times in the loop below.
+            w = (w+cable_delay)*(-2.0*M_PI);
+
+            if (debug>1) {
+                fprintf(fpd,"doing inps %d,%d. ants: %d,%d pols: %d,%d, polind: %d, bl_ind: %d, w (m): %g, delay (m): %g, blrev: %d\n",
+                    inp1,inp2,ant1,ant2,pol1,pol2,pol_ind,bl_index,w,cable_delay,baseline_reverse);
+            }
+
+            /* populate the visibility arrays */
+            cvis = (float complex *) visdata;    /* cast this so we can use pointer arithmetic */
+            for(chan_ind=0; chan_ind < header->n_chans; chan_ind++) {
+                float complex vis,phase;
+
+                if (inp1 != inp2) {
+                    phase = cexp(I*w*k[chan_ind]);
+                    //vis = visdata[chan_ind*2] + I*(header->conjugate ? -visdata[chan_ind*2+1]: visdata[chan_ind*2+1]);
+                    vis = header->conjugate ? conjf(cvis[chan_ind]) : cvis[chan_ind];
+/*
+                    if(debug && chan_ind==header->n_chans/2) {
+                        fprintf(fpd,"Chan %d, w: %g (wavelen), vis: %g,%g. ph: %g,%g. rot vis: %g,%g\n",
+                                    chan_ind,w*k[chan_ind],creal(vis),cimag(vis),creal(phase),cimag(phase),
+                                    creal(vis*phase),cimag(vis*phase));
+                    }
+*/
+                    // apply input-based flags if necessary
+
+                    if ( (inps->inpFlag[inp1] || inps->inpFlag[inp2]) && vis_weight > 0) {
+                        vis=0.0;
+                    }
+
+                    if (baseline_reverse) vis = conjf(vis);
+                    cvis[chan_ind] = vis*phase; /* update the input data with the phase correction */
+                }
+            }
+        }
+    }
+    if (k != NULL) free(k);
     return 0;
 }
 
