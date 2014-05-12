@@ -298,16 +298,21 @@ int applyFlagsFile(char *filename,uvdata *data) {
  file and populate the antenna positions in the
  data structure.
 *******************************/
-int readArray(char *filename, double lat_radian, ant_table *antennas, int *n_ants) {
+int readArray(char *filename, const double lat_radian, const double arr_lon_rad, array_data *array) {
   FILE *fp=NULL;
   char line[MAX_LINE];
   int index=0,nscan;
   double east=0,north=0,height=0;
+  ant_table *antennas;
 
   if( (fp=fopen(filename,"r"))==NULL) {
     fprintf(stderr,"ERROR: readArray: failed to open array file <%s>\n",filename);
     return 1;
   }
+
+  antennas = array->antennas;
+  array->arr_lat_rad = lat_radian;
+  array->arr_lon_rad = arr_lon_rad;
 
   /* scan through lines. convert east,north,height units to XYZ units */
   while((fgets(line,MAX_LINE-1,fp)) !=NULL) {
@@ -329,7 +334,7 @@ int readArray(char *filename, double lat_radian, ant_table *antennas, int *n_ant
         exit(1);
     }
   }
-  *n_ants = index;
+  array->n_ant = index;
   fclose(fp);
   return 0;
 }
@@ -390,7 +395,7 @@ int readInputConfig(char *filename, InpConfig *inp) {
  ***************************/
 int readHeader(char *header_filename, Header *header) {
     FILE *fp=NULL;
-    char line[MAX_LINE],key[MAX_LINE],value[MAX_LINE];
+    char line[MAX_LINE],key[MAX_LINE],value[MAX_LINE],junk[MAX_LINE];
     
     if((fp=fopen(header_filename,"r"))==NULL) {
         fprintf(stderr,"ERROR: failed to open obs metadata file <%s>\n",header_filename);
@@ -422,13 +427,12 @@ int readHeader(char *header_filename, Header *header) {
     header->invert_freq = 0;    // correlators have now been fixed
     header->conjugate = 0;      // just in case.
     header->geom_correct = 1;   // default, stop the fringes
-    header->pol_products[0] = '\0';
-    header->pol_products[SIZ_PRODNAME] = '\0';
-    
+    memset(header->pol_products,'\0',SIZ_PRODNAME+1);
+
     while((fgets(line,MAX_LINE-1,fp)) !=NULL) {
         if(line[0]=='\n' || line[0]=='#' || line[0]=='\0') continue; // skip blank/comment lines
 
-        if (sscanf(line,"%s %s",key,value) < 2) {
+        if (sscanf(line,"%s %s %s",key,value,junk) < 2) {
             fprintf(stderr,"WARNING: failed to make 2 conversions on line: %s\n",line);
         }
         if (strncmp(key,"FIELDNAME",MAX_LINE)==0) strncpy(header->field_name,value,SIZE_SOURCE_NAME);
@@ -719,7 +723,6 @@ void stelaber(double eq, double mjd, double v1[3], double v2[3])
 
    slaMappa(eq,mjd,amprms);
 
-
 /* code from mapqk.c (w/ a few names changed): */
 
 /* Unpack scalar and vector parameters */
@@ -827,11 +830,231 @@ int makeBaselineLookup(InpConfig *inps, Header *header, array_data *array, int b
           if (checkAntennaPresent(inps,ant1) == 0) continue;
             for(ant2=ant1; ant2 < array->n_ant; ant2++) {
               if (checkAntennaPresent(inps,ant2) == 0) continue;
-              if(debug) fprintf(fpd,"BOTH: bl %d is for ants %d-%d\n",bl_index,ant1,ant2);
+              if(debug> 1) fprintf(fpd,"BOTH: bl %d is for ants %d-%d\n",bl_index,ant1,ant2);
               bl_ind_lookup[ant1][ant2] = bl_index++;
             }
         }
     }
+    return 0;
+}
+
+
+/*****************
+Calculate the phase of each antenna for a given time relative to the array centre.
+Applies precession and nutation corrections to calculate the correct u,v,w for
+mean (J2000) coords. The phase on the baseline is then just ant1-conj(ant2)
+*****************/
+int calcAntPhases(double mjd, Header *header, array_data *array,double ant_u[], double ant_v[], double ant_w[]) {
+    double ha,ra_app,dec_app,lmst,ra_aber,dec_aber,ha2000,lmst2000,newarrlat;
+    double rmatpr[3][3], rmattr[3][3];
+    double x,y,z,xprec, yprec, zprec,ant_u_ep, ant_v_ep, ant_w_ep;
+    int i;
+
+    lmst = slaRanorm(slaGmst(mjd) + array->arr_lon_rad);  // local mean sidereal time, given array location
+
+    /* convert mean RA/DEC of phase center to apparent for current observing time. This applies precession,
+     nutation, annual abberation. */
+    slaMap(header->ra_hrs*(M_PI/12.0), header->dec_degs*(M_PI/180.0), 0.0, 0.0, 0.0, 0.0, 2000.0, mjd, &ra_app, &dec_app);
+    if (debug) {
+        fprintf(fpd,"Mean coords (radian):               RA: %g, DEC: %g\n",header->ra_hrs*(M_PI/12.0),
+                      header->dec_degs*(M_PI/180.0));
+        fprintf(fpd,"Precessed apparent coords (radian): RA: %g, DEC: %g\n",ra_app,dec_app);
+    }
+    /* calc apparent HA of phase center, normalise to be between 0 and 2*pi */
+    ha = slaRanorm(lmst - ra_app);
+
+    /* I think this is correct - it does the calculations in the frame with current epoch
+    * and equinox, nutation, and aberrated star positions, i.e., the apparent geocentric
+    * frame of epoch. (AML)
+    */
+
+    if(debug) fprintf(fpd,"lmst: %g (radian). HA (calculated): %g (radian)\n",lmst,ha);
+
+    /* calc el,az of desired phase centre for debugging */
+    if (debug) {
+        double az,el;
+        slaDe2h(ha,dec_app,array->arr_lat_rad,&az,&el);
+        fprintf(fpd,"Phase cent ha/dec: %g,%g. az,el: %g,%g\n",ha,dec_app,az,el);
+    }
+
+    /* Compute the apparent direction of the phase center in the J2000 coordinate system */
+    aber_radec_rad(2000.0,mjd,header->ra_hrs*(M_PI/12.0),header->dec_degs*(M_PI/180.0), &ra_aber,&dec_aber);
+    if (debug) {
+        fprintf(fpd,"aber_radec_rad apparent coords (radian): RA: %g, DEC: %g\n",ra_aber,dec_aber);
+    }
+
+    /* Below, the routines "slaPrecl" and "slaPreces" do only a precession correction,
+     * i.e, they do NOT do corrections for aberration or nutation.
+     *
+     * We want to go from apparent coordinates at the observation epoch
+     * to J2000 coordinates which do not have the nutation or aberration corrections
+     * (and since the frame is J2000 no precession correction is needed).
+     */
+
+    // slaPrecl(slaEpj(mjd),2000.0,rmatpr);  /* 2000.0 = epoch of J2000 */
+    slaPrenut(2000.0,mjd,rmattr);
+    mat_transpose(rmattr,rmatpr);
+    /* rmatpr undoes precession and nutation corrections */
+    ha_dec_j2000(rmatpr,lmst,array->arr_lat_rad,ra_aber,dec_aber,&ha2000,&newarrlat,&lmst2000);
+
+    if (debug) {
+        fprintf(fpd,"Dec, dec_app, newarrlat (radians): %f %f %f\n", header->dec_degs*(M_PI/180.0),dec_app,newarrlat);
+        fprintf(fpd,"lmst, lmst2000 (radians): %f %f\n",lmst,lmst2000);
+        fprintf(fpd,"ha, ha2000 (radians): %f %f\n",ha,ha2000);
+    }
+    /* calc u,v,w at phase center and reference for all antennas relative to center of array */
+    for(i=0; i<array->n_ant; i++) {
+        // double x,y,z;   /* moved to front of this function (Aug. 12, 2011) */
+        x = array->antennas[i].xyz_pos[0];
+        y = array->antennas[i].xyz_pos[1];
+        z = array->antennas[i].xyz_pos[2];
+      /* value of lmst at current epoch - will be changed to effective value in J2000 system
+       *
+       * To do this, need to precess "ra, dec" (in quotes on purpose) of array center
+       * from value at current epoch
+       */
+        precXYZ(rmatpr,x,y,z,lmst,&xprec,&yprec,&zprec,lmst2000);
+        calcUVW(ha,dec_app,x,y,z,&ant_u_ep,&ant_v_ep,&ant_w_ep);
+        calcUVW(ha2000,dec_aber,xprec,yprec,zprec,ant_u+i,ant_v+i,ant_w+i);
+        if (debug) {
+        /* The w value should be the same in either reference frame. */
+            fprintf(fpd,"Ant: %d, u,v,w: %g,%g,%g.\n",i,ant_u[i],ant_v[i],ant_w[i]);
+            fprintf(fpd,"Ant at epoch: %d, u,v,w: %g,%g,%g.\n",i,ant_u_ep,ant_v_ep,ant_w_ep);
+        }
+    }
+    return 0;
+}
+
+
+/***********************
+Apply geometric and/or cable length corrections to the data. Handles various MWA and other
+oddities like sign errors and baseline antenna reversals.
+************************/
+int correctPhases(double mjd, Header *header, InpConfig *inps, array_data *array, int bl_ind_lookup[MAX_ANT][MAX_ANT], float *ac_data, float complex *cc_data,double ant_u[MAX_ANT],double ant_v[MAX_ANT],double ant_w[MAX_ANT]) {
+    int chan_ind, baseline_reverse=0, inp1, inp2, ac_chunk_index=0, cc_chunk_index=0,res=0;
+    double *k=NULL;
+    float vis_weight=1.0;
+
+    k  = malloc(sizeof(double)*header->n_chans);
+    assert(k != NULL);
+
+    if(header->integration_time > 0.0) vis_weight = header->integration_time;
+
+    res = calcAntPhases(mjd, header, array,ant_u, ant_v, ant_w);
+    if (res) return res;
+
+    /* pre-calculate wavenumber for each channel */
+    for(chan_ind=0; chan_ind<header->n_chans; chan_ind++) {
+        double freq;
+
+        /* calc wavenumber for this cannel. header freqs are in MHz*/
+        freq = (header->cent_freq + (header->invert_freq? -1.0:1.0)*(chan_ind - header->n_chans/2.0)/header->n_chans*header->bandwidth);
+        k[chan_ind] = freq/(VLIGHT/1e6);
+    }
+
+    for(inp1=0; inp1 < header->n_inputs ; inp1++) {
+        for(inp2=inp1; inp2 < header->n_inputs ; inp2++) {
+            double w,cable_delay=0.0;
+            int pol_ind=0,ant1,ant2,bl_index,pol1,pol2;
+            float *visdata=NULL;
+            float complex *cvis;
+
+            /* decode the inputs into antennas and pols */
+            baseline_reverse=0;
+            ant1 = inps->ant_index[inp1];
+            ant2 = inps->ant_index[inp2];
+            pol1 = inps->pol_index[inp1];
+            pol2 = inps->pol_index[inp2];
+            /* UVFITS by convention expects the index of ant2 to be greater than ant1, so swap if necessary */
+            if (ant1>ant2) {
+                int temp;
+                temp=ant1;
+                ant1=ant2;
+                ant2=temp;
+                temp=pol1;
+                pol1=pol2;
+                pol2=temp;
+                baseline_reverse=1;
+            }
+            if (debug) pol_ind = decodePolIndex(pol1, pol2);
+            bl_index = bl_ind_lookup[ant1][ant2];
+
+            /* cable delay: the goal is to *correct* for differential cable lengths. The inputs include a delta (offset)
+           of cable length relative to some ideal length. (positive = longer than ideal)
+           Call the dot product of the baseline (ant2-ant1) and look direction 'phi'.
+           Then if ant1 has more delay than ant2, then this is like having phi be positive where
+           the visibility is V = Iexp(-j*2*pi*phi)
+           Hence we want to add the difference ant2-ant1 (in wavelengths) to phi to correct for the length difference.
+            */
+            cable_delay = (inps->cable_len_delta[inp2] - inps->cable_len_delta[inp1]);
+            if (baseline_reverse) cable_delay = -cable_delay;
+
+            /* only process the appropriate correlations */
+            if (header->corr_type=='A' && inp1!=inp2) continue;
+            if (header->corr_type=='C' && inp1==inp2) continue;
+
+            /* keep track of which chunk of channels we're up to in autos and crosses.
+            Use visdata as a sort of void pointer to point to the start of the block
+            of channels. */
+            if (inp1 != inp2) {
+                /* process a block of cross-correlations */
+                visdata = (float *)(cc_data + header->n_chans*cc_chunk_index);
+                cc_chunk_index += 1;
+            }
+            else {
+                /* process a block of auto-correlations */
+                visdata = (ac_data + header->n_chans*ac_chunk_index);
+                ac_chunk_index += 1;
+            }
+
+            /* throw away cross correlations from different pols on the same antenna if we only want cross products */
+            if (header->corr_type=='C' && ant1==ant2) continue;
+ 
+            /* calc u,v,w for this baseline in meters */
+            w=0.0;
+            /* if not correcting for geometry, don't apply w */
+            if(header->geom_correct) {
+                //u = ant_u[ant1] - ant_u[ant2];
+                //v = ant_v[ant1] - ant_v[ant2];
+                w = ant_w[ant1] - ant_w[ant2];
+            }
+            // add the cable delay term and 2pi here so that we don't have to add it many times in the loop below.
+            w = (w+cable_delay)*(-2.0*M_PI);
+
+            if (debug>1) {
+                fprintf(fpd,"doing inps %d,%d. ants: %d,%d pols: %d,%d, polind: %d, bl_ind: %d, w (m): %g, delay (m): %g, blrev: %d\n",
+                    inp1,inp2,ant1,ant2,pol1,pol2,pol_ind,bl_index,w,cable_delay,baseline_reverse);
+            }
+
+            /* populate the visibility arrays */
+            cvis = (float complex *) visdata;    /* cast this so we can use pointer arithmetic */
+            for(chan_ind=0; chan_ind < header->n_chans; chan_ind++) {
+                float complex vis,phase;
+
+                if (inp1 != inp2) {
+                    phase = cexp(I*w*k[chan_ind]);
+                    //vis = visdata[chan_ind*2] + I*(header->conjugate ? -visdata[chan_ind*2+1]: visdata[chan_ind*2+1]);
+                    vis = header->conjugate ? conjf(cvis[chan_ind]) : cvis[chan_ind];
+/*
+                    if(debug && chan_ind==header->n_chans/2) {
+                        fprintf(fpd,"Chan %d, w: %g (wavelen), vis: %g,%g. ph: %g,%g. rot vis: %g,%g\n",
+                                    chan_ind,w*k[chan_ind],creal(vis),cimag(vis),creal(phase),cimag(phase),
+                                    creal(vis*phase),cimag(vis*phase));
+                    }
+*/
+                    // apply input-based flags if necessary
+
+                    if ( (inps->inpFlag[inp1] || inps->inpFlag[inp2]) && vis_weight > 0) {
+                        vis=0.0;
+                    }
+
+                    if (baseline_reverse) vis = conjf(vis);
+                    cvis[chan_ind] = vis*phase; /* update the input data with the phase correction */
+                }
+            }
+        }
+    }
+    if (k != NULL) free(k);
     return 0;
 }
 

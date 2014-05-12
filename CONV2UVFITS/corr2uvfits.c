@@ -82,7 +82,7 @@ int main(const int argc, char * const argv[]) {
   }
 
   /* get the number of antennas and their locations relative to the centre of the array */
-  if ((res = readArray(stationfilename, arr_lat_rad, antennas,&(arraydat->n_ant))) != 0) {
+  if ((res = readArray(stationfilename, arr_lat_rad, arr_lon_rad, arraydat)) != 0) {
       fprintf(stderr,"readArray failed with code %d. exiting\n",res);
   }
 
@@ -204,28 +204,29 @@ int readScan(FILE *fp_ac, FILE *fp_cc,int scan_count, Header *header, InpConfig 
   static double date_zero=0.0;  // time of zeroth scan
 
   array_data *array;    /*convenience pointer */
-  double ha=0,mjd,lmst,ra_app,dec_app;
+  double mjd;
   double ant_u[MAX_ANT],ant_v[MAX_ANT],ant_w[MAX_ANT]; //u,v,w for each antenna, in meters
-  double u,v,w,cable_delay=0;
-  double x,y,z, xprec, yprec, zprec, rmatpr[3][3], rmattr[3][3];
-  double lmst2000, ha2000, newarrlat, ant_u_ep, ant_v_ep, ant_w_ep;
-  double ra_aber, dec_aber;
-  int i,inp1,inp2,ant1,ant2,pol1,pol2,bl_index=0,visindex,pol_ind,chan_ind,n_read;
-  int temp,baseline_reverse,scan=0;
-  float *visdata=NULL;
+  int res=0,chan_ind,n_read,inp1,inp2;
+  int scan=0,ac_chunk_index=0,cc_chunk_index=0;
+  size_t size_ac, size_cc;
+  float *ac_data=NULL,*visdata=NULL;
+  float complex *cc_data=NULL;
 
   array = uvdata->array;
 
-  /* allocate space to read binary correlation data. Size is complex float * n_channels */
-  visdata = calloc(2*uvdata->n_freq,sizeof(float));
-  if (visdata==NULL) {
-      fprintf(stderr,"ERROR: no malloc for visdata array in readScan\n");
-      exit(1);
-  }
+  /* allocate space to read 1 time step of binary correlation data.
+    There are n_inputs*nchan floats of autocorrelations per time step 
+    and n_inp*(n_inp-1)/2*nchan float complex cross correlations*/
+  size_ac = uvdata->n_freq*header->n_inputs*sizeof(float);
+  size_cc = uvdata->n_freq*header->n_inputs*(header->n_inputs-1)/2*sizeof(float complex);
+  ac_data = calloc(1,size_ac);
+  cc_data = calloc(1,size_cc);
+  assert(ac_data != NULL);
+  assert(cc_data != NULL);
 
   if (!init) {
     /* count the total number of antennas actually present in the data */
-    if (debug) fprintf(fpd,"Init readscan.\n");
+    if (debug) fprintf(fpd,"Init %s.\n",__func__);
 
     /* increase size of arrays for the new scan */
     // date and n_baselines should already be allocated
@@ -240,7 +241,7 @@ int readScan(FILE *fp_ac, FILE *fp_cc,int scan_count, Header *header, InpConfig 
     uvdata->baseline = calloc(1,sizeof(float *));
 
     /* make space for the actual visibilities and weights */
-    if (debug) fprintf(fpd,"readScan: callocing array of %d floats\n",uvdata->n_baselines[scan]*uvdata->n_freq*uvdata->n_pol*2);
+    if (debug) fprintf(fpd,"%s: callocing array of %d floats\n",__func__,uvdata->n_baselines[scan]*uvdata->n_freq*uvdata->n_pol*2);
     uvdata->visdata[scan]    = calloc(uvdata->n_baselines[scan]*uvdata->n_freq*uvdata->n_pol*2,sizeof(float));
     uvdata->weightdata[scan] = calloc(uvdata->n_baselines[scan]*uvdata->n_freq*uvdata->n_pol  ,sizeof(float));
     uvdata->u[scan] = calloc(uvdata->n_baselines[scan],sizeof(double));
@@ -249,7 +250,7 @@ int readScan(FILE *fp_ac, FILE *fp_cc,int scan_count, Header *header, InpConfig 
     uvdata->baseline[scan] = calloc(uvdata->n_baselines[scan],sizeof(float));
     if(uvdata->visdata[scan]==NULL || uvdata->weightdata[scan]==NULL || uvdata->visdata[scan]==NULL
        || uvdata->visdata[scan]==NULL || uvdata->visdata[scan]==NULL || uvdata->baseline[scan]==NULL) {
-      fprintf(stderr,"readScan: no malloc for BIG arrays\n");
+      fprintf(stderr,"%s: no malloc for BIG arrays\n",__func__);
       exit(1);
     }
     /* set a weight for the visibilities based on integration time */
@@ -259,140 +260,76 @@ int readScan(FILE *fp_ac, FILE *fp_cc,int scan_count, Header *header, InpConfig 
 
     init=1;
   }
-  
+
+  /* read all the data for this timestep */
+  n_read = fread(cc_data,size_cc,1,fp_cc);
+  if (n_read != 1) {
+    fprintf(stderr,"EOF: reading cross correlations. Wanted to read %d bytes.\n",(int) size_cc);
+    return 1;
+  }
+  n_read = fread(ac_data,size_ac,1,fp_ac);
+  if (n_read != 1) {
+    fprintf(stderr,"EOF: reading auto correlations. Wanted to read %d bytes.\n",(int) size_ac);
+    return 1;
+  }
+
   /* set time of scan. Note that 1/2 scan time offset already accounted for in date[0]. */
   if (scan_count > 0) uvdata->date[scan] = date_zero + scan_count*header->integration_time/86400.0;
+  mjd = uvdata->date[scan] - 2400000.5;  // get Modified Julian date of scan.
 
   /* set default ha/dec from header, if HA was specified. Otherwise, it will be calculated below */
-  dec_app = header->dec_degs*(M_PI/180.0);
-  mjd = uvdata->date[scan] - 2400000.5;  // get Modified Julian date of scan.
-  if (lock_pointing==0) {   // special case for RTS output which wants a phase centre fixed at an az/el, not ra/dec
-    ha = (header->ha_hrs_start+(scan_count+0.5)*header->integration_time/3600.0*1.00274)*(M_PI/12.0);
-  } else {
-    ha = (header->ha_hrs_start)*(M_PI/12.0);
+  if (lock_pointing!=0) {   // special case for RTS output which wants a phase centre fixed at an az/el, not ra/dec
     mjd = date_zero - 2400000.5;  // get Modified Julian date of scan.
   }
 
-  lmst = slaRanorm(slaGmst(mjd) + arr_lon_rad);  // local mean sidereal time, given array location
+  /* apply geometric and/or cable length corrections to the visibilities */
+  res = correctPhases(mjd, header, inps, array, bl_ind_lookup, ac_data, cc_data, ant_u, ant_v, ant_w);
+  if (res) return res;
 
-  /* convert mean RA/DEC of phase center to apparent for current observing time. This applies precession,
-     nutation, annual abberation. */
-  slaMap(header->ra_hrs*(M_PI/12.0), header->dec_degs*(M_PI/180.0), 0.0, 0.0, 0.0, 0.0, 2000.0, mjd, &ra_app, &dec_app);
-  if (debug) fprintf(fpd,"Precessed apparent coords (radian): RA: %g, DEC: %g\n",ra_app,dec_app);
-  /* calc apparent HA of phase center, normalise to be between 0 and 2*pi */
-  ha = slaRanorm(lmst - ra_app);
-
-  /* I think this is correct - it does the calculations in the frame with current epoch 
-  * and equinox, nutation, and aberrated star positions, i.e., the apparent geocentric
-  * frame of epoch. (AML)
-  */
-
-  if(debug) fprintf(fpd,"scan %d. lmst: %g (radian). HA (calculated): %g (radian)\n",scan_count, lmst,ha);
-
-  /* calc el,az of desired phase centre for debugging */
-  if (debug) {
-      double az,el;
-      slaDe2h(ha,dec_app,arr_lat_rad,&az,&el);
-      fprintf(fpd,"Phase cent ha/dec: %g,%g. az,el: %g,%g\n",ha,dec_app,az,el);
-  }
-
-  /* Compute the apparent direction of the phase center in the J2000 coordinate system */
-  aber_radec_rad(2000.0,mjd,header->ra_hrs*(M_PI/12.0),header->dec_degs*(M_PI/180.0), &ra_aber,&dec_aber);
-
-  /* Below, the routines "slaPrecl" and "slaPreces" do only a precession correction,
-   * i.e, they do NOT do corrections for aberration or nutation.
-   *
-   * We want to go from apparent coordinates at the observation epoch
-   * to J2000 coordinates which do not have the nutation or aberration corrections
-   * (and since the frame is J2000 no precession correction is needed).
-   */
-
-  // slaPrecl(slaEpj(mjd),2000.0,rmatpr);  /* 2000.0 = epoch of J2000 */
-  slaPrenut(2000.0,mjd,rmattr);
-  mat_transpose(rmattr,rmatpr);
-  /* rmatpr undoes precession and nutation corrections */
-  ha_dec_j2000(rmatpr,lmst,arr_lat_rad,ra_aber,dec_aber,&ha2000,&newarrlat,&lmst2000);
-
-  if (debug) {
-    fprintf(fpd,"Dec, dec_app, newarrlat (radians): %f %f %f\n",
-        header->dec_degs*(M_PI/180.0),dec_app,newarrlat);
-    fprintf(fpd,"lmst, lmst2000 (radians): %f %f\n",lmst,lmst2000);
-    fprintf(fpd,"ha, ha2000 (radians): %f %f\n",ha,ha2000);
-  }
-  /* calc u,v,w at phase center and reference for all antennas relative to center of array */
-  for(i=0; i<array->n_ant; i++) {
-    // double x,y,z;   /* moved to front of this function (Aug. 12, 2011) */
-      x = array->antennas[i].xyz_pos[0];
-      y = array->antennas[i].xyz_pos[1];
-      z = array->antennas[i].xyz_pos[2];
-      /* value of lmst at current epoch - will be changed to effective value in J2000 system 
-       * 
-       * To do this, need to precess "ra, dec" (in quotes on purpose) of array center
-       * from value at current epoch 
-       */
-      precXYZ(rmatpr,x,y,z,lmst,&xprec,&yprec,&zprec,lmst2000);
-      calcUVW(ha,dec_app,x,y,z,&ant_u_ep,&ant_v_ep,&ant_w_ep);
-      calcUVW(ha2000,dec_aber,xprec,yprec,zprec,ant_u+i,ant_v+i,ant_w+i);
-      if (debug) {
-        /* The w value should be the same in either reference frame. */
-          fprintf(fpd,"Ant: %d, u,v,w: %g,%g,%g.\n",i,ant_u[i],ant_v[i],ant_w[i]);
-          fprintf(fpd,"Ant at epoch: %d, u,v,w: %g,%g,%g.\n",i,ant_u_ep,ant_v_ep,ant_w_ep);
-      }
-  }
- 
+  /* copy out the phase rotated data into the uvfits data structure */
   for(inp1=0; inp1 < header->n_inputs ; inp1++) {
     for(inp2=inp1; inp2 < header->n_inputs ; inp2++) {
+        float complex *cvis;
+        int ant1,ant2,pol1,pol2,pol_ind,bl_index;
+        double u,v,w;
 
         /* decode the inputs into antennas and pols */
-        baseline_reverse=0;
         ant1 = inps->ant_index[inp1];
         ant2 = inps->ant_index[inp2];
         pol1 = inps->pol_index[inp1];
         pol2 = inps->pol_index[inp2];
         /* UVFITS by convention expects the index of ant2 to be greater than ant1, so swap if necessary */
         if (ant1>ant2) {
+            int temp;
             temp=ant1;
             ant1=ant2;
             ant2=temp;
             temp=pol1;
             pol1=pol2;
             pol2=temp;
-            baseline_reverse=1;
         }
         pol_ind = decodePolIndex(pol1, pol2);
         bl_index = bl_ind_lookup[ant1][ant2];
-        
-        /* cable delay: the goal is to *correct* for differential cable lengths. The inputs include a delta (offset)
-           of cable length relative to some ideal length. (positive = longer than ideal)
-           Call the dot product of the baseline (ant2-ant1) and look direction 'phi'.
-           Then if ant1 has more delay than ant2, then this is like having phi be positive where
-           the visibility is V = Iexp(-j*2*pi*phi)
-           Hence we want to add the difference ant2-ant1 (in wavelengths) to phi to correct for the length difference.
-         */
-        cable_delay = (inps->cable_len_delta[inp2] - inps->cable_len_delta[inp1]);
-        
+
         /* only process the appropriate correlations */
         if (header->corr_type=='A' && inp1!=inp2) continue;
         if (header->corr_type=='C' && inp1==inp2) continue;
-
-        /* There is now one block of channels for each correlation product, read it. */
+        /* keep track of which chunk of channels we're up to in autos and crosses.
+        Use visdata as a sort of void pointer to point to the start of the block
+        of channels. */
         if (inp1 != inp2) {
-            /* read a block of cross-correlations */
-            n_read = fread(visdata,sizeof(float)*2,uvdata->n_freq,fp_cc);
+            /* process a block of cross-correlations */
+            visdata = (float *)(cc_data + header->n_chans*cc_chunk_index);
+            cc_chunk_index += 1;
         }
         else {
-            /* read a block of auto-correlations */
-            n_read = fread(visdata,sizeof(float),uvdata->n_freq,fp_ac);
+            /* process a block of auto-correlations */
+            visdata = (ac_data + header->n_chans*ac_chunk_index);
+            ac_chunk_index += 1;
         }
-        if (n_read != uvdata->n_freq) {
-            fprintf(stderr,"EOF: inps %d,%d. expected to read %d channels, only got %d\n",inp1, inp2,uvdata->n_freq,n_read);
-            return 1;
-        }
- 
-         /* throw away cross correlations from different pols on the same antenna if we only want cross products */
-         /* we do this here to make sure that the data is read and the file advanced on to data we want */
-         if (header->corr_type=='C' && ant1==ant2) continue;
- 
+
+        if (header->corr_type=='C' && ant1==ant2) continue;
+
         /* calc u,v,w for this baseline in meters */
         u=v=w=0.0;
         if(ant1 != ant2) {
@@ -404,44 +341,22 @@ int readScan(FILE *fp_ac, FILE *fp_cc,int scan_count, Header *header, InpConfig 
         /* populate the baseline info. Antenna numbers start at 1 in UVFITS.  */
         uvdata->baseline[scan][bl_index] = 0; // default: no baseline. useful to catch bugs.
         EncodeBaseline(ant1+1, ant2+1, uvdata->baseline[scan]+bl_index);
-        /* arcane units of UVFITS require u,v,w in nanoseconds */
+        /* arcane units of UVFITS require u,v,w in light-seconds */
         uvdata->u[scan][bl_index] = u/VLIGHT;
         uvdata->v[scan][bl_index] = v/VLIGHT;
         uvdata->w[scan][bl_index] = w/VLIGHT;
 
-        if (debug) {
-            fprintf(fpd,"doing inps %d,%d. ants: %d,%d pols: %d,%d, polind: %d, bl_ind: %d, w (m): %g, delay (m): %g, blrev: %d\n",
-                    inp1,inp2,ant1,ant2,pol1,pol2,pol_ind,bl_index,w,cable_delay,baseline_reverse);
-        }
-        
-        /* if not correcting for geometry, don't apply w */
-        if(!header->geom_correct) {
-            w = 0.0;
-        }
-
-        /* populate the visibility arrays */
+        cvis = (float complex *)visdata;    /* cast this so we can use pointer arithmetic */
         for(chan_ind=0; chan_ind<uvdata->n_freq; chan_ind++) {
-            double freq,lambda;
-            float complex vis,phase=1.0;
+            int visindex;
 
-            /* calc wavelen for this channel in meters. header freqs are in MHz*/
-            freq = (header->cent_freq + (header->invert_freq? -1.0:1.0)*(chan_ind - uvdata->n_freq/2.0)/uvdata->n_freq*header->bandwidth);
-            lambda = (VLIGHT/1e6)/freq;
-            phase = cexp(I*(-2.0*M_PI)*(w+cable_delay*(baseline_reverse? -1.0:1.0))/lambda);
             visindex = bl_index*uvdata->n_pol*uvdata->n_freq + chan_ind*uvdata->n_pol + pol_ind;
-            vis = visdata[chan_ind*2] + I*(header->conjugate ? -visdata[chan_ind*2+1]: visdata[chan_ind*2+1]);
-
-            if(debug && chan_ind==uvdata->n_freq/2) {
-                fprintf(fpd,"Chan %d, w: %g (wavelen), vis: %g,%g. ph: %g,%g. rot vis: %g,%g\n",chan_ind,w/lambda,creal(vis),cimag(vis),creal(phase),cimag(phase),creal(vis*phase),cimag(vis*phase));
-            }
-
-            if (baseline_reverse) vis = conj(vis);
-            vis *= phase;
 
             if (inp1 != inp2) {
+
                 /* cross correlation, use imaginary and real */
-                uvdata->visdata[scan][visindex*2   ] = crealf(vis);
-                uvdata->visdata[scan][visindex*2 +1] = cimagf(vis);
+                uvdata->visdata[scan][visindex*2   ] = crealf(cvis[chan_ind]);
+                uvdata->visdata[scan][visindex*2 +1] = cimagf(cvis[chan_ind]);
             }
             else {
                 /* auto correlation, set imag to zero */
@@ -455,9 +370,16 @@ int readScan(FILE *fp_ac, FILE *fp_cc,int scan_count, Header *header, InpConfig 
             }
         }
     }
-
   }
-  if (visdata != NULL) free(visdata);
+
+
+  /* sanity check */
+  if (debug) {
+    fprintf(fpd,"At end of %s. ac_chunk_index: %d, cc_chunk_index: %d\n", __func__,ac_chunk_index, cc_chunk_index);
+  }
+
+  if (ac_data != NULL) free(ac_data);
+  if (cc_data != NULL) free(cc_data);
   return 0;
 }
 
@@ -581,6 +503,8 @@ void initData(uvdata *data) {
   data->visdata=NULL;
   data->pol_type=1;    /* default is Stokes pol products */
   data->array->n_ant=0;
+  data->array->arr_lat_rad = arr_lat_rad;
+  data->array->arr_lon_rad = arr_lon_rad;
   strcpy(data->array->name,"UNKNOWN");
 }
 
