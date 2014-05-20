@@ -70,6 +70,7 @@ int main(const int argc, char * const argv[]) {
   source = calloc(1,sizeof(source_table));
   arraydat = calloc(1,sizeof(array_data));
   antennas = calloc(MAX_ANT,sizeof(ant_table));
+  memset(&inputs,'\0', sizeof(InpConfig));
   assert(antennas!=NULL && source!=NULL && arraydat!=NULL && data !=NULL);
   data->array    = arraydat;
   data->array->antennas = antennas;

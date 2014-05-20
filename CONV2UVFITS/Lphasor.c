@@ -78,7 +78,7 @@ int main(const int argc, char * const argv[]) {
   arraydat = calloc(1,sizeof(array_data));
   antennas = calloc(MAX_ANT,sizeof(ant_table));
   assert(antennas!=NULL && arraydat!=NULL && data != NULL);
-
+  memset(&inputs,'\0', sizeof(InpConfig));
   arraydat->antennas = antennas;
   arraydat->arr_lat_rad = options.arr_lat_rad;
   arraydat->arr_lon_rad = options.arr_lon_rad;
@@ -181,7 +181,7 @@ int doScan(FILE *fp_cc, FILE *fpout_cc, int scan_count, Header *header, InpConfi
     There are n_inputs*nchan floats of autocorrelations per time step 
     and n_inp*(n_inp-1)/2*nchan float complex cross correlations*/
   size_cc = header->n_chans*header->n_inputs*(header->n_inputs-1)/2*sizeof(float complex);
-  cc_data = calloc(1,size_cc);
+  cc_data = malloc(size_cc);
   assert(cc_data != NULL);
 
   if (!init) {
@@ -199,7 +199,8 @@ int doScan(FILE *fp_cc, FILE *fpout_cc, int scan_count, Header *header, InpConfi
   n_read = fread(cc_data,size_cc,1,fp_cc);
   if (n_read != 1) {
     //fprintf(stderr,"EOF: reading cross correlations. Wanted to read %d bytes.\n",(int) size_cc);
-    return 1;
+    res=1;
+    goto EXIT;
   }
 
   /* set time of scan. Note that 1/2 scan time offset already accounted for in date[0]. */
@@ -213,17 +214,20 @@ int doScan(FILE *fp_cc, FILE *fpout_cc, int scan_count, Header *header, InpConfi
 
   /* apply geometric and/or cable length corrections to the visibilities */
   res = correctPhases(mjd, header, inps, array, bl_ind_lookup, NULL, cc_data, ant_u, ant_v, ant_w);
-  if (res) return res;
+  if (res) goto EXIT;
 
   /* write the data back out again */
   n_read = fwrite(cc_data,size_cc,1,fpout_cc);
   if (n_read != 1) {
     fprintf(stderr,"%s: Failed to write cross correlations of size %d\n",__func__,(int)size_cc);
-    return 1;
+    res = 1;
   }
 
+  if (debug) fprintf(fpd,"%s: processed scan %d\n",__func__,scan_count);
+
+EXIT:
   if (cc_data != NULL) free(cc_data);
-  return 0;
+  return res;
 }
 
 
