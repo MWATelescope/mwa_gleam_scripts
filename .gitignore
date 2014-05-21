@@ -11,6 +11,7 @@ build
 CONV2UVFITS/corr2uvfits
 CONV2UVFITS/libsla.a
 CONV2UVFITS/test_readuvfits
+CONV2UVFITS/Lphasor
 build_lfiles/build_lfiles
 casatasks/flagChanGaps.py
 casatasks/flagChanGaps_cli.py

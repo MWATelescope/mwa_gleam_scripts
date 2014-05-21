@@ -401,33 +401,18 @@ int readHeader(char *header_filename, Header *header) {
         fprintf(stderr,"ERROR: failed to open obs metadata file <%s>\n",header_filename);
         exit(1);
     }
-    header->n_scans=0;
-    header->n_inputs  = 0;
-    header->n_chans=0;
+    memset(header,'\0', sizeof(Header));
     header->corr_type = 'N';
-    header->integration_time = 0.0;
-    header->cent_freq = 0;
-    header->bandwidth = 0;
     header->ha_hrs_start = -99.0;
     header->ra_hrs = -99.0;
     header->dec_degs = -99.0;
     header->ref_el = M_PI/2.0;
     header->ref_az = 0.0;
-    header->year=0;
-    header->month=0;
-    header->day=0;
-    header->ref_hour=0;
-    header->ref_minute=0;
-    header->ref_second=0;
-    memset(header->field_name,0,SIZE_SOURCE_NAME+1);
     strcpy(header->telescope,"MWA");
     strcpy(header->instrument,"128T");
-    header->telescope[SIZ_TELNAME]='\0';
-    header->instrument[SIZ_TELNAME]='\0';
     header->invert_freq = 0;    // correlators have now been fixed
     header->conjugate = 0;      // just in case.
     header->geom_correct = 1;   // default, stop the fringes
-    memset(header->pol_products,'\0',SIZ_PRODNAME+1);
 
     while((fgets(line,MAX_LINE-1,fp)) !=NULL) {
         if(line[0]=='\n' || line[0]=='#' || line[0]=='\0') continue; // skip blank/comment lines
@@ -1006,9 +991,6 @@ int correctPhases(double mjd, Header *header, InpConfig *inps, array_data *array
                 visdata = (ac_data + header->n_chans*ac_chunk_index);
                 ac_chunk_index += 1;
             }
-
-            /* throw away cross correlations from different pols on the same antenna if we only want cross products */
-            if (header->corr_type=='C' && ant1==ant2) continue;
  
             /* calc u,v,w for this baseline in meters */
             w=0.0;
