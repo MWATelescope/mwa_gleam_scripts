@@ -17,7 +17,6 @@
 //  Copyright (c) 2013 ICRAR/UWA. All rights reserved.
 //
 
-
 #include "compress.h"
 #include <fitsio.h>
 
@@ -86,18 +85,7 @@ int main(int argc, const char * argv[])
     remove(OutputFileName);
     fits_create_file(&out, OutputFileName, &status);
  
-/*
-    size_t blockSize = 20000000;
-    char *memblock = (char*) malloc(blockSize);
-    fits_create_memfile(&out,(void**) &memblock, &blockSize, 2880, &realloc, &status);
-*/
  	PRINTERRMSG(status);
-
-    //copy and skip the first HDU
-    fits_copy_header(in, out, &status);
-    PRINTERRMSG(status);
-    fits_movrel_hdu(in, 1, NULL, &status);
-    PRINTERRMSG(status);
 
     time_t timerb, timere;
     time(&timerb);
