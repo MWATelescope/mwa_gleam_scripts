@@ -1,7 +1,15 @@
+CFLAGS=-g -O -Wall -D_FILE_OFFSET_BITS=64
 CFITSIO_INCS=$(shell pkg-config --silence-errors --cflags cfitsio)
 CFITSIO_LIBS=$(shell pkg-config --silence-errors --libs cfitsio)
-INCS=$(shell python -c "if len('${INCLUDE}')>0:print ' '.join(['-I ' + s for s in '${INCLUDE}'.split(':')])") -L${CFITSLIB} -I${CFITSINC} 
-CFLAGS+=-Wall
+
+# Hacks for people who have installed cfitsio themselves instead of using a package manager
+INCS=$(shell python -c "if len('${INCLUDE}')>0:print ' '.join(['-I ' + s for s in '${INCLUDE}'.split(':')])")
+ifneq ($(strip $(CFITSINC)),)
+INCS += -I$(CFITSINC)
+endif
+ifneq ($(strip $(CFITSLIB)),)
+INCS += -L$(CFITSLIB)
+endif
 
 all: build_lfiles read_mwac uvcompress
 
