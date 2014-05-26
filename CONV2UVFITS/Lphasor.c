@@ -19,12 +19,10 @@
 
 typedef struct {
     char *outccfilename;
-    char *outacfilename;
     char *stationfilename;
     char *configfilename;
     char *header_filename;
     char *crosscor_filename;
-    char *autocorr_filename;
     char *flagfilename;
     double arr_lat_rad;
     double arr_lon_rad;
@@ -34,7 +32,7 @@ typedef struct {
 
 /* private function prototypes */
 void printusage(const char *progname);
-int doScan(FILE *fp_ac, FILE *fp_cc,FILE *fpout_ac, FILE *fpout_cc,int scan,Header *header, InpConfig *inps, uvdata *data);
+int doScan(FILE *fp_cc,FILE *fpout_cc,int scan,Header *header, InpConfig *inps, uvdata *data);
 void parse_cmdline(const int argc, char * const argv[], const char *optstring);
 int applyHeader(Header *header, uvdata *data);
 void checkInputs(Header *header,uvdata *data,InpConfig *inputs);
@@ -52,8 +50,8 @@ static cl_options options;
 /************************
 ************************/
 int main(const int argc, char * const argv[]) {
-  const char optstring[] = "vldS:a:c:o:I:H:A:F:s:";
-  FILE *fpin_ac=NULL,*fpin_cc=NULL,*fpout_cc=NULL,*fpout_ac=NULL;
+  const char optstring[] = "vldS:c:o:I:H:A:F:";
+  FILE *fpin_cc=stdin,*fpout_cc=stdout;
   int scan=0,res=0;
   Header header;
   InpConfig inputs;
@@ -80,7 +78,7 @@ int main(const int argc, char * const argv[]) {
   arraydat = calloc(1,sizeof(array_data));
   antennas = calloc(MAX_ANT,sizeof(ant_table));
   assert(antennas!=NULL && arraydat!=NULL && data != NULL);
-
+  memset(&inputs,'\0', sizeof(InpConfig));
   arraydat->antennas = antennas;
   arraydat->arr_lat_rad = options.arr_lat_rad;
   arraydat->arr_lon_rad = options.arr_lon_rad;
@@ -106,23 +104,15 @@ int main(const int argc, char * const argv[]) {
 
   checkInputs(&header,data,&inputs);
 
-  /* open input files */
-  if (header.corr_type!='A' && (fpin_cc=fopen(options.crosscor_filename,"r"))==NULL) {
+  /* open input */
+  if (options.crosscor_filename != NULL && (fpin_cc=fopen(options.crosscor_filename,"r"))==NULL) {
     fprintf(stderr,"cannot open cross correlation input file <%s>\n",options.crosscor_filename);
     exit(1);
   }
-  if (header.corr_type!='C' && (fpin_ac=fopen(options.autocorr_filename,"r"))==NULL) {
-    fprintf(stderr,"cannot open auto correlation input file <%s>\n",options.autocorr_filename);
-    exit(1);
-  }
 
-  /* open output files */
-  if (header.corr_type != 'A' && (fpout_cc=fopen(options.outccfilename,"wb"))==NULL) {
+  /* open output */
+  if (options.outccfilename != NULL && (fpout_cc=fopen(options.outccfilename,"wb"))==NULL) {
     fprintf(stderr,"cannot open cross correlation output file <%s>\n",options.outccfilename);
-    exit(1);
-  }
-  if (header.corr_type != 'C' && (fpout_ac=fopen(options.outacfilename,"wb"))==NULL) {
-    fprintf(stderr,"cannot open auto correlation output file <%s>\n",options.outacfilename);
     exit(1);
   }
 
@@ -142,7 +132,7 @@ int main(const int argc, char * const argv[]) {
 
   /* read each scan, populating the data structure. */
   scan=0;
-  while ((res = doScan(fpin_ac,fpin_cc,fpout_ac,fpout_cc,scan, &header, &inputs,data))==0) {
+  while ((res = doScan(fpin_cc,fpout_cc,scan, &header, &inputs,data))==0) {
 
     if (options.flagfilename != NULL) {
       if (debug) fprintf(fpd,"Applying flags...\n");
@@ -162,10 +152,8 @@ int main(const int argc, char * const argv[]) {
   if (debug) fprintf(fpd,"Read %d time steps\n",scan);
 
   /* finish up  */
-  if(fpin_ac !=NULL) fclose(fpin_ac);
-  if(fpin_cc !=NULL) fclose(fpin_cc);
-  if(fpout_ac !=NULL) fclose(fpout_ac);
-  if(fpout_cc !=NULL) fclose(fpout_cc);
+  if(fpin_cc !=NULL && fpin_cc != stdin) fclose(fpin_cc);
+  if(fpout_cc !=NULL && fpout_cc != stdout) fclose(fpout_cc);
 
   freeUVFITSdata(data);
 
@@ -175,7 +163,7 @@ int main(const int argc, char * const argv[]) {
 
 /***************************
  ***************************/
-int doScan(FILE *fp_ac, FILE *fp_cc,FILE *fpout_ac, FILE *fpout_cc,int scan_count, Header *header, InpConfig *inps,uvdata *uvdata) {
+int doScan(FILE *fp_cc, FILE *fpout_cc, int scan_count, Header *header, InpConfig *inps, uvdata *uvdata) {
 
   static int init=0;
   //static float vis_weight=1.0;
@@ -184,8 +172,7 @@ int doScan(FILE *fp_ac, FILE *fp_cc,FILE *fpout_ac, FILE *fpout_cc,int scan_coun
   double mjd;
   double ant_u[MAX_ANT],ant_v[MAX_ANT],ant_w[MAX_ANT]; //u,v,w for each antenna, in meters
   int res=0,n_read,scan=0;
-  size_t size_ac, size_cc;
-  float *ac_data=NULL;
+  size_t size_cc;
   float complex *cc_data=NULL;
   array_data *array;
 
@@ -193,11 +180,8 @@ int doScan(FILE *fp_ac, FILE *fp_cc,FILE *fpout_ac, FILE *fpout_cc,int scan_coun
   /* allocate space to read 1 time step of binary correlation data.
     There are n_inputs*nchan floats of autocorrelations per time step 
     and n_inp*(n_inp-1)/2*nchan float complex cross correlations*/
-  size_ac = header->n_chans*header->n_inputs*sizeof(float);
   size_cc = header->n_chans*header->n_inputs*(header->n_inputs-1)/2*sizeof(float complex);
-  ac_data = calloc(1,size_ac);
-  cc_data = calloc(1,size_cc);
-  assert(ac_data != NULL);
+  cc_data = malloc(size_cc);
   assert(cc_data != NULL);
 
   if (!init) {
@@ -215,12 +199,8 @@ int doScan(FILE *fp_ac, FILE *fp_cc,FILE *fpout_ac, FILE *fpout_cc,int scan_coun
   n_read = fread(cc_data,size_cc,1,fp_cc);
   if (n_read != 1) {
     //fprintf(stderr,"EOF: reading cross correlations. Wanted to read %d bytes.\n",(int) size_cc);
-    return 1;
-  }
-  n_read = fread(ac_data,size_ac,1,fp_ac);
-  if (n_read != 1) {
-    //fprintf(stderr,"EOF: reading auto correlations. Wanted to read %d bytes.\n",(int) size_ac);
-    return 1;
+    res=1;
+    goto EXIT;
   }
 
   /* set time of scan. Note that 1/2 scan time offset already accounted for in date[0]. */
@@ -233,24 +213,21 @@ int doScan(FILE *fp_ac, FILE *fp_cc,FILE *fpout_ac, FILE *fpout_cc,int scan_coun
   }
 
   /* apply geometric and/or cable length corrections to the visibilities */
-  res = correctPhases(mjd, header, inps, array, bl_ind_lookup, ac_data, cc_data, ant_u, ant_v, ant_w);
-  if (res) return res;
+  res = correctPhases(mjd, header, inps, array, bl_ind_lookup, NULL, cc_data, ant_u, ant_v, ant_w);
+  if (res) goto EXIT;
 
   /* write the data back out again */
   n_read = fwrite(cc_data,size_cc,1,fpout_cc);
   if (n_read != 1) {
     fprintf(stderr,"%s: Failed to write cross correlations of size %d\n",__func__,(int)size_cc);
-    return 1;
-  }
-  n_read = fwrite(ac_data,size_ac,1,fpout_ac);
-  if (n_read != 1) {
-    fprintf(stderr,"%s: Failed to write auto correlations of size %d\n",__func__,(int)size_ac);
-    return 1;
+    res = 1;
   }
 
-  if (ac_data != NULL) free(ac_data);
+  if (debug) fprintf(fpd,"%s: processed scan %d\n",__func__,scan_count);
+
+EXIT:
   if (cc_data != NULL) free(cc_data);
-  return 0;
+  return res;
 }
 
 
@@ -267,10 +244,6 @@ void parse_cmdline(const int argc,char * const argv[], const char *optstring) {
           case 'S': options.stationfilename = optarg;
             break;
           case 'o': options.outccfilename = optarg;
-            break;
-          case 's': options.outacfilename = optarg;
-            break;
-          case 'a': options.autocorr_filename = optarg;
             break;
           case 'c': options.crosscor_filename = optarg;
             break;
@@ -318,8 +291,8 @@ void parse_cmdline(const int argc,char * const argv[], const char *optstring) {
     }
 
     /* auto flagging requires autocorrelations */
-    if (options.autocorr_filename==NULL && options.do_flag) {
-        fprintf(stderr,"ERROR: auto flagging requires the autocorrelations to be used\n");
+    if (options.do_flag) {
+        fprintf(stderr,"WARNING: no autoflag this.\n");
         exit(1);
     }
 }
@@ -330,10 +303,8 @@ void parse_cmdline(const int argc,char * const argv[], const char *optstring) {
 void printusage(const char *progname) {
   fprintf(stderr,"Usage: %s [options]\n\n",progname);
   fprintf(stderr,"options are:\n");
-  fprintf(stderr,"-a filename\tThe name of the input autocorrelation data file. no default.\n");
-  fprintf(stderr,"-c filename\tThe name of the input cross-correlation data file. no default.\n");
-  fprintf(stderr,"-o filename\tThe name of the output cross correlation file. No default.\n");
-  fprintf(stderr,"-s filename\tThe name of the output auto (self) correlation file. No default.\n");
+  fprintf(stderr,"-c filename\tThe name of the input cross-correlation data file. Default: stdin.\n");
+  fprintf(stderr,"-o filename\tThe name of the output cross correlation file. Default: stdout.\n");
   fprintf(stderr,"-S filename\tThe name of the file containing antenna name and local x,y,z. Default: %s\n",
                     options.stationfilename);
   fprintf(stderr,"-I filename\tThe name of the file containing instrument config. Default: %s\n",options.configfilename);
@@ -415,22 +386,24 @@ void checkInputs(Header *header,uvdata *data,InpConfig *inputs) {
         fprintf(stderr,"ERROR: mismatch between the number of antennas in %s (%d) and %s (%d)\n",
                 options.stationfilename,data->array->n_ant,options.configfilename,total_ants);
     }
-    
-    if ((options.crosscor_filename==NULL || options.outccfilename==NULL) && 
-        (header->corr_type == 'C' || header->corr_type=='B')) {
-        fprintf(stderr,"ERROR: must specify an input and output cross correlation file for type '%c'\n",header->corr_type);
-        exit(1);
+
+    if (header->corr_type != 'C') {
+        // silently override the header type since we only care about the cross correlations
+        if (debug) fprintf(fpd,"INFO: Overriding input type to 'C'\n");
+        header->corr_type = 'C';
     }
-    if ((options.autocorr_filename==NULL || options.outacfilename==NULL) && 
-        (header->corr_type == 'A' || header->corr_type=='B')) {
-        fprintf(stderr,"ERROR: must specify an input and output auto correlation file for type '%c'\n",header->corr_type);
-        exit(1);
+
+    if (options.crosscor_filename==NULL && debug!=0 ) {
+        fprintf(fpd,"INFO: reading from stdin\n");
+    }
+    if (options.outccfilename==NULL && debug!=0 ) {
+        fprintf(fpd,"INFO: writing to stdout\n");
     }
     if (header->ha_hrs_start == -99.0 && lock_pointing) {
         fprintf(stderr,"ERROR: HA must be specified in header if -l flag is used.\n");
         exit(1);
     }
-
+    
 }
 
 
