@@ -13,6 +13,8 @@ CONV2UVFITS/libsla.a
 CONV2UVFITS/test_readuvfits
 CONV2UVFITS/Lphasor
 build_lfiles/build_lfiles
+build_lfiles/read_mwac
+build_lfiles/uvcompress
 casatasks/flagChanGaps.py
 casatasks/flagChanGaps_cli.py
 casatasks/flagDC.py
