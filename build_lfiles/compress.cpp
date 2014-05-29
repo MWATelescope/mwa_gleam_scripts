@@ -63,8 +63,8 @@ int fits_write_compressed(fitsfile *out, float *buff_in, LONGLONG nelements, int
     // add the keys
     double bzero = 0;
     bscale = 1.0/bscale;
-    fits_write_key(out, TDOUBLE, "BSCALE", &bscale, NULL, &status);
-    fits_write_key(out, TDOUBLE, "BZERO", &bzero, NULL, &status);
+    fits_update_key(out, TDOUBLE, "BSCALE", &bscale, NULL, &status);
+    fits_update_key(out, TDOUBLE, "BZERO", &bzero, NULL, &status);
     PRINTERRMSG(status);
     
     free(buff_out);
@@ -87,7 +87,7 @@ int fits_write_compressed(fitsfile *out, float *buff_in, LONGLONG nelements, int
 int Compress(fitsfile *in, fitsfile *out, double bscale, int comp, bool v)
 {
     long naxes[]={1,1,1,1,1,1,1,1,1};
-    int naxis;
+    int naxis=0;
     int status = 0;    // returned status of FITS functions
     int bitpix;
     int count = 0;
@@ -98,28 +98,35 @@ int Compress(fitsfile *in, fitsfile *out, double bscale, int comp, bool v)
     while(status != END_OF_FILE){
 
         cout << "Reading HDU "<<count++ << endl;
-        
+
         // get image dimensions and total number of pixels in image
         fits_get_img_param(in, 9, &bitpix, &naxis, naxes, &status);
         PRINTERRMSG(status);
 
-        // try reading the whole image
-        LONGLONG nelements = naxes[0] * naxes[1] * naxes[2] * naxes[3] * naxes[4] * naxes[5] * naxes[6] * naxes[7] * naxes[8];
-        
-        float *buff_in = (float*) malloc(sizeof(float) * nelements);
-        if( buff_in == NULL ){
-            cerr << "Err: Could not allocate memory.";
-            exit(EXIT_FAILURE);
+        //copy and skip the first HDU, which has NAXIS=0
+        if (naxis==0) {
+            fits_copy_header(in, out, &status);
+            PRINTERRMSG(status);
+            cout << "HDU has NAXIS 0. Just copying header" << endl;
         }
+        else {
+            // read whole HDU and convert in one shot
+            LONGLONG nelements = naxes[0] * naxes[1] * naxes[2] * naxes[3] * naxes[4] * naxes[5] * naxes[6] * naxes[7] * naxes[8];
         
-        float nulval = 0.0;
-        fits_read_img(in, TFLOAT, 1, nelements, &nulval, buff_in, NULL, &status);
-        PRINTERRMSG(status);
+            float *buff_in = (float*) malloc(sizeof(float) * nelements);
+            if( buff_in == NULL ){
+                cerr << "Err: Could not allocate memory.";
+                exit(EXIT_FAILURE);
+            }
+
+            float nulval = 0.0;
+            fits_read_img(in, TFLOAT, 1, nelements, &nulval, buff_in, NULL, &status);
+            PRINTERRMSG(status);
         
         fits_write_compressed(out, buff_in, nelements, naxis, naxes, bscale, comp, maxabsdiff, maxreldiff);
 
-        free(buff_in);
-        
+            free(buff_in);
+        }
         // try next HDU
         fits_movrel_hdu(in, 1, NULL, &status);
     }
