@@ -26,10 +26,10 @@ return status;                                  \
 }}                                              \
 
 // basic functions
-int fits_write_compressed(fitsfile *out, float *buff_in, LONGLONG nelements, int naxis, long *naxes, double bscale, int comp);
+int fits_write_compressed(fitsfile *out, float *buff_in, LONGLONG nelements, int naxis, long *naxes, float bscale, int comp, float &maxabsdiff, float &maxreldiff);
 
 
-int Compress(fitsfile *in, fitsfile *out, double bscale, int comp);
+int Compress(fitsfile *in, fitsfile *out, double bscale, int comp, bool v);
 int Decompress(fitsfile *in, fitsfile *out);
 
 

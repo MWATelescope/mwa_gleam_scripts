@@ -30,6 +30,7 @@ static void show_usage(string name)
     << "\t-c, --compress\t\tCompress source FITS into destination FITS\n"
     << "\tRICE\t\t\tuse RICE compression (default if omited)\n"
     << "\tGZIP\t\t\tuse GZIP compression\n\n"
+    << "\t-v\t\t\treport max difference and max relative difference\n\n"
     << "\t-d0, ... -d4\t\tforced precition as a number of decimal places (-d0 is default if omited)\n"
     << "\t-d bscale \t\t scales the data by arbitrary factor bscale and rounds the value\n"
     << "Note: Only image HDU containing 32-bit floating point data will be compressed.\n"
@@ -42,9 +43,10 @@ int main(int argc, const char * argv[])
     fitsfile *in;       // pointer to input FITS file
     fitsfile *out;      // pointer to output FITS file
     int status;         // returned status of FITS functions
-    double bscale = 1;     // scale for forced precision
+    float bscale = 1;     // scale for forced precision
     int comp = RICE_1;  // compression type
     bool c = true;      // compress/decompress flag
+    bool v = false;     // report the max difference
     const char *InputFileName, *OutputFileName;
     
     if (argc < 3) { // We expect at least 3 arguments: the program name, the source path and the destination path
@@ -71,7 +73,8 @@ int main(int argc, const char * argv[])
         if(arg == "-d2") bscale = 100;
         if(arg == "-d3") bscale = 1000;
         if(arg == "-d4") bscale = 10000;
-        if(arg == "-d") sscanf(argv[i+1], "%lf", &bscale);
+        if(arg == "-d") sscanf(argv[i+1], "%f", &bscale);
+        if(arg == "-v") v = true;
         }
     }
 
@@ -103,7 +106,7 @@ int main(int argc, const char * argv[])
     time(&timerb);
 
     if(c)
-        Compress(in, out, bscale, comp);
+        Compress(in, out, bscale, comp, v);
     else
         Decompress(in, out);
 

@@ -26,19 +26,29 @@
 // comp - type of binary compression to use. Can be either RICE_1 or GZIP_1
 // nelements - number of elements in array
 // naxis & naxes[] - as per cfitsio library description
+// maxabsdiff - maximum difference reported for the entire file
+// maxreldiff - maximum relative difference reported for the entire file
 //
-int fits_write_compressed(fitsfile *out, float *buff_in, LONGLONG nelements, int naxis, long *naxes, double bscale, int comp)
+int fits_write_compressed(fitsfile *out, float *buff_in, LONGLONG nelements, int naxis, long *naxes, float bscale, int comp, float &maxabsdiff, float &maxreldiff)
 {
     int status = 0;    // returned status of FITS functions
     int *buff_out = (int*) malloc(sizeof(int) * nelements);
+    float tmp;
     if( buff_in == NULL ){
         cerr << "Err: Could not allocate memory.";
         exit(EXIT_FAILURE);
     }
 
     // round, decimate and convert
-    for(int i=0; i<nelements; ++i)
+    for(int i=0; i<nelements; ++i){
         buff_out[i] = (int)round(bscale * buff_in[i]);
+    
+        // calculate max diff and relative max diff
+        tmp = fabs(buff_in[i] - buff_out[i] * bscale);
+        maxabsdiff = tmp > maxabsdiff ? tmp : maxabsdiff;
+        tmp = tmp / buff_in[i];
+        maxreldiff = tmp > maxreldiff ? tmp : maxreldiff;
+    }
     
     //lets create HDU for encoded data
     fits_set_compression_type(out, comp, &status);
@@ -74,12 +84,15 @@ int fits_write_compressed(fitsfile *out, float *buff_in, LONGLONG nelements, int
 // bscale - scaling factor used to force the precition
 // comp - type of binary compression to use. Can be either RICE_1 or GZIP_1
 //
-int Compress(fitsfile *in, fitsfile *out, double bscale, int comp)
+int Compress(fitsfile *in, fitsfile *out, double bscale, int comp, bool v)
 {
     long naxes[]={1,1,1,1,1,1,1,1,1};
     int naxis;
     int status = 0;    // returned status of FITS functions
-    int bitpix,count=0;
+    int bitpix;
+    int count = 0;
+    float maxabsdiff = 0;
+    float maxreldiff = 0;
     
     // loop through till the end of file
     while(status != END_OF_FILE){
@@ -103,15 +116,21 @@ int Compress(fitsfile *in, fitsfile *out, double bscale, int comp)
         fits_read_img(in, TFLOAT, 1, nelements, &nulval, buff_in, NULL, &status);
         PRINTERRMSG(status);
         
-        fits_write_compressed(out, buff_in, nelements, naxis, naxes, bscale, comp);
+        fits_write_compressed(out, buff_in, nelements, naxis, naxes, bscale, comp, maxabsdiff, maxreldiff);
 
         free(buff_in);
         
         // try next HDU
         fits_movrel_hdu(in, 1, NULL, &status);
     }
-    // clear the error from trying to move past the last HDU from errror stack
+    // clear the error from trying to move past the last HDU from error stack
     fits_clear_errmsg();
+    
+    if(v)
+    {
+        cout << "Largest abs diff: " << maxabsdiff << endl;
+        cout << "Largest rel diff: " << maxreldiff << endl;
+    }
     
     return 0;
 }
