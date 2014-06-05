@@ -14,7 +14,8 @@
 //                      4           1:1.9     1:1.3
 //
 //  Created by Slava Kitaeff on 27/03/13.
-//  Copyright (c) 2013 ICRAR/UWA. All rights reserved.
+//  Edited: 05/06/14
+//  Copyright (c) 2013-14 ICRAR/UWA. All rights reserved.
 //
 
 #include "compress.h"

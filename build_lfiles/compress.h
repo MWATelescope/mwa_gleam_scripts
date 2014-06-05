@@ -3,11 +3,14 @@
 //  uvcompress
 //
 //  Created by Slava Kitaeff on 2/04/13.
-//  Copyright (c) 2013 ICRAR/UWA. All rights reserved.
+//  Edited: 05/06/14
+//  Copyright (c) 2013-14 ICRAR/UWA. All rights reserved.
 //
 
 #ifndef __uvcompress__compress__
 #define __uvcompress__compress__
+
+//#define __openmp__
 
 #include <iostream>
 #include <string>

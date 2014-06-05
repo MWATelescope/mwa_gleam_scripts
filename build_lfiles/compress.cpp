@@ -3,8 +3,8 @@
 //  uvcompress
 //
 //  Created by Slava Kitaeff on 2/04/13.
-//  Edited: 26/05/14
-//  Copyright (c) 2013 ICRAR/UWA. All rights reserved.
+//  Edited: 05/06/14
+//  Copyright (c) 2013-14 ICRAR/UWA. All rights reserved.
 //
 
 #include "compress.h"
@@ -92,7 +92,7 @@ int fits_write_compressed(fitsfile *out,
         
         memset(hist, 0, sizeof(int) * hbinnum);
 
-        float dr = (maxbin - minbin) / hbinnum;
+        float dr = (maxbin - minbin) / (hbinnum-1);
         
         // another pass to built the histogram
 #pragma omp parallel for
@@ -231,7 +231,7 @@ int Compress(fitsfile *in,
         
         nelements = naxes[0] * naxes[1] * naxes[2] * naxes[3] * naxes[4] * naxes[5] * naxes[6] * naxes[7] * naxes[8];
         
-        float dr = (maxglobal - minglobal) / binnum;
+        float dr = (maxglobal - minglobal) / (binnum - 1);
      
         //go through the file again to build the histogram
         while(status != END_OF_FILE){
