@@ -16,6 +16,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <assert.h>
 #include "fitsio.h"
 #ifdef __openmp__
 #include <omp.h>
@@ -27,7 +28,8 @@ using namespace std;
 
 #define PRINTERRMSG(status) {if (status != 0) { \
 fits_report_error(stderr, status);              \
-return status;                                  \
+/*return status; */                            \
+assert(status != 0); \
 }}                                              \
 
 // basic functions
