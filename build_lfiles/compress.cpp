@@ -40,8 +40,8 @@ int fits_write_compressed(fitsfile *out,
                           long *naxes,
                           float bscale,
                           int comp,
-                          float &maxabsdiff,
-                          float &maxreldiff,
+                          float maxabsdiff[],
+                          float maxreldiff[],
                           float &maxglobal,
                           float &minglobal,
                           int hbinnum)
@@ -67,10 +67,18 @@ int fits_write_compressed(fitsfile *out,
         maxbin = buff_in[i] > maxbin ? buff_in[i] : maxbin;
         
         // calculate max diff and relative max diff
-        tmp = fabs(buff_in[i]) - fabs(buff_out[i] / bscale);
-        maxabsdiff = tmp > maxabsdiff ? tmp : maxabsdiff;
-        tmp = tmp / buff_in[i];
-        maxreldiff = tmp > maxreldiff ? tmp : maxreldiff;
+        if (buff_in[i]){
+            tmp = fabs(buff_in[i]) - fabs(buff_out[i] / bscale);
+            if (tmp > maxabsdiff[1]){
+                maxabsdiff[1] = tmp;
+                maxabsdiff[0] = buff_in[i];
+            }
+            tmp = tmp / buff_in[i];
+            if (tmp > maxreldiff[1]){
+                maxreldiff[1] = tmp;
+                maxabsdiff[0] = buff_in[i];
+            }
+        }
     }
 
     //build and output a histirgam for this HDU
@@ -158,8 +166,8 @@ int Compress(fitsfile *in,
     int bitpix;
     LONGLONG nelements = 0;
     int count = 0;
-    float maxabsdiff = 0;
-    float maxreldiff = 0;
+    float maxabsdiff[] = {0.0, 0.0};
+    float maxreldiff[] = {0.0, 0.0};
     float maxglobal = 0;
     float minglobal = 0;
     
@@ -255,6 +263,7 @@ int Compress(fitsfile *in,
         // clear the error from trying to move past the last HDU from error stack
         fits_clear_errmsg();
 
+        cout.precision(12);
         
         //print the histogram data
         cout << endl << "================== File Statistics ==================" << endl;
@@ -271,8 +280,8 @@ int Compress(fitsfile *in,
     if(v)
     {
         cout << endl;
-        cout << "Largest abs diff: " << maxabsdiff << endl;
-        cout << "Largest rel diff: " << maxreldiff << endl;
+        cout << "Largest abs diff: " << maxabsdiff[1] << " for the value " << maxabsdiff[0] << endl;
+        cout << "Largest rel diff: " << maxreldiff[1] << " for the value " << maxreldiff[0] << endl;
         cout << endl;
     }
     
