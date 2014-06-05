@@ -18,7 +18,6 @@
 //
 
 #include "compress.h"
-#include <fitsio.h>
 
 static void show_usage(string name)
 {
@@ -49,6 +48,9 @@ int main(int argc, const char * argv[])
     bool v = false;     // report the max difference
     int binnum = 0;         // number of bins for histogram
     int hbinnum = 0;         // number of bins for histogram for each HDU
+#ifdef __openmp__
+    int num_thread = 1;
+#endif
 
     const char *InputFileName, *OutputFileName;
     
@@ -78,14 +80,20 @@ int main(int argc, const char * argv[])
         if(arg == "-d4") bscale = 10000;
         if(arg == "-d") sscanf(argv[i+1], "%f", &bscale);
         if(arg == "-v") v = true;
-        if(arg == "-h") sscanf(argv[i+1], "%d", &binnum);;
-        if(arg == "-hh") sscanf(argv[i+1], "%d", &hbinnum);;
-
+        if(arg == "-h") sscanf(argv[i+1], "%d", &binnum);
+        if(arg == "-hh") sscanf(argv[i+1], "%d", &hbinnum);
+#ifdef __openmp__
+        if(arg == "-t") sscanf(argv[i+1], "%d", &num_thread);
+#endif
         }
     }
 
     InputFileName = argv[argc-2];
     OutputFileName = argv[argc-1];
+    
+#ifdef __openmp__
+    omp_set_num_threads(num_thread);
+#endif
     
     //read FITS
     // Open specified file for read only access.

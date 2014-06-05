@@ -20,7 +20,7 @@ build_lfiles: build_lfiles.o mwac_utils.o antenna_mapping.o
 	$(CC) $(CFLAGS) $(CFITSIO_INCS) build_lfiles.o mwac_utils.o antenna_mapping.o -o build_lfiles ${INCS} $(CFITSIO_LIBS) -lcfitsio -lm
 
 uvcompress: compress.cpp uvcompress.cpp
-	$(CXX) $(CFLAGS) $(CFITSIO_INCS) -o $@ $^ ${INCS} $(CFITSIO_LIBS) -lcfitsio -lm
+	$(CXX) $(CFLAGS) $(CFITSIO_INCS) -ftree-vectorize -msse2 -ffast-math -o $@ $^ ${INCS} $(CFITSIO_LIBS) -lcfitsio -lm
 
 mwac_utils.o: mwac_utils.c
 	$(CC) $(CFLAGS)  -c mwac_utils.c

@@ -8,10 +8,7 @@
 //
 
 #include "compress.h"
-#include <stdlib.h>
-#include <string.h>
-
-//#include <omp.h>
+#include <assert.h>
 
 /* there is already a built-in round function in math.h type "man round"
 #define round(r) (r>0.0)?floor(r+0.5):ceil(r-0.5)
@@ -60,6 +57,7 @@ int fits_write_compressed(fitsfile *out,
         exit(EXIT_FAILURE);
     }
 
+#pragma omp parallel for
     for(int i=0; i<nelements; ++i){
         // round, decimate and convert
         buff_out[i] = (int)round(bscale * buff_in[i]);
@@ -69,7 +67,7 @@ int fits_write_compressed(fitsfile *out,
         maxbin = buff_in[i] > maxbin ? buff_in[i] : maxbin;
         
         // calculate max diff and relative max diff
-        tmp = fabs(buff_in[i] - buff_out[i] / bscale);
+        tmp = fabs(buff_in[i]) - fabs(buff_out[i] / bscale);
         maxabsdiff = tmp > maxabsdiff ? tmp : maxabsdiff;
         tmp = tmp / buff_in[i];
         maxreldiff = tmp > maxreldiff ? tmp : maxreldiff;
@@ -84,23 +82,28 @@ int fits_write_compressed(fitsfile *out,
             exit(EXIT_FAILURE);
         }
         
-        memset(hist, 0, sizeof(hist) * hbinnum);
+        memset(hist, 0, sizeof(int) * hbinnum);
 
         float dr = (maxbin - minbin) / hbinnum;
         
         // another pass to built the histogram
+#pragma omp parallel for
         for(int i=0; i<nelements; ++i){
-            hist[(int)round((buff_in[i] - minbin)/dr)]++;
+            int j = (buff_in[i] - minbin)/dr;
+            if(j >= hbinnum || j < 0) assert("Exceeds the index in histogram or negative");
+            else
+                hist[j]++;
         }
         
         //print the histogram data
-        cout << "--------- HDU histogram ---------" << endl;
+        cout << "--------- Histogram ---------" << endl;
         cout << "First Bin = " << minbin << endl;
         cout << "Step = " << dr << endl;
         cout << "Number of bins = " << hbinnum << endl;
         for(int i=0; i<hbinnum; ++i)
                         cout << hist[i] << ";";
-        cout << endl << "------------------------" << endl;
+        cout << endl << endl;
+        if( hist != NULL) free(hist);
     }
     
     //lets create HDU for encoded data
@@ -124,7 +127,7 @@ int fits_write_compressed(fitsfile *out,
     minglobal = minbin < minglobal ? minbin : minglobal;
     maxglobal = maxbin > maxglobal ? maxbin : maxglobal;
     
-    free(buff_out);
+    if(buff_out != NULL) free(buff_out);
 
     return 0;
 }
@@ -191,7 +194,7 @@ int Compress(fitsfile *in,
         
             fits_write_compressed(out, buff_in, nelements, naxis, naxes, bscale, comp, maxabsdiff, maxreldiff, maxglobal, minglobal, hbinnum);
 
-            free(buff_in);
+            if( buff_in != NULL ) free(buff_in);
         }
         // try next HDU
         fits_movrel_hdu(in, 1, NULL, &status);
@@ -208,7 +211,7 @@ int Compress(fitsfile *in,
             cerr << "Err: Could not allocate memory.";
             exit(EXIT_FAILURE);
         }
-        memset(hist, 0, sizeof(hist) * binnum);
+        memset(hist, 0, sizeof(int) * binnum);
 
         //go back to the first HDU with data
         fits_movabs_hdu(in, 2, NULL, &status);
@@ -234,13 +237,17 @@ int Compress(fitsfile *in,
             float nulval = 0.0;
             fits_read_img(in, TFLOAT, 1, nelements, &nulval, buff_in, NULL, &status);
             PRINTERRMSG(status);
-
+            
+#pragma omp parallel for
             // another pass to built the histogram
             for(int i=0; i<nelements; ++i){
-                hist[(int)round((buff_in[i] - minglobal)/dr)]++;
+                int j = (buff_in[i] - minglobal)/dr;
+                if(j >= binnum || j < 0) assert("Exceeds the index in histogram or negative");
+                    else
+                        hist[j]++;
             }
             
-            free(buff_in);
+            if( buff_in != NULL )free(buff_in);
             
             // try next HDU
             fits_movrel_hdu(in, 1, NULL, &status);
@@ -250,20 +257,23 @@ int Compress(fitsfile *in,
 
         
         //print the histogram data
-        cout << "================== File histogram ==================" << endl;
+        cout << endl << "================== File Statistics ==================" << endl;
+        cout << "------ Histogram ------" << endl;
         cout << "First Bin = " << minglobal << endl;
         cout << "Step = " << dr << endl;
         cout << "Number of bins = " << binnum << endl;
         for(int i=0; i<binnum; ++i)
                     cout << hist[i] << ";";
-        cout << endl << "----------------------------------" << endl;
+        cout << endl;
+        if(hist != NULL) free(hist);
     }
 
     if(v)
     {
-        cout << "---- File Statistics ----" << endl;
+        cout << endl;
         cout << "Largest abs diff: " << maxabsdiff << endl;
         cout << "Largest rel diff: " << maxreldiff << endl;
+        cout << endl;
     }
     
     return 0;
@@ -321,7 +331,7 @@ int Decompress(fitsfile *in,
         fits_write_img(out, TFLOAT, 1, nelements, buff, &status);
         PRINTERRMSG(status);
         
-        free(buff);
+        if( buff != NULL ) free(buff);
         
         //move to the next HDU
         fits_movrel_hdu(in, 1, NULL, &status);
