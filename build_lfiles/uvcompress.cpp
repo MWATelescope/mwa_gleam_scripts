@@ -14,11 +14,11 @@
 //                      4           1:1.9     1:1.3
 //
 //  Created by Slava Kitaeff on 27/03/13.
-//  Copyright (c) 2013 ICRAR/UWA. All rights reserved.
+//  Edited: 05/06/14
+//  Copyright (c) 2013-14 ICRAR/UWA. All rights reserved.
 //
 
 #include "compress.h"
-#include <fitsio.h>
 
 static void show_usage(string name)
 {
@@ -29,9 +29,10 @@ static void show_usage(string name)
     << "\t-c, --compress\t\tCompress source FITS into destination FITS\n"
     << "\tRICE\t\t\tuse RICE compression (default if omited)\n"
     << "\tGZIP\t\t\tuse GZIP compression\n\n"
-    << "\t-v\t\t\treport max difference and max relative difference\n\n"
-    << "\t-d0, ... -d4\t\tforced precition as a number of decimal places (-d0 is default if omited)\n"
-    << "\t-d bscale \t\t scales the data by arbitrary factor bscale and rounds the value\n"
+    << "\t-v\t\t\t\t\t\treport max difference and max relative difference\n"
+    << "\t-d0, ... -d4\t\t\tforced precition as a number of decimal places (-d0 is default if omited)\n"
+    << "\t-h number_of_bins\t\toutput a histogram\n"
+    << "\t-hh number_of_bins\t\toutput a histogram for each HDU\n\n"
     << "Note: Only image HDU containing 32-bit floating point data will be compressed.\n"
     << "\tAll other types of HDU will be copied over without modification.\n"
     << endl;
@@ -46,6 +47,12 @@ int main(int argc, const char * argv[])
     int comp = RICE_1;  // compression type
     bool c = true;      // compress/decompress flag
     bool v = false;     // report the max difference
+    int binnum = 0;         // number of bins for histogram
+    int hbinnum = 0;         // number of bins for histogram for each HDU
+#ifdef __openmp__
+    int num_thread = 1;
+#endif
+
     const char *InputFileName, *OutputFileName;
     
     if (argc < 3) { // We expect at least 3 arguments: the program name, the source path and the destination path
@@ -74,11 +81,20 @@ int main(int argc, const char * argv[])
         if(arg == "-d4") bscale = 10000;
         if(arg == "-d") sscanf(argv[i+1], "%f", &bscale);
         if(arg == "-v") v = true;
+        if(arg == "-h") sscanf(argv[i+1], "%d", &binnum);
+        if(arg == "-hh") sscanf(argv[i+1], "%d", &hbinnum);
+#ifdef __openmp__
+        if(arg == "-t") sscanf(argv[i+1], "%d", &num_thread);
+#endif
         }
     }
 
     InputFileName = argv[argc-2];
     OutputFileName = argv[argc-1];
+    
+#ifdef __openmp__
+    omp_set_num_threads(num_thread);
+#endif
     
     //read FITS
     // Open specified file for read only access.
@@ -94,7 +110,7 @@ int main(int argc, const char * argv[])
     time(&timerb);
 
     if(c)
-        Compress(in, out, bscale, comp, v);
+        Compress(in, out, bscale, comp, v, binnum, hbinnum);
     else
         Decompress(in, out);
 
