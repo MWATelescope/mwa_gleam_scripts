@@ -57,7 +57,6 @@ int fits_write_compressed(fitsfile *out,
         exit(EXIT_FAILURE);
     }
 
-#pragma omp parallel for
     for(int i=0; i<nelements; ++i){
         // round, decimate and convert
         buff_out[i] = (int)round(bscale * buff_in[i]);
@@ -68,15 +67,17 @@ int fits_write_compressed(fitsfile *out,
         
         // calculate max diff and relative max diff
         if (buff_in[i]){
-            tmp = fabs(buff_in[i]) - fabs(buff_out[i] / bscale);
+            tmp = fabs(buff_in[i] - buff_out[i] / bscale);
             if (tmp > maxabsdiff[1]){
                 maxabsdiff[1] = tmp;
                 maxabsdiff[0] = buff_in[i];
             }
-            tmp = tmp / buff_in[i];
-            if (tmp > maxreldiff[1]){
-                maxreldiff[1] = tmp;
-                maxabsdiff[0] = buff_in[i];
+            if (fabs(buff_in[i]) > 1e-1) {
+                tmp = tmp / fabs(buff_in[i]);
+                if (tmp > maxreldiff[1]){
+                    maxreldiff[1] = tmp;
+                    maxreldiff[0] = buff_in[i];
+                }
             }
         }
     }
@@ -95,7 +96,6 @@ int fits_write_compressed(fitsfile *out,
         float dr = (maxbin - minbin) / (hbinnum-1);
         
         // another pass to built the histogram
-#pragma omp parallel for
         for(int i=0; i<nelements; ++i){
             int j = (buff_in[i] - minbin)/dr;
             if(j >= hbinnum || j < 0) assert("Exceeds the index in histogram or negative");
@@ -246,7 +246,6 @@ int Compress(fitsfile *in,
             fits_read_img(in, TFLOAT, 1, nelements, &nulval, buff_in, NULL, &status);
             PRINTERRMSG(status);
             
-#pragma omp parallel for
             // another pass to built the histogram
             for(int i=0; i<nelements; ++i){
                 int j = (buff_in[i] - minglobal)/dr;
