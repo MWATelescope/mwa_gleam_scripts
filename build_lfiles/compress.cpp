@@ -51,7 +51,7 @@ int fits_write_compressed(fitsfile *out,
     float minbin = 0;
     float maxbin = 0;
     float tmp;
-    
+ 
     if( buff_in == NULL){
         cerr << "Err: Could not allocate memory.";
         exit(EXIT_FAILURE);
@@ -66,18 +66,16 @@ int fits_write_compressed(fitsfile *out,
         maxbin = buff_in[i] > maxbin ? buff_in[i] : maxbin;
         
         // calculate max diff and relative max diff
-        if (buff_in[i]){
-            tmp = fabs(buff_in[i] - buff_out[i] / bscale);
-            if (tmp > maxabsdiff[1]){
-                maxabsdiff[1] = tmp;
-                maxabsdiff[0] = buff_in[i];
-            }
-            if (fabs(buff_in[i]) > 1e-1) {
-                tmp = tmp / fabs(buff_in[i]);
-                if (tmp > maxreldiff[1]){
-                    maxreldiff[1] = tmp;
-                    maxreldiff[0] = buff_in[i];
-                }
+        tmp = fabs(buff_in[i] - buff_out[i] / bscale);
+        if (tmp > maxabsdiff[1]){
+            maxabsdiff[1] = tmp;
+            maxabsdiff[0] = buff_in[i];
+        }
+        if (fabs(buff_in[i]) > 1e-1) {
+            tmp = tmp / fabs(buff_in[i]);
+            if (tmp > maxreldiff[1]){
+                maxreldiff[1] = tmp;
+                maxreldiff[0] = buff_in[i];
             }
         }
     }
@@ -127,7 +125,7 @@ int fits_write_compressed(fitsfile *out,
     // add the keys
     double bzero = 0;
     bscale = 1.0/bscale;
-    fits_update_key(out, TDOUBLE, "BSCALE", &bscale, NULL, &status);
+    fits_update_key(out, TFLOAT, "BSCALE", &bscale, NULL, &status);
     fits_update_key(out, TDOUBLE, "BZERO", &bzero, NULL, &status);
     PRINTERRMSG(status);
     
