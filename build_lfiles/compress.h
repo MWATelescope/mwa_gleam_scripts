@@ -31,8 +31,8 @@ using namespace std;
 
 #define PRINTERRMSG(status) {if (status != 0) { \
 fits_report_error(stderr, status);              \
-/*return status; */                            \
-assert(status != 0); \
+/* abort on error */                            \
+exit(EXIT_FAILURE); \
 }}                                              \
 
 // basic functions
