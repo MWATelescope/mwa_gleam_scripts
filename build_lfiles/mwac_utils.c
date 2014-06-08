@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <stdio.h>
+#include <omp.h>
 //#include <plot.h>
 #include "mwac_utils.h"
 #include "antenna_mapping.h"
@@ -110,7 +111,8 @@ void get_baseline_lu(int st1, int st2, int pol1, int pol2, float complex *data,
     out = baseline;
 
 	/* direct lookup */
-    offset = (st1*nstation*npol*npol) + (st2*npol*npol) + (pol1*npol) + pol2;
+//    offset = (st1*nstation*npol*npol) + (st2*npol*npol) + (pol1*npol) + pol2;
+    offset = npol*((st1*nstation*npol) + (st2*npol) + pol1) + pol2;
     stride = (nstation*nstation*npol*npol);
     for (i=0;i<nfrequency;i++) {
         in_index = i*stride + offset;
@@ -207,13 +209,21 @@ void full_reorder(float complex *full_matrix_h, float complex *reordered)
 }
 // Extracts the full matrix from the packed Hermitian form
 void extractMatrix(float complex *matrix, float complex *packed) {
-	int f, i, j, pol1, pol2;
+	int f;
 
 	extern int npol;
 	extern int nstation;
 	extern int nfrequency;
 
+    /* use openmp to parallelise this. In single threaded version, this task takes 1/3 the overall CPU time,
+        so 4 threads should be plenty to make this negligible
+    */
+    omp_set_num_threads(4);
+    #pragma omp parallel private (f)
+    {
+    #pragma omp for
 	for (f = 0; f < nfrequency; f++) {
+        int i,j,pol1,pol2;
 		for (i = 0; i < nstation; i++) {
 			for (j = 0; j <= i; j++) {
 				int k = f * (nstation + 1) * (nstation / 2) + i * (i + 1) / 2 + j;
@@ -228,7 +238,7 @@ void extractMatrix(float complex *matrix, float complex *packed) {
 			}
 		}
 	}
-
+    }   // end openmp
 }
 void extractMatrix_slow(float complex *matrix, float complex *packed) {
 	int f, i, j, pol1, pol2;

@@ -17,13 +17,13 @@ read_mwac: read_mwac.o
 	$(CC) $(CFLAGS) read_mwac.o -o read_mwac ${INCS} $(CFITSIO_LIBS) -lcfitsio -lm
 
 build_lfiles: build_lfiles.o mwac_utils.o antenna_mapping.o
-	$(CC) $(CFLAGS) $(CFITSIO_INCS) build_lfiles.o mwac_utils.o antenna_mapping.o -o build_lfiles ${INCS} $(CFITSIO_LIBS) -lcfitsio -lm
+	$(CC) $(CFLAGS) $(CFITSIO_INCS) -fopenmp build_lfiles.o mwac_utils.o antenna_mapping.o -o build_lfiles ${INCS} $(CFITSIO_LIBS) -lcfitsio -lm -lpthread
 
 uvcompress: compress.cpp uvcompress.cpp
 	$(CXX) $(CFLAGS) $(CFITSIO_INCS) -o $@ $^ ${INCS} $(CFITSIO_LIBS) -lcfitsio -lm
 
 mwac_utils.o: mwac_utils.c
-	$(CC) $(CFLAGS)  -c mwac_utils.c
+	$(CC) $(CFLAGS) -fopenmp  -c mwac_utils.c
 
 build_lfiles.o: build_lfiles.c
 	$(CC) $(CFLAGS) $(CFITSIO_INCS) ${INCS} -c build_lfiles.c 
