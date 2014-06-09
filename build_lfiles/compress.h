@@ -21,9 +21,6 @@
 #include <string.h>
 #include <assert.h>
 #include "fitsio.h"
-#ifdef __openmp__
-#include <omp.h>
-#endif
 
 using namespace std;
 

@@ -3,12 +3,13 @@
 //  uvcompress
 //
 //  Created by Slava Kitaeff on 2/04/13.
-//  Edited: 05/06/14
+//  Edited: 09/06/14
 //  Copyright (c) 2013-14 ICRAR/UWA. All rights reserved.
 //
 
 #include "compress.h"
 #include <assert.h>
+
 
 /* there is already a built-in round function in math.h type "man round"
 #define round(r) (r>0.0)?floor(r+0.5):ceil(r-0.5)
@@ -94,8 +95,9 @@ int fits_write_compressed(fitsfile *out,
         float dr = (maxbin - minbin) / (hbinnum-1);
         
         // another pass to built the histogram
+        int j;
         for(int i=0; i<nelements; ++i){
-            int j = (buff_in[i] - minbin)/dr;
+            j = (buff_in[i] - minbin)/dr;
             if(j >= hbinnum || j < 0) assert("Exceeds the index in histogram or negative");
             else
                 hist[j]++;
@@ -245,8 +247,9 @@ int Compress(fitsfile *in,
             PRINTERRMSG(status);
             
             // another pass to built the histogram
+            int j;
             for(int i=0; i<nelements; ++i){
-                int j = (buff_in[i] - minglobal)/dr;
+                j = (buff_in[i] - minglobal)/dr;
                 if(j >= binnum || j < 0) assert("Exceeds the index in histogram or negative");
                     else
                         hist[j]++;
