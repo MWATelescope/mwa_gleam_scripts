@@ -2,6 +2,8 @@
 echo -------------------- provision.sh --------------------
 echo Starting to provision server post script
 
+MWA_PATH="/mnt/MWA_Tools"
+
 # Create swapfile of 1GB with block size 1MB
 /bin/dd if=/dev/zero of=/swapfile bs=1024 count=1048576
 # Set up the swap file and enable
@@ -22,10 +24,14 @@ pip install scipy
 pip install psycopg2 matplotlib ephem pyfits pytz
 
 # Web Framework
-# TODO
+sudo apt-get -y install libapache2-mod-wsgi
+pip install -r $MWA_PATH/eorlive_v2/requirements.txt
 
 #copy the apache config and restart apache
-sudo cp /mnt/MWA_Tools/eorlive_v2/server_configs/eorlive_dev.conf /etc/apache2/sites-available/
+sudo cp $MWA_PATH/eorlive_v2/server_configs/eorlive_dev.conf /etc/apache2/sites-available/
 sudo rm /etc/apache2/sites-enabled/*.conf
 sudo ln -s /etc/apache2/sites-available/eorlive_dev.conf /etc/apache2/sites-enabled/eorlive_dev.conf
 sudo service apache2 restart
+
+#Build mwapy
+$MWA_PATH/make_MWA_Tools.sh
