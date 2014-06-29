@@ -2,7 +2,7 @@
 
 This is a successor of the old EORLive web application. The old EORLive code base is a dependency of this. Please do not delete or move it.
 
-### Set Up ###
+### Development Set Up ###
 
 To run the server locally. Install the following on your computer. Do not use a Windows based machine. Use OS X or Linux.
 
@@ -15,15 +15,21 @@ Then simply run
 vagrant up
 ```
 
-After a series of provisioning executions, you will have the server running.
+After a series of provisioning executions, you will have the server running. Type 192.168.56.107 in your browser and you will see the eorlive website. I recommend adding something like the following line to /etc/hosts.
+
+```
+192.168.56.107  local.eorlive.org
+```
+
+So you can start typing something that resembles a real web site address instead of the ip address. Easier to remember. Up to you.
+
 To ssh into the instance, use the following command.
 ```
 vagrant ssh
 
 ```
 
-Vagrant supports lots of commands. Use vagrant --help for more details.
-
+Vagrant supports lots of commands. Use `vagrant --help` for more details. The most useful would be `suspend` and `resume`.
 
 ### Deployment ###
 
