@@ -6,21 +6,21 @@
   <script type="text/javascript" src="https://www.google.com/jsapi"></script>
   <script src="jquery-latest.js"></script>
   <script type="text/javascript">
-    
+
 
     google.load("visualization", "1", {'packages':['table']});
 
     function loadLog()
     {
-    
-    
+
+
 
     var queryText=encodeURIComponent('select A,B,C,D,E order by A desc limit 10');
     <!--var key='0Au_2bmQn8fR4dHFqb0VwNHpKdjBoWFZrVzV3dm8zenc';-->
     var key='0Ate0sqkDCwhydEpHMnlHckFSRjRhaE5IdHFUcDd2enc'
     var query = new google.visualization.Query('http://spreadsheets.google.com/a/google.com/tq?key='+key+'&tq='+queryText);
 <!--    document.getElementById("obslog").innerHTML="http://spreadsheets.google.com/a/google.com/tq?key="+key+"&tq="+queryText;-->
-    
+
     query.send(
     function(response){
     if (response.isError()) {
@@ -49,7 +49,7 @@
     }
     }
 
-    <!-- This Function get's the time of the next Observation-->
+    //This Function get's the time of the next Observation
     function getNextObs()
     {
     var xhr=createXHR();
@@ -144,7 +144,7 @@
     xhr.open("GET","G9Total.php",true);
     xhr.send();
     }
-    
+
     function getTime()
     {
     var xhr=createXHR();
@@ -160,7 +160,7 @@
     var perthTime=timestr.substr(76,19);
     var bangaloreTime=timestr.substr(95,19);
     var UTCTime=timestr.substr(114,19);
-    
+
 
 
     document.getElementById("timeBoston").innerHTML=bostonTime;
@@ -175,7 +175,7 @@
     xhr.open("GET","ServerTime.php",true);
     xhr.send();
     }
-    
+
     function getG9Day()
     {
     var xhr=createXHR()
@@ -189,7 +189,7 @@
     xhr.open("GET","G9DayCount.php",true);
     xhr.send();
     }
-    
+
 
     function getDayTableUpdate()
     {
@@ -219,7 +219,7 @@
     xhr.send();
     }
 
-    
+
     function getG9()
     {
     var xhr=createXHR()
@@ -233,7 +233,7 @@
     xhr.open("GET","G9Count.php",true);
     xhr.send();
     }
-    
+
 
     function commandCount()
     {
@@ -248,7 +248,7 @@
     xhr.open("GET","CommandCount.php",true);
     xhr.send();
     }
-    
+
     function goodCount(rx_id)
     {
     rx_id=rx_id.toString();
@@ -287,7 +287,7 @@
 			  goodCount(i);
 			  }
 			  }
-			  
+
 			  function init()
 			  {
 			  getTime();
@@ -301,13 +301,13 @@
 			  window.onload=init();
 			 google.setOnLoadCallback(loadLog);
 			 var refresh1=window.setInterval("getTime()",1000);
-			 var refresh2=window.setInterval("getNextObs()",1000);
-			 var refresh3=window.setInterval("getG9Day()",60000);
-			 var refresh4=window.setInterval("getG9()",60000);
-			  var refresh5=window.setInterval("currentObs()",15000);
-			  var refresh6=window.setInterval("refreshBeam()",60000);
-			  var refresh7=window.setInterval("getDayTableUpdate()",6000)
-			  var refresh8=window.setInterval("getObsTableUpdate()",6000)
+			//  var refresh2=window.setInterval("getNextObs()",1000);
+			//  var refresh3=window.setInterval("getG9Day()",60000);
+			//  var refresh4=window.setInterval("getG9()",60000);
+			//   var refresh5=window.setInterval("currentObs()",15000);
+			//   var refresh6=window.setInterval("refreshBeam()",60000);
+			//   var refresh7=window.setInterval("getDayTableUpdate()",6000)
+			//   var refresh8=window.setInterval("getObsTableUpdate()",6000)
   </script>
 </head>
 
@@ -356,7 +356,7 @@ href="http://mro.mwa128t.org/burst/live/"> Tile Total Power</a></td><td><a href=
 <table>
 <tr>
 <td id="nextobstitle" class="nextobs">
-<font size="5">Next Observation in :</font> 
+<font size="5">Next Observation in :</font>
 </td>
 <td id="nextobs" class="nextobs">
 </td>
