@@ -1,5 +1,5 @@
 /**
- * CoolClock 2.1.4
+ * CoolClock 2.0.2
  * Copyright 2010, Simon Baird
  * Released under the BSD License.
  *
@@ -9,8 +9,8 @@
  */
 
 // Constructor for CoolClock objects
-window.CoolClock = function(options) {
-	return this.init(options);
+window.CoolClock = function(canvasId,displayRadius,skinId,showSecondHand,gmtOffset) {
+	return this.init(canvasId,displayRadius,skinId,showSecondHand,gmtOffset);
 }
 
 // Config contains some defaults, and clock skins
@@ -19,10 +19,7 @@ CoolClock.config = {
 	longTickDelay: 15000,
 	defaultRadius: 85,
 	renderRadius: 100,
-	defaultSkin: "chunkySwiss",
-	// Should be in skin probably...
-	// (TODO: allow skinning of digital display)
-	showSecs: true,
+	defaultSkin: "swissRail",
 	showAmPm: true,
 
 	skins:	{
@@ -37,33 +34,25 @@ CoolClock.config = {
 			secondHand: { lineWidth: 1, startAt: -20, endAt: 85, color: "red", alpha: 1 },
 			secondDecoration: { lineWidth: 1, startAt: 70, radius: 4, fillColor: "red", color: "red", alpha: 1 }
 		},
-		chunkySwiss: {
-			outerBorder: { lineWidth: 4, radius:97, color: "black", alpha: 1 },
-			smallIndicator: { lineWidth: 4, startAt: 89, endAt: 93, color: "black", alpha: 1 },
-			largeIndicator: { lineWidth: 8, startAt: 80, endAt: 93, color: "black", alpha: 1 },
-			hourHand: { lineWidth: 12, startAt: -15, endAt: 60, color: "black", alpha: 1 },
-			minuteHand: { lineWidth: 10, startAt: -15, endAt: 85, color: "black", alpha: 1 },
-			secondHand: { lineWidth: 4, startAt: -20, endAt: 85, color: "red", alpha: 1 },
-			secondDecoration: { lineWidth: 2, startAt: 70, radius: 8, fillColor: "red", color: "red", alpha: 1 }
-		},
-		chunkySwissOnBlack: {
-			outerBorder: { lineWidth: 4, radius:97, color: "white", alpha: 1 },
-			smallIndicator: { lineWidth: 4, startAt: 89, endAt: 93, color: "white", alpha: 1 },
-			largeIndicator: { lineWidth: 8, startAt: 80, endAt: 93, color: "white", alpha: 1 },
-			hourHand: { lineWidth: 12, startAt: -15, endAt: 60, color: "white", alpha: 1 },
-			minuteHand: { lineWidth: 10, startAt: -15, endAt: 85, color: "white", alpha: 1 },
-			secondHand: { lineWidth: 4, startAt: -20, endAt: 85, color: "red", alpha: 1 },
-			secondDecoration: { lineWidth: 2, startAt: 70, radius: 8, fillColor: "red", color: "red", alpha: 1 }
-		},
 		fancy: {
-			outerBorder:      { lineWidth: 5, radius: 95, color: "green", alpha: 0.7 },
-			smallIndicator:   { lineWidth: 1, startAt: 80, endAt: 93, color: "black", alpha: 0.4 },
-			largeIndicator:   { lineWidth: 1, startAt: 30, endAt: 93, color: "black", alpha: 0.5 },
-			hourHand:         { lineWidth: 8, startAt: -15, endAt: 50, color: "blue", alpha: 0.7 },
-			minuteHand:       { lineWidth: 7, startAt: -15, endAt: 92, color: "red", alpha: 0.7 },
-			secondHand:       { lineWidth: 10, startAt: 80, endAt: 85, color: "blue", alpha: 0.3 },
+			outerBorder: { lineWidth: 5, radius:95, color: "green", alpha: 0.7 },
+			smallIndicator: { lineWidth: 1, startAt: 80, endAt: 93, color: "black", alpha: 0.4 },
+			largeIndicator: { lineWidth: 1, startAt: 30, endAt: 93, color: "black", alpha: 0.5 },
+			hourHand: { lineWidth: 8, startAt: -15, endAt: 50, color: "blue", alpha: 0.7 },
+			minuteHand: { lineWidth: 7, startAt: -15, endAt: 92, color: "red", alpha: 0.7 },
+			secondHand: { lineWidth: 10, startAt: 80, endAt: 85, color: "blue", alpha: 0.3 },
 			secondDecoration: { lineWidth: 1, startAt: 30, radius: 50, fillColor: "blue", color: "red", alpha: 0.15 }
+		},
+		eor: {
+			outerBorder: { lineWidth: 5, radius:95, color: "green", alpha: 0.7 },
+			smallIndicator: { lineWidth: 1, startAt: 80, endAt: 93, color: "black", alpha: 0.4 },
+			largeIndicator: { lineWidth: 1, startAt: 30, endAt: 93, color: "black", alpha: 0.5 },
+			hourHand: { lineWidth: 6, startAt: -15, endAt: 50, color: "blue", alpha: 0.6 },
+			minuteHand: { lineWidth: 4, startAt: -15, endAt: 80, color: "red", alpha: 0.6 },
+			secondHand: { lineWidth: 1, startAt: -20, endAt: 85, color: "red", alpha: 0.6 },
+			secondDecoration: { lineWidth: 1, startAt: 70, radius: 4, fillColor: "red", color: "red", alpha: 0.6 }
 		}
+
 	},
 
 	// Test for IE so we can nurse excanvas in a couple of places
@@ -80,21 +69,17 @@ CoolClock.config = {
 CoolClock.prototype = {
 
 	// Initialise using the parameters parsed from the colon delimited class
-	init: function(options) {
-		// Parse and store the options
-		this.canvasId       = options.canvasId;
-		this.skinId         = options.skinId || CoolClock.config.defaultSkin;
-		this.displayRadius  = options.displayRadius || CoolClock.config.defaultRadius;
-		this.showSecondHand = typeof options.showSecondHand == "boolean" ? options.showSecondHand : true;
-		this.gmtOffset      = (options.gmtOffset != null && options.gmtOffset != '') ? parseFloat(options.gmtOffset) : null;
-		this.showDigital    = typeof options.showDigital == "boolean" ? options.showDigital : false;
-		this.logClock       = typeof options.logClock == "boolean" ? options.logClock : false;
-		this.logClockRev    = typeof options.logClock == "boolean" ? options.logClockRev : false;
-
-		this.tickDelay      = CoolClock.config[ this.showSecondHand ? "tickDelay" : "longTickDelay" ];
+	init: function(canvasId,displayRadius,skinId,showSecondHand,gmtOffset) {
+		// Store the parameters
+		this.canvasId = canvasId;
+		this.displayRadius = displayRadius || CoolClock.config.defaultRadius;
+		this.skinId = skinId || CoolClock.config.defaultSkin;
+		this.showSecondHand = typeof showSecondHand == "boolean" ? showSecondHand : true;
+		this.tickDelay = CoolClock.config[ this.showSecondHand ? "tickDelay" : "longTickDelay" ];
+		this.gmtOffset = gmtOffset != null ? parseFloat(gmtOffset) : gmtOffset;
 
 		// Get the canvas element
-		this.canvas = document.getElementById(this.canvasId);
+		this.canvas = document.getElementById(canvasId);
 
 		// Make the canvas the requested size. It's always square.
 		this.canvas.setAttribute("width",this.displayRadius*2);
@@ -111,115 +96,106 @@ CoolClock.prototype = {
 		this.ctx.scale(this.scale,this.scale);
 
 		// Keep track of this object
-		CoolClock.config.clockTracker[this.canvasId] = this;
+		CoolClock.config.clockTracker[canvasId] = this;
 
 		// Start the clock going
 		this.tick();
+
+
 
 		return this;
 	},
 
 	// Draw a circle at point x,y with params as defined in skin
 	fullCircleAt: function(x,y,skin) {
-		this.ctx.save();
-		this.ctx.globalAlpha = skin.alpha;
-		this.ctx.lineWidth = skin.lineWidth;
+		with (this.ctx) {
+			save();
+			globalAlpha = skin.alpha;
+			lineWidth = skin.lineWidth;
 
-		if (!CoolClock.config.isIE) {
-			this.ctx.beginPath();
-		}
+			if (!CoolClock.config.isIE) {
+				beginPath();
+			}
 
-		if (CoolClock.config.isIE) {
-			// excanvas doesn't scale line width so we will do it here
-			this.ctx.lineWidth = this.ctx.lineWidth * this.scale;
-		}
+			if (CoolClock.config.isIE) {
+				// excanvas doesn't scale line width so we will do it here
+				lineWidth = lineWidth * this.scale;
+			}
 
-		this.ctx.arc(x, y, skin.radius, 0, 2*Math.PI, false);
+			arc(x, y, skin.radius, 0, 2*Math.PI, false);
 
-		if (CoolClock.config.isIE) {
-			// excanvas doesn't close the circle so let's fill in the tiny gap
-			this.ctx.arc(x, y, skin.radius, -0.1, 0.1, false);
-		}
+			if (CoolClock.config.isIE) {
+				// excanvas doesn't close the circle so let's fill in the tiny gap
+				arc(x, y, skin.radius, -0.1, 0.1, false);
+			}
 
-		if (skin.fillColor) {
-			this.ctx.fillStyle = skin.fillColor
-			this.ctx.fill();
+			if (skin.fillColor) {
+				fillStyle = skin.fillColor
+				fill();
+			}
+			else {
+				// XXX why not stroke and fill
+				strokeStyle = skin.color;
+				stroke();
+			}
+			restore();
 		}
-		else {
-			// XXX why not stroke and fill
-			this.ctx.strokeStyle = skin.color;
-			this.ctx.stroke();
-		}
-		this.ctx.restore();
 	},
 
 	// Draw some text centered vertically and horizontally
 	drawTextAt: function(theText,x,y) {
-		this.ctx.save();
-		this.ctx.font = '15px sans-serif';
-		var tSize = this.ctx.measureText(theText);
-		if (!tSize.height) tSize.height = 15; // no height in firefox.. :(
-		this.ctx.fillText(theText,x - tSize.width/2,y - tSize.height/2);
-		this.ctx.restore();
+		with (this.ctx) {
+			save();
+			font = '22px sans-serif';
+			var tSize = this.ctx.measureText(theText);
+			if (!tSize.height) tSize.height = 22; // no height in firefox.. :(
+			fillText(theText,x - tSize.width/2,y - tSize.height/2);
+			restore();
+		}
 	},
 
 	lpad2: function(num) {
 		return (num < 10 ? '0' : '') + num;
 	},
 
-	tickAngle: function(second) {
-		// Log algorithm by David Bradshaw
-		var tweak = 3; // If it's lower the one second mark looks wrong (?)
-		if (this.logClock) {
-			return second == 0 ? 0 : (Math.log(second*tweak) / Math.log(60*tweak));
-		}
-		else if (this.logClockRev) {
-			// Flip the seconds then flip the angle (trickiness)
-			second = (60 - second) % 60;
-			return 1.0 - (second == 0 ? 0 : (Math.log(second*tweak) / Math.log(60*tweak)));
-		}
-		else {
-			return second/60.0;
-		}
-	},
-
 	timeText: function(hour,min,sec) {
 		var c = CoolClock.config;
 		return '' +
-			(c.showAmPm ? ((hour%12)==0 ? 12 : (hour%12)) : hour) + ':' +
+			(c.showAmPm ? (hour==0 ? 12 : (hour%12)) : hour) + ':' +
 			this.lpad2(min) +
-			(c.showSecs ? ':' + this.lpad2(sec) : '') +
-			(c.showAmPm ? (hour < 12 ? ' am' : ' pm') : '')
+			(this.showSecondHand? ':' + this.lpad2(sec) : '') +
+			(c.showAmPm ? (hour < 12 ? ' AM' : ' PM') : '')
 		;
 	},
 
 	// Draw a radial line by rotating then drawing a straight line
-	// Ha ha, I think I've accidentally used Taus, (see http://tauday.com/)
 	radialLineAtAngle: function(angleFraction,skin) {
-		this.ctx.save();
-		this.ctx.translate(this.renderRadius,this.renderRadius);
-		this.ctx.rotate(Math.PI * (2.0 * angleFraction - 0.5));
-		this.ctx.globalAlpha = skin.alpha;
-		this.ctx.strokeStyle = skin.color;
-		this.ctx.lineWidth = skin.lineWidth;
+		with (this.ctx) {
+			save();
+			translate(this.renderRadius,this.renderRadius);
+			rotate(Math.PI * (2 * angleFraction - 0.5));
+			globalAlpha = skin.alpha;
+			strokeStyle = skin.color;
+			lineWidth = skin.lineWidth;
 
-		if (CoolClock.config.isIE)
-			// excanvas doesn't scale line width so we will do it here
-			this.ctx.lineWidth = this.ctx.lineWidth * this.scale;
+			if (CoolClock.config.isIE)
+				// excanvas doesn't scale line width so we will do it here
+				lineWidth = lineWidth * this.scale;
 
-		if (skin.radius) {
-			this.fullCircleAt(skin.startAt,0,skin)
+			if (skin.radius) {
+				this.fullCircleAt(skin.startAt,0,skin)
+			}
+			else {
+				beginPath();
+				moveTo(skin.startAt,0)
+				lineTo(skin.endAt,0);
+				stroke();
+			}
+			restore();
 		}
-		else {
-			this.ctx.beginPath();
-			this.ctx.moveTo(skin.startAt,0)
-			this.ctx.lineTo(skin.endAt,0);
-			this.ctx.stroke();
-		}
-		this.ctx.restore();
 	},
 
-	render: function(hour,min,sec) {
+	render: function(hour,min,sec,date_string) {
 		// Get the skin
 		var skin = CoolClock.config.skins[this.skinId];
 		if (!skin) skin = CoolClock.config.skins[CoolClock.config.defaultSkin];
@@ -233,32 +209,38 @@ CoolClock.prototype = {
 
 		// Draw the tick marks. Every 5th one is a big one
 		for (var i=0;i<60;i++) {
-			(i%5)  && skin.smallIndicator && this.radialLineAtAngle(this.tickAngle(i),skin.smallIndicator);
-			!(i%5) && skin.largeIndicator && this.radialLineAtAngle(this.tickAngle(i),skin.largeIndicator);
-		}
-
-		// Write the time
-		if (this.showDigital) {
-			this.drawTextAt(
-				this.timeText(hour,min,sec),
-				this.renderRadius,
-				this.renderRadius+this.renderRadius/2
-			);
+			(i%5)  && skin.smallIndicator && this.radialLineAtAngle(i/60,skin.smallIndicator);
+			!(i%5) && skin.largeIndicator && this.radialLineAtAngle(i/60,skin.largeIndicator);
 		}
 
 		// Draw the hands
 		if (skin.hourHand)
-			this.radialLineAtAngle(this.tickAngle(((hour%12)*5 + min/12.0)),skin.hourHand);
+			this.radialLineAtAngle((hour+min/60)/12,skin.hourHand);
 
 		if (skin.minuteHand)
-			this.radialLineAtAngle(this.tickAngle((min + sec/60.0)),skin.minuteHand);
+			this.radialLineAtAngle((min+sec/60)/60,skin.minuteHand);
 
 		if (this.showSecondHand && skin.secondHand)
-			this.radialLineAtAngle(this.tickAngle(sec),skin.secondHand);
+			this.radialLineAtAngle(sec/60,skin.secondHand);
 
 		// Second hand decoration doesn't render right in IE so lets turn it off
 		if (!CoolClock.config.isIE && this.showSecondHand && skin.secondDecoration)
-			this.radialLineAtAngle(this.tickAngle(sec),skin.secondDecoration);
+			this.radialLineAtAngle(sec/60,skin.secondDecoration);
+
+		// Write the time
+		this.drawTextAt(
+			this.timeText(hour,min,sec),
+			this.renderRadius,
+			this.renderRadius*7/4
+		);
+
+		if(date_string) {
+			this.drawTextAt(
+				date_string,
+				this.renderRadius,
+				this.renderRadius*2/4
+			)
+		}
 	},
 
 	// Check the time and display the clock
@@ -267,11 +249,11 @@ CoolClock.prototype = {
 		if (this.gmtOffset != null) {
 			// Use GMT + gmtOffset
 			var offsetNow = new Date(now.valueOf() + (this.gmtOffset * 1000 * 60 * 60));
-			this.render(offsetNow.getUTCHours(),offsetNow.getUTCMinutes(),offsetNow.getUTCSeconds());
+			this.render(offsetNow.getUTCHours(),offsetNow.getUTCMinutes(),offsetNow.getUTCSeconds(), (offsetNow.getMonth()+1)+"/"+offsetNow.getDate());
 		}
 		else {
 			// Use local time
-			this.render(now.getHours(),now.getMinutes(),now.getSeconds());
+			this.render(now.getHours(),now.getMinutes(),now.getSeconds(),(now.getMonth()+1)+"/"+now.getDate());
 		}
 	},
 
@@ -288,7 +270,7 @@ CoolClock.prototype = {
 	// Main tick handler. Refresh the clock then setup the next tick
 	tick: function() {
 		if (this.stillHere()) {
-			this.refreshDisplay();
+			this.refreshDisplay()
 			this.nextTick();
 		}
 	}
@@ -307,16 +289,7 @@ CoolClock.findAndCreateClocks = function() {
 				canvases[i].id = '_coolclock_auto_id_' + CoolClock.config.noIdCount++;
 			}
 			// Create a clock object for this element
-			new CoolClock({
-				canvasId:       canvases[i].id,
-				skinId:         fields[1],
-				displayRadius:  fields[2],
-				showSecondHand: fields[3]!='noSeconds',
-				gmtOffset:      fields[4],
-				showDigital:    fields[5]=='showDigital',
-				logClock:       fields[6]=='logClock',
-				logClockRev:    fields[6]=='logClockRev'
-			});
+			new CoolClock(canvases[i].id,fields[2],fields[1],fields[3]!="noSeconds",fields[4]);
 		}
 	}
 };

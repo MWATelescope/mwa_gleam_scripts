@@ -18,7 +18,7 @@ EoR.clock.SIZE = 60;
 EoR.clock.create_div = function(name, tz, size, seconds){
   var no_seconds = seconds? "" : ":noSeconds",
     tz_string = tz !==null && (":"+tz) || "",
-    option = "CoolClock:swissRail:"+size+no_seconds+tz_string;
+    option = "CoolClock:eor:"+size+no_seconds+tz_string;
   console.log(option);
   return $("<div/>")
     .addClass("clock_div")
