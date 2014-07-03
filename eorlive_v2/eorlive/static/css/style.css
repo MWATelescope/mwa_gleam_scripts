@@ -1,4 +1,21 @@
 body {
-    font-family: sans-serif;
-    background: #eee;
+  padding-top: 50px;
+}
+div#home {
+  padding: 10px 5px;
+  text-align: center;
+}
+
+/* CLOCK */
+.clocks.container {
+
+}
+
+.clocks.container .clock_div{
+  display: inline-block;
+  padding: 20px;
+}
+
+.clocks.container .clock_div canvas{
+  display: block;
 }

@@ -9,7 +9,7 @@ To run the server locally. Install the following on your computer. Do not use a 
 - VirtualBox 4.3.8+
 - Vagrant 1.5+
 
-Then simply run
+Then simply run this command in MWA_Tools/eorlive_v2 directory
 
 ```
 vagrant up
