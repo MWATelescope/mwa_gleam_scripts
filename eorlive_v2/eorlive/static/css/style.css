@@ -1,6 +1,10 @@
 body {
   padding-top: 50px;
 }
+button {
+  margin: 2px 7px;
+}
+
 div#home {
   padding: 10px 5px;
   text-align: center;
@@ -18,4 +22,10 @@ div#home {
 
 .clocks.container .clock_div canvas{
   display: block;
+}
+
+/* LOGS */
+div#logs .button_container {
+  text-align: right;
+  padding-bottom: 20px;
 }

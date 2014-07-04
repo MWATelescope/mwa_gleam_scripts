@@ -14,5 +14,10 @@ EoR.init = function(){
   hashChanged();
 
   // Initiate content boxes
-  EoR.clock.init();
+  EoR.clock.init(); // Clocks widget
+  EoR.google.init(); // Logs and Graphs based on Google APIs
 };
+
+EoR.create_loading = function(){
+  return $("<img>").addClass("loading").attr("src", STATIC_PATH+"/img/loading.gif");
+}
