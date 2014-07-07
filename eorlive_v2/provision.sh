@@ -23,9 +23,21 @@ pip install numpy
 pip install scipy
 pip install psycopg2 matplotlib ephem pyfits pytz
 
+# PostgreSQL
+# - set password so web server can access as postgres user
+# THIS IS NOT A GOOD IDEA FOR PROD, BUT FOR LOCAL IT'S FINE
+sudo -u postgres psql -c "ALTER USER postgres PASSWORD 'postgres';"
+sudo -u postgres createdb -E UTF8 -T template0 --locale=en_US.utf8 eor
+
 # Web Framework
 sudo apt-get -y install libapache2-mod-wsgi
 pip install -r $MWA_PATH/eorlive_v2/requirements.txt
+# - Set Web Environment
+export EOR_ENV=dev
+echo 'EOR_EVN=dev' >> /etc/environment
+# DB
+cd $MWA_PATH/eorlive_v2/
+python -m eorlive db upgrade head
 
 #copy the apache config and restart apache
 sudo cp $MWA_PATH/eorlive_v2/server_configs/eorlive_dev.conf /etc/apache2/sites-available/

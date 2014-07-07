@@ -31,6 +31,17 @@ vagrant ssh
 
 Vagrant supports lots of commands. Use `vagrant --help` for more details. The most useful would be `suspend` and `resume`.
 
+### DB Migration ###
+
+Database migration is managed by alembic (flask extention is called Flask-Migration). To create a new migration script, use the following command.
+```
+python -m eorlive db revision -m "create user table"
+```
+To run the migration to make the database schema up to date, use
+```
+python -m eorlive db upgrade head
+```
+
 ### Deployment ###
 
 TBA
