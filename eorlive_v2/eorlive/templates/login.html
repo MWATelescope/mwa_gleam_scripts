@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='css/bootstrap.min.css') }}">
+  <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='css/style.css') }}">
+
+  <title>EoR Observing Webpage - Login</title>
+</head>
+
+<body>
+
+
+  <div class="container" id="content">
+    <div class="login_container" style="text-align:center;max-width: 380px; padding: 15px; margin: 0 auto;">
+      <h2>EoRLive</h2><br/>
+      <fieldset>
+  			<div class="form-group">
+  				<div>
+  					<input class="form-control input-lg" id="username" placeholder="Username" type="text">
+  				</div>
+  			</div>
+  			<div class="form-group">
+  				<div>
+  					<input class="form-control input-lg" id="password" placeholder="Password" type="password">
+  				</div>
+  			</div>
+  		</fieldset>
+      <div id="loading" style="display:none;">
+        <img src="{{ url_for('static', filename='/img/loading.gif') }}" />
+      </div>
+      <div style="color:red; display:none;" id="error_msg">Wrong username or password.</div>
+      <button class="btn btn-primary btn-lg btn-block" onClick="login();" id="login_btn">Log In</button>
+    </div>
+  </div><!-- /.container -->
+
+  <script type="text/javascript" src="{{ url_for('static', filename='js/jquery.js') }}"></script>
+  <script type="text/javascript" src="{{ url_for('static', filename='js/bootstrap.min.js') }}"></script>
+  <script type="text/javascript">
+    var STATIC_PATH = {{ url_for('static', filename='') }};
+    function login(){
+      $("#login_btn").prop("disabled", true);
+      $("#loading").show();
+      $.ajax({
+        method: "POST",
+        url: '/api/login',
+        type: 'json',
+        data: {username: $("#username").val(), password: $("#password").val()},
+        success: function(data){
+          window.location = "/";
+        },
+        error: function(xhr, status, err){
+          $("#error_msg").fadeIn();
+          $("#login_btn").prop("disabled", false);
+          $("#loading").hide();
+        }
+      })
+    }
+  </script>
+</body>
+
+
+
+</html>

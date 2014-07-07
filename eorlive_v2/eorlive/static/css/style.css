@@ -10,6 +10,13 @@ div#home {
   text-align: center;
 }
 
+.navbar .nav-status {
+  display: block;
+  padding-top: 15px;
+  padding-bottom: 15px;
+  color: white;
+}
+
 /* CLOCK */
 .clocks.container {
 
