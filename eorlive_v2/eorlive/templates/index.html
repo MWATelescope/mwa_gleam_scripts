@@ -32,25 +32,25 @@
   <div class="container" id="content">
 
     <!-- OVERVIEW AKA HOME-->
-    <div id="home" class="content_container">
+    <div id="home" class="content_container container">
       <h1>EoR - Observation Overview</h1>
       <div class="clocks container"></div>
     </div>
 
     <!-- OBSERVATIONS -->
-    <div id="obs" class="content_container">
+    <div id="obs" class="content_container container" style="display:none;">
       <h2>Observations</h2>
       <div class="container" id="mit_observations"></div>
       <div class="container" id="fb_graphs_container"></div>
     </div>
 
     <!-- LOGS-->
-    <div id="logs" class="content_container">
+    <div id="logs" class="content_container container" style="display:none;">
       <h2>Observation Logs</h2>
     </div>
 
     <!-- USEFUL LINKS-->
-    <div id="links" class="content_container">
+    <div id="links" class="content_container container" style="display:none;">
       <h2>Useful Links</h2>
       <ul>
         <li><a href="https://docs.google.com/spreadsheet/ccc?key=0Ate0sqkDCwhydFNsNmEzdVJGOFdHUUdsQXFidVYzY0E#gid=0" target="_blank">Observer's Schedule</a></li>
@@ -66,6 +66,7 @@
   </div><!-- /.container -->
 
   <script type="text/javascript" src="{{ url_for('static', filename='js/jquery.js') }}"></script>
+  <script type="text/javascript" src="{{ url_for('static', filename='js/modernizr.custom.js') }}"></script>
   <script type="text/javascript" src="{{ url_for('static', filename='js/bootstrap.min.js') }}"></script>
   <!--[if IE]><script type="text/javascript" src="{{ url_for('static', filename='js/excanvas.js') }}"></script><![endif]-->
   <script type="text/javascript" src="{{ url_for('static', filename='js/coolclock.js') }}"></script>

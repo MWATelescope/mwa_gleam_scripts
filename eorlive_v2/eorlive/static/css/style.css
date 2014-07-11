@@ -23,6 +23,7 @@ div#home {
 
 .content_container {
   text-align: center;
+  position: absolute;
 }
 
 /* CLOCK */
@@ -55,4 +56,59 @@ div#logs .button_container {
 
 #links {
   text-align: left;
+}
+
+
+/* ANIMATION STUFF */
+
+.pt-page-moveToLeft {
+	-webkit-animation: moveToLeft .4s ease both;
+	animation: moveToLeft .4s ease both;
+}
+
+.pt-page-moveFromLeft {
+	-webkit-animation: moveFromLeft .4s ease both;
+	animation: moveFromLeft .4s ease both;
+}
+
+.pt-page-moveToRight {
+	-webkit-animation: moveToRight .4s ease both;
+	animation: moveToRight .4s ease both;
+}
+
+.pt-page-moveFromRight {
+	-webkit-animation: moveFromRight .4s ease both;
+	animation: moveFromRight .4s ease both;
+}
+
+@-webkit-keyframes moveToLeft {
+	from { }
+	to { -webkit-transform: translateX(-100%); }
+}
+@keyframes moveToLeft {
+	from { }
+	to { -webkit-transform: translateX(-100%); transform: translateX(-100%); }
+}
+
+@-webkit-keyframes moveFromLeft {
+	from { -webkit-transform: translateX(-100%); }
+}
+@keyframes moveFromLeft {
+	from { -webkit-transform: translateX(-100%); transform: translateX(-100%); }
+}
+
+@-webkit-keyframes moveToRight {
+	from { }
+	to { -webkit-transform: translateX(100%); }
+}
+@keyframes moveToRight {
+	from { }
+	to { -webkit-transform: translateX(100%); transform: translateX(100%); }
+}
+
+@-webkit-keyframes moveFromRight {
+	from { -webkit-transform: translateX(100%); }
+}
+@keyframes moveFromRight {
+	from { -webkit-transform: translateX(100%); transform: translateX(100%); }
 }

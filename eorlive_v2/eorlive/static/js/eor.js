@@ -6,9 +6,12 @@ EoR.init = function(){
 
   // Handle hash change event and navbar component updates
   function hashChanged(){
-    $(".content_container").hide();
+    if( EoR.isAnimating ) {
+      setTimeout(hashChanged, 300);
+      return;
+    }
     var content_id = (window.location.hash.replace("#", "")) || "home";
-    $("#"+content_id).show();
+    EoR.view_translate(content_id);
     $(".navbar .nav.navbar-nav li").removeClass("active");
     $(".navbar .nav.navbar-nav li."+content_id).addClass("active");
   }
@@ -64,4 +67,58 @@ EoR.logout = function(e){
 
 EoR.render_user_info = function(){
 
+};
+
+
+// Things needed for view translation
+EoR.isAnimating = false;
+EoR.endCurrPage = false;
+EoR.endNextPage = false;
+EoR.animEndEventNames = {
+  'WebkitAnimation' : 'webkitAnimationEnd',
+  'OAnimation' : 'oAnimationEnd',
+  'msAnimation' : 'MSAnimationEnd',
+  'animation' : 'animationend'
+};
+EoR.animEndEventName = EoR.animEndEventNames[ Modernizr.prefixed( 'animation' ) ],
+EoR.css_support = Modernizr.cssanimations;
+EoR.onEndAnimation = function(from, to){
+  EoR.isAnimating = false;
+  from.removeClass("pt-page-current pt-page-moveToLeft pt-page-moveToRight").hide();
+  to.removeClass("pt-page-moveFromRight pt-page-moveFromLeft pt-page-current");
+};
+
+EoR.view_translate = function(to_id){
+
+  if( EoR.isAnimating ) return;
+
+  var from = $(".content_container:visible").addClass( 'pt-page-current' ), to = $("#"+to_id),
+    order = ["home", "obs", "logs", "links"],
+    is_left = order.indexOf(to_id) > order.indexOf(from.attr("id")),
+    in_class = is_left ? "pt-page-moveFromRight": "pt-page-moveFromLeft",
+    out_class = is_left ? "pt-page-moveToLeft": "pt-page-moveToRight";
+
+  if (from.attr("id") == to_id) return;
+
+  EoR.isAnimating = true;
+  EoR.endCurrPage = false;
+  EoR.endNextPage = false;
+
+  from.addClass( out_class ).on( EoR.animEndEventName, function() {
+    from.off( EoR.animEndEventName );
+    EoR.endCurrPage = true;
+    if(EoR.endNextPage)
+      EoR.onEndAnimation( from, to );
+  });
+
+  to.show().addClass( in_class ).on( EoR.animEndEventName, function() {
+    to.off( EoR.animEndEventName );
+    EoR.endNextPage = true;
+    if(EoR.endCurrPage)
+      EoR.onEndAnimation( from, to );
+  });
+
+	if( !EoR.css_support  ) {
+		EoR.onEndAnimation( from, to );
+	}
 };
