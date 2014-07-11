@@ -63,7 +63,7 @@ EoR.google.create_fb_iframe = function(src, title, width, height){
 
   return $("<div/>")
     .addClass("iframe_container")
-    .append("<h1>"+title+"</h1>")
+    .append("<h3>"+title+"</h3>")
     .append(iframe);
 };
 
@@ -102,7 +102,7 @@ EoR.google.init = function(){
   // Fusion Tables
   // Render them in overview for now
   $.each(EoR.google.FT_SOURCES, function(i,v){
-    $("#home")
+    $("#fb_graphs_container")
       .append(EoR.google.create_fb_iframe(v[0], v[1], v[2], v[3]));
   });
 

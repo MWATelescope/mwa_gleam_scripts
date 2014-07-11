@@ -19,15 +19,19 @@ from flask.ext.sqlalchemy import SQLAlchemy
 from flask.ext.script import Manager
 from flask.ext.migrate import Migrate, MigrateCommand
 from flask.ext.login import LoginManager
+from flask.ext.cache import Cache
 
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
+mit_db_engine = db.get_engine(app, bind="mit")
 
 manager = Manager(app)
 manager.add_command('db', MigrateCommand)
 
 login_manager = LoginManager()
 login_manager.init_app(app)
+
+cache = Cache(app,config={'CACHE_TYPE': 'simple'})
 
 # Load Controllers
 from eorlive.controllers import *

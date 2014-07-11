@@ -24,6 +24,7 @@ EoR.init = function(){
     // Initiate content boxes
     EoR.clock.init(); // Clocks widget
     EoR.google.init(); // Logs and Graphs based on Google APIs
+    EoR.obs.init(); // Observation data from MIT database
   });
 };
 

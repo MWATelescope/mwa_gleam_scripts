@@ -16,6 +16,7 @@
       <div class="collapse navbar-collapse">
         <ul class="nav navbar-nav">
           <li class="home"><a href="#">Overview</a></li>
+          <li class="obs"><a href="#obs">Observations</a></li>
           <li class="logs"><a href="#logs">Logs</a></li>
           <li class="links"><a href="#links">Useful Links</a></li>
         </ul>
@@ -32,8 +33,15 @@
 
     <!-- OVERVIEW AKA HOME-->
     <div id="home" class="content_container">
-      <h1>Epoch of Reionization - Observation Overview</h1>
+      <h1>EoR - Observation Overview</h1>
       <div class="clocks container"></div>
+    </div>
+
+    <!-- OBSERVATIONS -->
+    <div id="obs" class="content_container">
+      <h2>Observations</h2>
+      <div class="container" id="mit_observations"></div>
+      <div class="container" id="fb_graphs_container"></div>
     </div>
 
     <!-- LOGS-->
@@ -42,7 +50,6 @@
     </div>
 
     <!-- USEFUL LINKS-->
-
     <div id="links" class="content_container">
       <h2>Useful Links</h2>
       <ul>
@@ -66,6 +73,7 @@
   <script type="text/javascript" src="{{ url_for('static', filename='js/eor.js') }}"></script>
   <script type="text/javascript" src="{{ url_for('static', filename='js/eor.clock.js') }}"></script>
   <script type="text/javascript" src="{{ url_for('static', filename='js/eor.google.js') }}"></script>
+  <script type="text/javascript" src="{{ url_for('static', filename='js/eor.obs.js') }}"></script>
 
   <script type="text/javascript" src="https://www.google.com/jsapi"></script>
   <script type="text/javascript">

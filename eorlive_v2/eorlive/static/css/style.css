@@ -5,6 +5,10 @@ button {
   margin: 2px 7px;
 }
 
+thead tr th{
+  text-align: center;
+}
+
 div#home {
   padding: 10px 5px;
   text-align: center;
@@ -15,6 +19,10 @@ div#home {
   padding-top: 15px;
   padding-bottom: 15px;
   color: white;
+}
+
+.content_container {
+  text-align: center;
 }
 
 /* CLOCK */
@@ -35,4 +43,16 @@ div#home {
 div#logs .button_container {
   text-align: right;
   padding-bottom: 20px;
+}
+
+/* OBSERVATIONS */
+
+#fb_graphs_container{
+  text-align: center;
+}
+
+/* USEFUL LINKS */
+
+#links {
+  text-align: left;
 }
