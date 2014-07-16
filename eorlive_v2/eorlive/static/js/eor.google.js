@@ -6,17 +6,17 @@ EoR.google.SPREADSHEET = "https://docs.google.com/a/mindbloom.com/spreadsheet/cc
 // array of [source, title, width, height]
 EoR.google.FT_SOURCES = [
   [
-    "https://www.google.com/fusiontables/embedviz?containerId=googft-gviz-canvas&viz=GVIZ&t=LINE_AGGREGATE&isXyPlot=true&bsize=0&q=select+col0%2C+col1%2C+col5%2C+col4%2C+col25+from+1UspWE7G7ccKncYTUbEkpSaSitomsN-7vLkNdx-I&qrs=+where+col0+%3E%3D+&qre=+and+col0+%3C%3D+&qe=+order+by+col0+asc&uiversion=2&gco_forceIFrame=true&gco_hasLabelsColumn=true&width=<width>&height=<height>",
+    "https://www.google.com/fusiontables/embedviz?containerId=googft-gviz-canvas&viz=GVIZ&t=LINE_AGGREGATE&isXyPlot=true&bsize=0&q=select+col0%2C+col1%2C+col5%2C+col4%2C+col25+from+1UspWE7G7ccKncYTUbEkpSaSitomsN-7vLkNdx-I&qrs=+where+col0+%3E%3D+&qre=+and+col0+%3C%3D+&qe=+order+by+col0+asc&uiversion=2&gco_hasLabelsColumn=true&width=<width>&height=<height>",
     "Hours of Observing",
     1000, 600
   ],
   [
-    "https://www.google.com/fusiontables/embedviz?containerId=gviz_canvas&viz=GVIZ&t=LINE_AGGREGATE&isXyPlot=true&bsize=0&q=select+col0%2C+col24+from+1UspWE7G7ccKncYTUbEkpSaSitomsN-7vLkNdx-I&qrs=+where+col0+%3E%3D+&qre=+and+col0+%3C%3D+&qe=+order+by+col0+asc&uiversion=2&gco_forceIFrame=true&gco_hasLabelsColumn=true&width=<width>&height=<height>",
+    "https://www.google.com/fusiontables/embedviz?containerId=gviz_canvas&viz=GVIZ&t=LINE_AGGREGATE&isXyPlot=true&bsize=0&q=select+col0%2C+col24+from+1UspWE7G7ccKncYTUbEkpSaSitomsN-7vLkNdx-I&qrs=+where+col0+%3E%3D+&qre=+and+col0+%3C%3D+&qe=+order+by+col0+asc&uiversion=2&gco_hasLabelsColumn=true&width=<width>&height=<height>",
     "", 1000, 600
   ]
   /*
   [
-    "https://www.google.com/fusiontables/embedviz?containerId=gviz_canvas&viz=GVIZ&t=LINE_AGGREGATE&isXyPlot=true&bsize=0&q=select+col0%2C+col7%2C+col6%2C+col8%2C+col9%2C+col10%2C+col11%2C+col12%2C+col13%2C+col14%2C+col15%2C+col16%2C+col18%2C+col19%2C+col20%2C+col21+from+1UspWE7G7ccKncYTUbEkpSaSitomsN-7vLkNdx-I&qrs=+where+col0+%3E%3D+&qre=+and+col0+%3C%3D+&qe=+order+by+col0+asc&uiversion=2&gco_forceIFrame=true&gco_hasLabelsColumn=true&width=<width>&height=<height>",
+    "https://www.google.com/fusiontables/embedviz?containerId=gviz_canvas&viz=GVIZ&t=LINE_AGGREGATE&isXyPlot=true&bsize=0&q=select+col0%2C+col7%2C+col6%2C+col8%2C+col9%2C+col10%2C+col11%2C+col12%2C+col13%2C+col14%2C+col15%2C+col16%2C+col18%2C+col19%2C+col20%2C+col21+from+1UspWE7G7ccKncYTUbEkpSaSitomsN-7vLkNdx-I&qrs=+where+col0+%3E%3D+&qre=+and+col0+%3C%3D+&qe=+order+by+col0+asc&uiversion=2&gco_hasLabelsColumn=true&width=<width>&height=<height>",
     "Failure Rate", 1000, 600
   ]
   */

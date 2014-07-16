@@ -3,7 +3,7 @@ EoR.obs = {};
 EoR.obs.create_mit_observations = function(){
   return $("<div/>")
     .attr("id", "mit_observations_container")
-    .append("<h3>Observation Table</h3>")
+    .append("<h3>Current And Past observations</h3>")
     .append( $("<table/>")
       .addClass("gs_table table table-striped")
       .append("<thead><tr><th>Obs. Number</th><th>Obs. Name</th><th>Project ID</th><th>Start Time</th><th>Stop Time</th><th>Files</th></tr></thead>")
@@ -13,7 +13,20 @@ EoR.obs.create_mit_observations = function(){
     .append(EoR.create_loading());
 };
 
-EoR.obs.fetch_observations = function(){
+EoR.obs.create_mit_future_observation_counts = function(){
+  return $("<div/>")
+    .attr("id", "mit_future_obs_div")
+    .append("<h3>Scheduled Observation Counts</h3>")
+    .append( $("<table/>")
+      .addClass("gs_table table table-striped")
+      .append("<thead><tr><th>Total Scheduled</th><th>Next 24 Hours</th></tr></thead>")
+      .append("<tbody></tbody>")
+      .hide()
+    )
+    .append(EoR.create_loading());
+};
+
+EoR.obs.fetch_observations = function(callback){
 
   var tb = $("#mit_observations_container table"),
     tbody = tb.find("tbody").empty(),
@@ -44,11 +57,44 @@ EoR.obs.fetch_observations = function(){
     complete: function(){
       tb.show();
       loading.hide();
+      if(callback) callback();
     }
   });
 };
 
+EoR.obs.fetch_future_observation_counts = function(callback){
+  var tb = $("#mit_future_obs_div table"),
+    tbody = tb.find("tbody").empty(),
+    loading = $("#mit_future_obs_div .loading");
+
+  tb.hide();
+  loading.show();
+
+  $.ajax({
+    url: "/api/mit_data/future_observation_counts",
+    type: "json",
+    method: "GET",
+    success: function(data){
+      tbody.append( $("<tr/>")
+        .append("<td>"+data.total+"</td>")
+        .append("<td>"+data.next_24+"</td>")
+      );
+    },
+    error: function(xhr, status, err){
+      tbody.append("<tr><td colspan=\"2\">Failed to get data...</td></tr>")
+    },
+    complete: function(){
+      tb.show();
+      loading.hide();
+      if(callback) callback();
+    }
+  });
+
+};
+
 EoR.obs.init = function(){
-  $("#mit_observations").append(EoR.obs.create_mit_observations());
-  EoR.obs.fetch_observations();
+  $("#mit_observations")
+    .append(EoR.obs.create_mit_observations())
+    .append(EoR.obs.create_mit_future_observation_counts());
+  EoR.obs.fetch_observations(EoR.obs.fetch_future_observation_counts);
 };
