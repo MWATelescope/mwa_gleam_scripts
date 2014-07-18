@@ -35,6 +35,8 @@ pip install -r $MWA_PATH/eorlive_v2/requirements.txt
 # - Set Web Environment
 export EOR_ENV=dev
 echo 'EOR_EVN=dev' >> /etc/environment
+export PYTHONPATH="/mnt/MWA_Tools:/mnt/MWA_Tools/configs"
+echo 'PYTHONPATH="/mnt/MWA_Tools:/mnt/MWA_Tools/configs"' >> /etc/environment
 # DB
 cd $MWA_PATH/eorlive_v2/
 python -m eorlive db upgrade head
@@ -45,5 +47,11 @@ sudo rm /etc/apache2/sites-enabled/*.conf
 sudo ln -s /etc/apache2/sites-available/eorlive_dev.conf /etc/apache2/sites-enabled/eorlive_dev.conf
 sudo service apache2 restart
 
+#Place for images
+mkdir /var/beam_images
+chmod 666 /var/beam_images
+
 #Build mwapy
 $MWA_PATH/make_MWA_Tools.sh
+cp $MWA_PATH/configs/mwa.conf /usr/local/etc
+#$MWA_PATH/scripts/change_db.py -g mit
