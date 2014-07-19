@@ -40,6 +40,21 @@ div#home {
   display: block;
 }
 
+/* BEAM IMAGES */
+
+#beam_image img{
+  margin: auto;
+}
+
+#beam_image {
+  margin-bottom: 30px;
+}
+
+#beam_image .carousel-indicators {
+  bottom: 30px;
+}
+
+
 /* LOGS */
 div#logs .button_container {
   text-align: right;

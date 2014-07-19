@@ -22,6 +22,7 @@ source /opt/pyvenv/eorlive/bin/activate
 pip install numpy
 pip install scipy
 pip install psycopg2 matplotlib ephem pyfits pytz
+pip install pywcs
 
 # PostgreSQL
 # - set password so web server can access as postgres user
@@ -35,8 +36,8 @@ pip install -r $MWA_PATH/eorlive_v2/requirements.txt
 # - Set Web Environment
 export EOR_ENV=dev
 echo 'EOR_EVN=dev' >> /etc/environment
-export PYTHONPATH="/mnt/MWA_Tools:/mnt/MWA_Tools/configs"
-echo 'PYTHONPATH="/mnt/MWA_Tools:/mnt/MWA_Tools/configs"' >> /etc/environment
+export PYTHONPATH="/mnt/MWA_Tools:/mnt/MWA_Tools/configs:/mnt/MWA_Tools/scripts"
+echo 'PYTHONPATH="/mnt/MWA_Tools:/mnt/MWA_Tools/configs:/mnt/MWA_Tools/scripts"' >> /etc/environment
 # DB
 cd $MWA_PATH/eorlive_v2/
 python -m eorlive db upgrade head
@@ -49,9 +50,11 @@ sudo service apache2 restart
 
 #Place for images
 mkdir /var/beam_images
-chmod 666 /var/beam_images
+chmod -R 777 /var/beam_images
 
 #Build mwapy
 $MWA_PATH/make_MWA_Tools.sh
 cp $MWA_PATH/configs/mwa.conf /usr/local/etc
+cd $MWA_PATH
+python setup.py install
 #$MWA_PATH/scripts/change_db.py -g mit

@@ -1,5 +1,7 @@
 var EoR = {};
 
+EoR.pages = ["home", "obs", "logs", "links", "account"];
+
 EoR.init = function(){
 
   $.ajaxSetup({type:"json"});
@@ -11,6 +13,7 @@ EoR.init = function(){
       return;
     }
     var content_id = (window.location.hash.replace("#", "")) || "home";
+    if(EoR.pages.indexOf(content_id) < 0) return;
     EoR.view_translate(content_id);
     $(".navbar .nav.navbar-nav li").removeClass("active");
     $(".navbar .nav.navbar-nav li."+content_id).addClass("active");
@@ -28,6 +31,7 @@ EoR.init = function(){
     EoR.clock.init(); // Clocks widget
     EoR.google.init(); // Logs and Graphs based on Google APIs
     EoR.obs.init(); // Observation data from MIT database
+    EoR.img.init(); // Load Beam Images
   });
 };
 
