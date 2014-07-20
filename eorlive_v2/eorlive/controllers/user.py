@@ -37,9 +37,28 @@ def show_user(id):
     return "no such user", 404
   return jsonify(user.asDict()), 200
 
-@app.route('/api/current_user', methods=['GET'])
+@app.route('/api/current_user', methods=['GET','PUT'])
 @login_required
 def show_current_user():
+  if request.method == 'PUT':
+    return update_current_user()
+  return jsonify(current_user.asDict()), 200
+
+def update_current_user():
+  password = request.form.get('password')
+  name = request.form.get("name")
+  email = request.form.get("email")
+
+  if password:
+    current_user.password = hashlib.sha256(password).hexdigest()
+  if name:
+    current_user.name = name
+  if email:
+    current_user.email = email
+
+  db.session.add(current_user)
+  db.session.commit()
+
   return jsonify(current_user.asDict()), 200
 
 @app.route('/api/login', methods=['POST'])

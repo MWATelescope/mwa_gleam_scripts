@@ -73,6 +73,21 @@ div#logs .button_container {
   text-align: left;
 }
 
+/* ACCOUNT */
+
+#account {
+  text-align: left;
+}
+
+#account form label{
+  display: inline-block;
+  width: 200px;
+}
+
+#account form input{
+  display: inline-block;
+  width: 300px;
+}
 
 /* ANIMATION STUFF */
 

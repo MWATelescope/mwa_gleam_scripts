@@ -41,7 +41,31 @@ To run the migration to make the database schema up to date, use
 ```
 python -m eorlive db upgrade head
 ```
+(Make sure you 'sourced' the virtualenv if it runs in virtualenv)
 
 ### Deployment ###
 
-TBA
+Right now, I'm using rsync commend to copy files to instances.
+
+For example,
+
+```
+rsync -avL --progress --exclude='.git/' -e "ssh -i <path to EoR.pem file>" ./MWA_Tools ubuntu@<hostname>:
+```
+
+This can be improved later.
+
+### Making Instances ###
+
+Take a look at the provision.sh for basic set up. Modify the commends for the paths specific to the instance where it's being installed.
+
+For any cronjobs that need virtualenv, make separate shell scripts with 'source /opt/pyvenv/eorlive/bin/activate' commend and execute them in crontab.
+
+Recommended MWA_Tools install path is /home/ubuntu for any EC2 ubuntu images.
+
+Make sure to set the envorinmental variable EOR_ENV to either 'prod' or 'stage'.
+```
+export EOR_ENV=stage
+echo 'EOR_ENV=stage' >> /etc/environment
+
+```

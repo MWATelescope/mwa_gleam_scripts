@@ -35,7 +35,7 @@ sudo apt-get -y install libapache2-mod-wsgi
 pip install -r $MWA_PATH/eorlive_v2/requirements.txt
 # - Set Web Environment
 export EOR_ENV=dev
-echo 'EOR_EVN=dev' >> /etc/environment
+echo 'EOR_ENV=dev' >> /etc/environment
 export PYTHONPATH="/mnt/MWA_Tools:/mnt/MWA_Tools/configs:/mnt/MWA_Tools/scripts"
 echo 'PYTHONPATH="/mnt/MWA_Tools:/mnt/MWA_Tools/configs:/mnt/MWA_Tools/scripts"' >> /etc/environment
 # DB

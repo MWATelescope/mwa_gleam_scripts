@@ -22,17 +22,22 @@ EoR.init = function(){
   hashChanged();
 
   EoR.check_user(function(){
-    $(".navbar .logging_in_msg").remove();
-    $(".navbar .logged_in_msg")
-      .append("Hello " + EoR.current_user.name + " (")
-      .append($("<a/>").attr("href", "#").text("Log out").click(EoR.logout))
-      .append(")");
+    EoR.render_logged_in_message();
     // Initiate content boxes
     EoR.clock.init(); // Clocks widget
     EoR.google.init(); // Logs and Graphs based on Google APIs
     EoR.obs.init(); // Observation data from MIT database
     EoR.img.init(); // Load Beam Images
+    EoR.account.init(); // Account settings render
   });
+};
+
+EoR.render_logged_in_message = function(){
+  $(".navbar .logging_in_msg").remove();
+  $(".navbar .logged_in_msg").empty()
+    .append("Hello " + EoR.current_user.name + " (")
+    .append($("<a/>").attr("href", "#").text("Log out").click(EoR.logout))
+    .append(")");
 };
 
 EoR.create_loading = function(){
@@ -97,7 +102,7 @@ EoR.view_translate = function(to_id){
   if( EoR.isAnimating ) return;
 
   var from = $(".content_container:visible").addClass( 'pt-page-current' ), to = $("#"+to_id),
-    order = ["home", "obs", "logs", "links"],
+    order = EoR.pages,
     is_left = order.indexOf(to_id) > order.indexOf(from.attr("id")),
     in_class = is_left ? "pt-page-moveFromRight": "pt-page-moveFromLeft",
     out_class = is_left ? "pt-page-moveToLeft": "pt-page-moveToRight";
