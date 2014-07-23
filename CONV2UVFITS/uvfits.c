@@ -242,7 +242,7 @@ int readUVFITSInitIterator(char *filename, uvdata **data, uvReadContext **iterat
     }
     for(i=0; i<iter->pcount; i++) {
         char typedesc[84];
-        double temp_pscal=0,temp_pzero=0;
+        double temp_pscal=1.0,temp_pzero=0.0;
 
         sprintf(temp,"PTYPE%d",i+1);
         fits_read_key(fptr,TSTRING,temp,typedesc,NULL,&status);
