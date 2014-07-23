@@ -64,6 +64,7 @@ int main(int argc, char *argv[]) {
     res = readUVFITSInitIterator(infilename, &data_new, &iter);
     if (res !=0) {
         fprintf(stderr,"readUVFITSInitIterator failed with error %d\n",res);
+        exit(1);
     }
     if (debug) fprintf(fpd,"n_vis: %d, n_pol: %d, gcount: %d\n",data_new->n_vis,data_new->n_pol, iter->gcount);
     fflush(stdout);

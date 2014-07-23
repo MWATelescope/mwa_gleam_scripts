@@ -246,11 +246,16 @@ int readUVFITSInitIterator(char *filename, uvdata **data, uvReadContext **iterat
 
         sprintf(temp,"PTYPE%d",i+1);
         fits_read_key(fptr,TSTRING,temp,typedesc,NULL,&status);
+        if (status) {
+            fprintf(stderr,"ERROR: Didn't find %s keyword in header\n",typedesc);
+            return -1;
+        }
         sprintf(temp,"PSCAL%d",i+1);
         fits_read_key(fptr,TDOUBLE,temp,&temp_pscal,NULL,&status);
         sprintf(temp,"PZERO%d",i+1);
         fits_read_key(fptr,TDOUBLE,temp,&temp_pzero,NULL,&status);
         if(debug) fprintf(stdout,"PTYPE%d: '%s', PSCAL: %g, PZERO: %g\n",i+1,typedesc,temp_pscal,temp_pzero);
+        fits_clear_errmsg(); // clear fits errors in case PSCAL and PZERO are missing since they have defaults
 
         /* remember the stuff we care about */
         if (strncmp("DATE",typedesc,4)==0) {
