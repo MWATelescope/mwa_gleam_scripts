@@ -116,18 +116,29 @@ def update():
 
   write_to_log("total_uvvits_hours query ran in %f seconds" %profile())
 
-  # TODO Data transfer rate
+  # Data transfer rate
+  data_transfer_rate = 0
+  last_query_time = send_local_query(
+    '''
+    SELECT created_date FROM graph_data ORDER BY created_date DESC LIMIT 1
+    ''').fetchone()
+  if last_query_time is not None:
+    last_query_time = last_query_time[0]
+    time_delta = datetime.now() - last_query_time
+    last_query_data_hours = send_local_query("SELECT hours_with_data FROM graph_data ORDER BY created_date DESC LIMIT 1").fetchone()[0]
+    data_transfer_rate = (total_data_hours - last_query_data_hours) / (time_delta.total_seconds() / 3600.)
 
   write_to_log("\nTotal Scheduled Hours = %.6f" %total_sch_hours)
   write_to_log("Total Observed Hours = %.6f" %total_obs_hours)
   write_to_log("Total Hours that have data = %.6f" %total_data_hours)
   write_to_log("Total Hours that have uvfits data = %.6f" %total_uvfits_hours)
+  write_to_log("Data transfer rate = %.6f" %data_transfer_rate)
 
   # TODO insert data_transfer_rate
   send_local_query("""
-    INSERT INTO graph_data (hours_scheduled, hours_observed, hours_with_data, hours_with_uvfits)
-    VALUES (%f, %f, %f, %f)
-  """ %(total_sch_hours, total_obs_hours, total_data_hours, total_uvfits_hours))
+    INSERT INTO graph_data (hours_scheduled, hours_observed, hours_with_data, hours_with_uvfits, data_transfer_rate)
+    VALUES (%f, %f, %f, %f, %f)
+  """ %(total_sch_hours, total_obs_hours, total_data_hours, total_uvfits_hours, data_transfer_rate))
 
   local_conn.commit()
 
