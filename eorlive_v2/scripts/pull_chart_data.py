@@ -14,6 +14,8 @@ mwa_conn = None
 local_conn = None
 profiling_mark = None
 
+cur_d = os.path.dirname(__file__)
+
 def write_to_log(msg):
   print msg
   f=open(os.path.join(cur_d, PATH_TO_LOG),'a')
