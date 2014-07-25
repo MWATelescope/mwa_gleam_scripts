@@ -10,7 +10,7 @@ if __name__=="__main__":
     #get the last command in mwa_setting
     eorconn = psycopg2.connect(database='mwa',host='eor-db.mit.edu',user='mwa',password='BowTie')
     cur = eorconn.cursor()
-    cur.execute('select starttime from mwa_setting where starttime < gpsnow() order by starttime desc limit 1')
+    cur.execute('select observation_number from obsc_mwa_setting where starttime < gpsnow() order by starttime desc limit 1')
     obsid=cur.fetchall()[0][0]
     #get current observation
     sp.call('/csr/mwa/python/mwa_git/mwatools_setup/bin/get_observation_info.py -g '+str(obsid)+' -i',shell=True)

@@ -53,6 +53,7 @@ if __name__=="__main__":
   cur = eorconn.cursor()
   cur.execute('select starttime from mwa_setting where starttime < gpsnow() order by starttime desc limit 1')
   obsid=cur.fetchall()[0][0]
+  eorconn.close()
 
   exitcode = sp.call('cd %s && %s -g %s -i' %(PATH_TO_PNGS, GET_OBS_INFO, str(obsid)), shell=True)
   write_to_log("get_observation_info ran with obsid = %d | exit code = %d \n" %(obsid, exitcode))
