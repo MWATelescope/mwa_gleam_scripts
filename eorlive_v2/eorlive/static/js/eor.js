@@ -25,7 +25,6 @@ EoR.init = function(){
     EoR.render_logged_in_message();
     // Initiate content boxes
     EoR.clock.init(); // Clocks widget
-    EoR.google.init(); // Logs and Graphs based on Google APIs
     EoR.obs.init(); // Observation data from MIT database
     EoR.img.init(); // Load Beam Images
     EoR.account.init(); // Account settings render
