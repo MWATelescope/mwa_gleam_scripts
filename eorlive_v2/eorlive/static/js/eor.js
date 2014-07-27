@@ -1,6 +1,7 @@
 var EoR = {};
 
 EoR.pages = ["home", "obs", "logs", "links", "account"];
+EoR.transitioned_to = [false, false, false, false, false]; // keeps track of whether a page has been viewed since load
 
 EoR.init = function(){
 
@@ -27,6 +28,7 @@ EoR.init = function(){
     EoR.clock.init(); // Clocks widget
     EoR.obs.init(); // Observation data from MIT database
     EoR.img.init(); // Load Beam Images
+    EoR.graph.init(); // Load graphs
     EoR.account.init(); // Account settings render
   });
 };
@@ -77,6 +79,35 @@ EoR.render_user_info = function(){
 
 };
 
+// Per Page Events
+EoR.onPageTransition = function(page_id){
+  console.log("onPageTransition  " + page_id);
+  var index = EoR.pages.indexOf(page_id);
+  if(!page_id) page_id = "_null";
+  var transitioned_to = EoR.transitioned_to[index];
+
+  switch(page_id){
+    case 'home':
+      break;
+    case 'obs':
+      if(!transitioned_to) {
+        //EoR.obs.fetch_observations(EoR.obs.fetch_future_observation_counts);
+        EoR.graph.fetch_data();
+      }
+      break;
+    case 'logs':
+      break;
+    case 'links':
+      break;
+    case 'account':
+      break;
+    case '_null':
+      break;
+  }
+
+  EoR.transitioned_to[index] = true;
+}
+
 
 // Things needed for view translation
 EoR.isAnimating = false;
@@ -90,10 +121,11 @@ EoR.animEndEventNames = {
 };
 EoR.animEndEventName = EoR.animEndEventNames[ Modernizr.prefixed( 'animation' ) ],
 EoR.css_support = Modernizr.cssanimations;
-EoR.onEndAnimation = function(from, to){
+EoR.onEndAnimation = function(from, to, to_id){
   EoR.isAnimating = false;
   from.removeClass("pt-page-current pt-page-moveToLeft pt-page-moveToRight").hide();
   to.removeClass("pt-page-moveFromRight pt-page-moveFromLeft pt-page-current");
+  EoR.onPageTransition(to_id);
 };
 
 EoR.view_translate = function(to_id){
@@ -123,10 +155,10 @@ EoR.view_translate = function(to_id){
     to.off( EoR.animEndEventName );
     EoR.endNextPage = true;
     if(EoR.endCurrPage)
-      EoR.onEndAnimation( from, to );
+      EoR.onEndAnimation( from, to, to_id );
   });
 
 	if( !EoR.css_support  ) {
-		EoR.onEndAnimation( from, to );
+		EoR.onEndAnimation( from, to, to_id );
 	}
 };

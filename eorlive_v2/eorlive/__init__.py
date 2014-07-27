@@ -1,5 +1,6 @@
 from flask import Flask
-import os
+import os, calendar
+from datetime import datetime
 
 app = Flask('eorlive')
 
@@ -20,6 +21,7 @@ from flask.ext.script import Manager
 from flask.ext.migrate import Migrate, MigrateCommand
 from flask.ext.login import LoginManager
 from flask.ext.cache import Cache
+from flask.json import JSONEncoder
 
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
@@ -32,6 +34,28 @@ login_manager = LoginManager()
 login_manager.init_app(app)
 
 cache = Cache(app,config={'CACHE_TYPE': 'simple'})
+
+# Customize jsonify
+
+class CustomJSONEncoder(JSONEncoder):
+  def default(self, obj):
+    try:
+      if isinstance(obj, datetime):
+        if obj.utcoffset() is not None:
+          obj = obj - obj.utcoffset()
+        millis = int(
+          calendar.timegm(obj.timetuple()) * 1000 +
+          obj.microsecond / 1000
+        )
+        return millis
+      iterable = iter(obj)
+    except TypeError:
+      pass
+    else:
+      return list(iterable)
+    return JSONEncoder.default(self, obj)
+
+app.json_encoder = CustomJSONEncoder
 
 # Load Controllers
 from eorlive.controllers import *

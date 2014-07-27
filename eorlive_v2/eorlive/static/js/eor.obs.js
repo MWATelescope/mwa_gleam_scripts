@@ -96,5 +96,5 @@ EoR.obs.init = function(){
   $("#mit_observations")
     .append(EoR.obs.create_mit_observations())
     .append(EoR.obs.create_mit_future_observation_counts());
-  EoR.obs.fetch_observations(EoR.obs.fetch_future_observation_counts);
+  //EoR.obs.fetch_observations(EoR.obs.fetch_future_observation_counts);
 };

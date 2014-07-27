@@ -45,6 +45,8 @@
     <div id="obs" class="content_container container" style="display:none;">
       <h2>Observations</h2>
       <div class="container" id="mit_observations"></div>
+      <h3>Graphs</h3>
+      <div class="container" id="graphs"></div>
     </div>
 
     <!-- LOGS-->
@@ -85,12 +87,14 @@
   <script type="text/javascript" src="{{ url_for('static', filename='js/bootstrap.min.js') }}"></script>
   <!--[if IE]><script type="text/javascript" src="{{ url_for('static', filename='js/excanvas.js') }}"></script><![endif]-->
   <script type="text/javascript" src="{{ url_for('static', filename='js/coolclock.js') }}"></script>
-  <script type="text/javascript" src="{{ url_for('static', filename='js/jquery.sheetrock.min.js') }}"></script>
+  <script type="text/javascript" src="{{ url_for('static', filename='js/amcharts/amcharts.js') }}"></script>
+  <script type="text/javascript" src="{{ url_for('static', filename='js/amcharts/serial.js') }}"></script>
   <script type="text/javascript" src="{{ url_for('static', filename='js/eor.js') }}"></script>
   <script type="text/javascript" src="{{ url_for('static', filename='js/eor.clock.js') }}"></script>
   <script type="text/javascript" src="{{ url_for('static', filename='js/eor.google.js') }}"></script>
   <script type="text/javascript" src="{{ url_for('static', filename='js/eor.obs.js') }}"></script>
   <script type="text/javascript" src="{{ url_for('static', filename='js/eor.img.js') }}"></script>
+  <script type="text/javascript" src="{{ url_for('static', filename='js/eor.graph.js') }}"></script>
   <script type="text/javascript" src="{{ url_for('static', filename='js/eor.account.js') }}"></script>
 
   <script type="text/javascript" src="https://www.google.com/jsapi"></script>

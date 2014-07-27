@@ -67,6 +67,12 @@ div#logs .button_container {
   text-align: center;
 }
 
+#graphs .graph_container > div{
+  width: 100%;
+  height: 400px;
+  margin: 12px;
+}
+
 /* USEFUL LINKS */
 
 #links {

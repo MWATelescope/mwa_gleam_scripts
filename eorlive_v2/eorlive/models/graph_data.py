@@ -4,12 +4,12 @@ from datetime import datetime
 
 class GraphData(db.Model):
   id = db.Column(db.Integer, primary_key=True)
-  created_date = db.Column(db.Datetime)
-  hours_scheduled = db.Column(db.Float))
-  hours_observed = db.Column(db.Float))
-  hours_with_data = db.Column(db.Float))
-  hours_with_uvfits = db.Column(db.Float))
-  data_transfer_rate = db.Column(db.Float))
+  created_date = db.Column(db.DateTime)
+  hours_scheduled = db.Column(db.Float)
+  hours_observed = db.Column(db.Float)
+  hours_with_data = db.Column(db.Float)
+  hours_with_uvfits = db.Column(db.Float)
+  data_transfer_rate = db.Column(db.Float)
 
   def __init__(self):
     pass
