@@ -29,6 +29,7 @@ EoR.init = function(){
     EoR.obs.init(); // Observation data from MIT database
     EoR.img.init(); // Load Beam Images
     EoR.graph.init(); // Load graphs
+    EoR.logs.init();
     EoR.account.init(); // Account settings render
   });
 };
@@ -96,6 +97,9 @@ EoR.onPageTransition = function(page_id){
       }
       break;
     case 'logs':
+      if(!transitioned_to){
+        EoR.logs.fetch_observation_logs(true);
+      }
       break;
     case 'links':
       break;

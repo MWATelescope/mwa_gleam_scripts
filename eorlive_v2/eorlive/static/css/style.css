@@ -61,6 +61,38 @@ div#logs .button_container {
   padding-bottom: 20px;
 }
 
+#observation_logs .fetch_interface{
+}
+
+#observation_logs .obs_tags{
+  list-style-type: none;
+  padding:0;
+  margin:0;
+}
+
+#observation_logs .obs_tags label{
+  padding-right: 5px;
+}
+
+#observation_logs .obs_tags li {
+  float: left;
+  padding-right: 20px;
+}
+
+#observation_logs .post_interface {
+  text-align: left;
+}
+
+#observation_logs .post_interface form textarea.note{
+  width: 40%;
+  height: 100px;
+}
+
+#observation_logs .post_interface form input.observed_date{
+  width: 300px;
+}
+
+
 /* OBSERVATIONS */
 
 #fb_graphs_container{
