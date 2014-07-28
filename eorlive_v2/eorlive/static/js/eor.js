@@ -92,7 +92,7 @@ EoR.onPageTransition = function(page_id){
       break;
     case 'obs':
       if(!transitioned_to) {
-        //EoR.obs.fetch_observations(EoR.obs.fetch_future_observation_counts);
+        EoR.obs.fetch_observations(EoR.obs.fetch_future_observation_counts);
         EoR.graph.fetch_data();
       }
       break;
