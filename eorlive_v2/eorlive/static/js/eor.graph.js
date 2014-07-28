@@ -122,7 +122,7 @@ EoR.graph.render = function(){
     legend.marginLeft = 100;
     legend.spacing = 30;
     legend.useGraphSettings = true;
-    legend.showEntries = false;
+    legend.valueAlign = "left";
     v.addLegend(legend);
 
     // Need something like below code if the data is really big - commented out for now

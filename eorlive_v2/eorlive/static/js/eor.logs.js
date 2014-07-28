@@ -148,7 +148,7 @@ EoR.logs.post_observation_log = function(){
     note =  $("#observation_logs .post_interface .note").val(),
     tags = EoR.logs.get_tags_value( $("#observation_logs .post_interface ul.obs_tags") );
 
-  if(!/^\d{4}[\/\-](0?[1-9]|1[012])[\/\-](0?[1-9]|[12][0-9]|3[01]))$/.test(observed_date)){
+  if(!/^\d{4}[\/\-](0?[1-9]|1[012])[\/\-](0?[1-9]|[12][0-9]|3[01])$/.test(observed_date)){
     alert("Please enter a valid date in yyyy-mm-dd format");
     return
   }

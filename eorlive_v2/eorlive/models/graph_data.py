@@ -18,9 +18,9 @@ class GraphData(db.Model):
     return {
       'id': self.id,
       'created_date': self.created_date,
-      'hours_scheduled': self.hours_scheduled,
-      'hours_observed': self.hours_observed,
-      'hours_with_data': self.hours_with_data,
-      'hours_with_uvfits': self.hours_with_uvfits,
-      'data_transfer_rate': self.data_transfer_rate,
+      'hours_scheduled': round(self.hours_scheduled or 0., 4),
+      'hours_observed': round(self.hours_observed or 0., 4),
+      'hours_with_data': round(self.hours_with_data or 0., 4),
+      'hours_with_uvfits': round(self.hours_with_uvfits or 0., 4),
+      'data_transfer_rate': round(self.data_transfer_rate or 0., 4),
     }
