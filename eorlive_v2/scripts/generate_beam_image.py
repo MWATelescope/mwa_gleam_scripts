@@ -51,7 +51,12 @@ if __name__=="__main__":
   #get the last command in mwa_setting
   eorconn = psycopg2.connect(database='mwa',host='eor-db.mit.edu',user='mwa',password='BowTie')
   cur = eorconn.cursor()
-  cur.execute('select starttime from mwa_setting where starttime < gpsnow() order by starttime desc limit 1')
+  cur.execute('''
+    select starttime from mwa_setting
+    where starttime < gpsnow()
+    and (projectid = 'G0009' or projectid = 'G0010')
+    order by starttime desc limit 1
+    ''')
   obsid=cur.fetchall()[0][0]
   eorconn.close()
 

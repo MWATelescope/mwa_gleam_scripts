@@ -19,13 +19,13 @@ EoR.img.fetch_images = function(callback){
     method: "GET",
     success: function(data){
       $.each(data.images, function(i,v){
-        ol.prepend(
+        ol.append(
           $("<li>")
             .attr("data-target","#beam_image")
-            .attr("data-slide-to", ""+(data.images.length-1-i))
+            .attr("data-slide-to", ""+i)
             .addClass(i===0?"active":"")
         );
-        div_inner.prepend(
+        div_inner.append(
           $("<div>")
             .addClass(i===0?"item active":"item")
             .append( $("<img/>").attr("src", "/beam_images/"+v) )

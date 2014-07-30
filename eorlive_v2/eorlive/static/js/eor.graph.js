@@ -40,10 +40,12 @@ EoR.graph.fetch_data = function(){
           hours_with_data: v.hours_with_data,
           hours_with_uvfits: v.hours_with_uvfits
         });
-        EoR.chartData2.push({
-          date: new Date(v.created_date),
-          data_transfer_rate: v.data_transfer_rate
-        });
+        if(v.data_transfer_rate){ // data_transfer_rate can be null sometimes. No need to push those. They don't mean 0.
+          EoR.chartData2.push({
+            date: new Date(v.created_date),
+            data_transfer_rate: v.data_transfer_rate
+          });
+        }
       });
       EoR.graph.render();
     },
@@ -126,9 +128,12 @@ EoR.graph.render = function(){
     v.addLegend(legend);
 
     // Need something like below code if the data is really big - commented out for now
-    // v.addListener("dataUpdated", function(){
-    //   v.zoomToIndexes(EoR.chartData1.length - 40, EoR.chartData1.length - 1);
-    // });
+    var d_length = EoR["chartData"+(i+1)].length;
+    if(d_length > 100){
+      v.addListener("dataUpdated", function(){
+        v.zoomToIndexes(d_length - 80, d_length- 1);
+      });
+    }
   });
 
   // GRAPHS - do this individually per graph

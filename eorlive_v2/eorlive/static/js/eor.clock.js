@@ -19,9 +19,9 @@ EoR.clock.create_div = function(name, tz, size, seconds){
 };
 
 EoR.clock.init = function(){
-  $(".clocks.container").append(EoR.clock.create_div("Local", null, EoR.clock.LOCAL_SIZE, true));
+  $(".clocks.container").append(EoR.clock.create_div("Local", null, EoR.clock.LOCAL_SIZE, false));
   $.each(EoR.clock.CLOCKS, function(i,v){
-    $(".clocks.container").append(EoR.clock.create_div(v[0], v[1], EoR.clock.SIZE, true));
+    $(".clocks.container").append(EoR.clock.create_div(v[0], v[1], EoR.clock.SIZE, false));
   });
   CoolClock.findAndCreateClocks();
 };
