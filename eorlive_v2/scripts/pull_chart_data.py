@@ -14,7 +14,7 @@ mwa_conn = None
 local_conn = None
 profiling_mark = None
 
-TESTING = True
+TESTING = False
 
 cur_d = os.path.dirname(__file__)
 
@@ -88,7 +88,7 @@ def update():
 
   ngas_files_rows = send_ngas_query(
   '''
-  SELECT file_id FROM ngas_files
+  SELECT DISTINCT file_id FROM ngas_files
   ORDER BY file_id ASC
   '''
   )
@@ -102,6 +102,8 @@ def update():
   no_more_ngas_files = False
   match = 0
   no_match = 0
+  weirdness = 0
+  not_weird = 0
   for row in mwa_setting_rows:
     #if i >= 10: break
     obsid = int(row[0])
@@ -112,7 +114,6 @@ def update():
       ngas_file = ngas_files_rows.fetchone()
       if not ngas_file:
         no_more_ngas_files = True
-        print "no_more_ngas_files set to True"
         break;
 
       ngas_file_id = ngas_file[0]
@@ -120,41 +121,44 @@ def update():
       try:
         ngas_file_obsid = int(ngas_file_id.split("_")[0])
       except ValueError as e:
+        #print "VALUE ERROR ngas_file_id = %s" %ngas_file_id
         ngas_file_obsid = 0 # so it can be just fast forwarded
+
+      #print "%s starts with %s ?" %(ngas_file_id, obsid_str)
 
       if ngas_file_id.startswith(obsid_str):
         num_ngas_files += 1
         match += 1
+        #print "match"
       else:
 
         # fast forward if ngas_file_obsid is smaller - for any normal situation it should be equal or greater
-        if ngas_file_obsid < obsid: continue
+        if ngas_file_obsid < obsid:
+          #print "ngas_file_obsid < obsid"
+          continue
 
         # if not move the cursor one step back and break so it fetches the same row on the next loop
         ngas_files_rows.scroll(-1)
         no_match += 1
+        #print "no match"
         break;
 
     num_mit_files = row[2]
+    #print "obsid = %d num_ngas_files = %d" % (obsid, num_ngas_files)
+    if num_ngas_files > num_mit_files:
+      print "what the hell! More files in ngas! obsid = %d num_mit_files = %s num_ngas_files = %d" % (obsid, num_mit_files, num_ngas_files)
+      weirdness += 1
+    else:
+      not_weird += 1
     total_data_hours += (float(num_ngas_files) / float(num_mit_files)) * (row[1] - row[0]) / 3600.
     i += 1
 
     if no_more_ngas_files: break;
 
   print "match = %d no_match = %d" %(match, no_match)
+  print "weirdness = %d not_weird = %d" %(weirdness, not_weird)
 
   write_to_log("The giant iteration ran in %f seconds" %profile())
-
-  # total_data_hours = float (send_eor_query('''
-  #   SELECT SUM(subq.stoptime-subq.starttime)
-  #   FROM
-  #     (SELECT starttime, stoptime, COUNT(data_files.id) as files
-  #     FROM mwa_setting
-  #     LEFT OUTER JOIN data_files ON mwa_setting.starttime = data_files.observation_num
-  #     WHERE projectid='G0009'
-  #     GROUP BY starttime, stoptime) as subq
-  #   WHERE subq.files > 0
-  # ''').fetchone()[0] ) / 3600.
 
   # UVFITS hours
   total_uvfits_hours = float (send_mwa_query(
