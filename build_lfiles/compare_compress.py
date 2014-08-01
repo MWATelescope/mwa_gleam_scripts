@@ -29,9 +29,12 @@ def compare_compress(uncomp_filename, compressed_filename):
         assert d_u.shape == d_c.shape, "Mismatch in shape at HDU index $d" % (i)
 
         diff = numpy.abs(d_u - d_c).flatten()
+        reldiffnonzeroind = numpy.flatnonzero(numpy.fabs(d_u) > 1e-1)
+        reldiff = diff[reldiffnonzeroind] / numpy.abs(d_u.flatten()[reldiffnonzeroind])
         p = numpy.argmax(diff)
+        prel = numpy.argmax(reldiff)
         maxdiffs.append(diff[p])
-        reldiffs.append(diff[p]/d_u.flatten()[p])
+        reldiffs.append(reldiff[prel])
         print "HDU %d. Max diff: %f. Rel diff at max: %g" % (i,maxdiffs[-1],reldiffs[-1])
 
     # report:
