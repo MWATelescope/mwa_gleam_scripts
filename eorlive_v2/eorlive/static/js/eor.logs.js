@@ -6,15 +6,54 @@ EoR.logs.tags = ["bad", "fine", "no data", "hardware issue", "dataflow issue", "
 EoR.logs.saved_tags_value = 0;
 
 EoR.logs.create_fetch_interface = function(){
+  now = new Date();
   return $("<div>").addClass("fetch_interface")
     .append(EoR.logs.create_tag_interface("fetch"))
-    .append( $("<button/>").attr("type", "button").addClass("btn btn-primary load_more")
-      .text("Fetch Data")
-      .css("float","left")
-      .click(function(e){
-        EoR.logs.fetch_observation_logs(true);
-      })
-    )
+    .append("<br/>")
+    .append($("<div/>").addClass("form-group form-inline")
+      .css("clear", "both").css("text-align", "left")
+      .append($("<input/>").attr("placeholder", "from").addClass("from_date form-control")
+        .datepicker({
+          format: 'yyyy-mm-dd',
+          onRender: function(date) {
+            return date.valueOf() >= now.valueOf() ? 'disabled' : '';
+          }
+        })
+        .on('changeDate', function(ev) {
+          var to = $(".fetch_interface input.to_date");
+          if (ev.date.valueOf() > to.data('datepicker').date.valueOf()) {
+            to.data('datepicker').setValue(new Date(ev.date));
+          }
+          $(this).datepicker("hide");
+          to[0].focus();
+        })
+      )
+      .append($("<input/>").attr("placeholder", "to").addClass("to_date form-control")
+        .datepicker({
+          format: 'yyyy-mm-dd',
+          onRender: function(date) {
+            var from = $(".fetch_interface input.from_date");
+            if(from && from.data('datepicker')){
+              return date.valueOf() < from.data('datepicker').date.valueOf() || date.valueOf() >= now.valueOf()  ? 'disabled' : '';
+            }
+            return date.valueOf() >= now.valueOf() ? 'disabled' : '';
+          }
+        })
+        .on('changeDate', function(ev) {
+          var from = $(".fetch_interface input.from_date");
+          if (ev.date.valueOf() < from.data('datepicker').date.valueOf()) {
+            from.data('datepicker').setValue(new Date(ev.date));
+          }
+          $(this).datepicker("hide");
+        })
+      )
+      .append( $("<button/>").attr("type", "button").addClass("btn btn-primary load_more")
+        .text("Filter")
+        .click(function(e){
+          EoR.logs.fetch_observation_logs(true);
+        })
+      )
+    );
 };
 
 EoR.logs.get_tags_value = function(ul){
@@ -52,7 +91,15 @@ EoR.logs.create_table = function(){
         .append($("<th/>").text("   "))
       )
     )
-    .append($("<tbody>"));
+    .append($("<tbody>"))
+    .delegate("button.delete", "click", function(el){
+      if(!confirm("Really delete?")) return false;
+      var id = $(this).data("log_id");
+      $(this).text("deleting...").prop("disabled", true);
+      EoR.logs.delete_observation_log(id, function(){
+        $("#log_tr_"+id).remove();
+      });
+    });
 };
 
 EoR.logs.create_post_interface = function(){
@@ -75,9 +122,16 @@ EoR.logs.create_post_interface = function(){
     .append( $("<div/>").addClass("post_interface").hide()
       .append("<hr/>")
       .append( $("<form>")
-        .append($("<textarea/>").attr("placeholder", "Brief note about this observation").addClass("note"))
+        .append($("<textarea/>").attr("placeholder", "Brief note about this observation").addClass("note form-control"))
         .append("<br/>")
-        .append($("<input/>").attr("placeholder", "observed date in yyyy-mm-dd format").addClass("observed_date"))
+        .append($("<input/>").attr("placeholder", "observed date").addClass("observed_date form-control")
+          .datepicker({
+    				format: 'yyyy-mm-dd'
+    			})
+          .on('changeDate', function(ev) {
+            $(this).datepicker("hide")
+          })
+        )
         .append($("<div/>").append(EoR.logs.create_tag_interface()))
       )
       .append( $("<div/>").addClass("buttons")
@@ -109,21 +163,30 @@ EoR.logs.fetch_observation_logs = function(reset){
 
   $("#observation_logs .loading").show();
   $("#observation_logs .button").prop("disabled", false);
+
+  var to_date = $("#observation_logs .fetch_interface .to_date").val(),
+    from_date = $("#observation_logs .fetch_interface .from_date").val()
   $.ajax({
-    url: "/api/observation_logs?tags="+EoR.logs.saved_tags_value+"&limit="+EoR.logs.LIMIT+"&offset="+EoR.logs.offset,
+    url: "/api/observation_logs?tags="+EoR.logs.saved_tags_value+"&limit="+EoR.logs.LIMIT+"&offset="+EoR.logs.offset+
+      "&from_data="+from_date + "&to_date="+to_date,
     type: "json",
     method: "GET",
     success: function(data){
       var tbody = $("#observation_logs .logs_table tbody");
       $.each(data.observation_logs, function(i,v){
         o_d = new Date(v.observed_date);
-        tbody.append($("<tr/>")
+        tbody.append($("<tr/>").attr("id", "log_tr_"+v.id)
           .append($("<td/>").text(o_d.getUTCFullYear() + "-" + (o_d.getUTCMonth()+1) + "-" + o_d.getUTCDate()))
           .append($("<td/>").text(v.author_user_name))
           .append($("<td/>").text(v.note))
           .append($("<td/>").text(EoR.logs.get_tags_str_from_values(v.tags)))
           .append($("<td/>")
-            .append( $("<div>") // delete/edit buttons
+            .append( v.author_user_id == EoR.current_user.id ?
+              $("<div>")
+                .append(  $("<button/>").attr("type", "button").addClass("btn btn-danger delete").text("Delete").data("log_id", v.id)
+                // EDIT BUTTON?
+                )
+              : ""
             )
           )
         );
@@ -162,6 +225,10 @@ EoR.logs.post_observation_log = function(){
     data: {observed_date: observed_date, note: note, tags: tags},
     success: function(data){
       EoR.logs.fetch_observation_logs(true);
+      $("#observation_logs .post_interface .observed_date").val("");
+      $("#observation_logs .post_interface .note").val("");
+      $("#observation_logs .tail_interface .bottom_buttons").show();
+      $("#observation_logs .tail_interface .post_interface").hide();
     },
     error: function(xhr, status, err){
       alert("error posting a new log");
@@ -171,7 +238,21 @@ EoR.logs.post_observation_log = function(){
       $("#observation_logs .button").prop("disabled", false);
     }
   })
-}
+};
+
+EoR.logs.delete_observation_log = function(id, callback){
+  $.ajax({
+    url: "/api/observation_logs/"+id,
+    method: "DELETE",
+    type: "json",
+    success:function(){
+      callback();
+    },
+    error: function(){
+      alert("An error has occurred");
+    }
+  });
+};
 
 EoR.logs.create_tag_interface = function(cls){
   var ul = $("<ul/>").addClass("obs_tags").addClass(cls);
@@ -192,4 +273,10 @@ EoR.logs.init = function(){
     .append(EoR.logs.create_table())
     .append(EoR.create_loading().hide())
     .append(EoR.logs.create_post_interface());
+
+  $("ul.obs_tags.fetch li input").each(function(i,el){
+    $(el).prop("checked", true);
+  });
+
+
 };

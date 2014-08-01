@@ -28,11 +28,31 @@ def observation_log_get_post():
     tags = int(request.args.get('tags') or 0)
     limit = int(request.args.get('limit') or 10)
     offset = int(request.args.get('offset') or 0)
+    from_date = request.args.get('from_date')
+    to_date = request.args.get('to_date')
     logs = []
-    for log, user in db.session.query(ObservationLog, User
-      ).filter(ObservationLog.author_user_id == User.id
-      ).filter(ObservationLog.tags.op('&')(tags) == tags
-      ).order_by(desc(ObservationLog.observed_date)
+
+    query = db.session.query(ObservationLog, User
+      ).filter(ObservationLog.author_user_id == User.id)
+
+    if tags > 0:
+      query = query.filter(ObservationLog.tags.op('&')(tags) > 0)
+
+    if from_date:
+      try:
+        from_date = datetime.strptime(from_date, "%Y-%m-%d")
+      except ValueError, e:
+        return "could not parse from_date", 400
+      query = query.filter(ObservationLog.observed_date >= from_date)
+
+    if to_date:
+      try:
+        to_date = datetime.strptime(to_date, "%Y-%m-%d")
+      except ValueError, e:
+        return "could not parse to_date", 400
+      query = query.filter(ObservationLog.observed_date <= to_date)
+
+    for log, user in query.order_by(desc(ObservationLog.observed_date)
       ).offset(offset).limit(limit):
       log_dict = log.asDict()
       log_dict["author_user_name"] = user.name
@@ -44,7 +64,7 @@ def observation_log_get_post():
 
 @app.route('/api/observation_logs/<int:id>', methods=['PUT', 'DELETE'])
 @login_required
-def observation_log_put_delete():
+def observation_log_put_delete(id):
   observation_log = ObservationLog.query.filter_by(id=id).first()
 
   if not observation_log:
