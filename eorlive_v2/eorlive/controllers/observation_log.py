@@ -1,4 +1,5 @@
 import os
+import pytz
 from eorlive import app
 from flask import jsonify, request
 from eorlive import db, mit_db_engine, cache
@@ -16,6 +17,7 @@ def observation_log_get_post():
     observed_date_str = request.form.get('observed_date')
     try:
       observed_date = datetime.strptime(observed_date_str, "%Y-%m-%d")
+      observed_date = pytz.utc.localize(observed_date)
     except ValueError, e:
       return "could not parse observed_date", 400
     author_user_id = current_user.id
@@ -82,7 +84,8 @@ def observation_log_put_delete(id):
     if request.form.has_key('observed_date'):
       observed_date_str = request.form.get('observed_date')
       try:
-        observed_date = datetime.strptime(observed_date_str, "%Y/%m/%d")
+        observed_date = datetime.strptime(observed_date_str, "%Y-%m-%d")
+        observed_date = pytz.utc.localize(observed_date)
       except ValueError, e:
         return "could not parse observed_date", 400
       observation_log.observed_date = observed_date

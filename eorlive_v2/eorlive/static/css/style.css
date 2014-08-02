@@ -92,6 +92,17 @@ div#logs .button_container {
   width: 300px;
 }
 
+#observation_logs .tail_interface{
+  margin-bottom: 22px;
+}
+
+#observation_logs .logs_table tbody td span.fine{
+  color: green;
+}
+
+#observation_logs .logs_table tbody td span.bad{
+  color: red;
+}
 
 /* OBSERVATIONS */
 

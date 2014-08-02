@@ -4,6 +4,7 @@ EoR.logs.offset = 0;
 // DO NOT CHANGE THE TAGS!!! YOU CAN ONLY ADD MORE. DO NOT REMOVE OR CHANGE THE ORDER!!
 EoR.logs.tags = ["bad", "fine", "no data", "hardware issue", "dataflow issue", "correlation issue", "got email from ops"];
 EoR.logs.saved_tags_value = 0;
+EoR.logs.log_being_edited = null;
 
 EoR.logs.create_fetch_interface = function(){
   now = new Date();
@@ -75,7 +76,8 @@ EoR.logs.get_tags_str_from_values = function(val){
   });
   var str = "";
   $.each(tags, function(i,v){
-    str += (i==tags.length-1) ? v : v + ", ";
+    var span = "<span class=\"" + v.replace(/ /g, "-") + "\">" + v + "</span>";
+    str += (i==tags.length-1) ? span : span + ", ";
   });
   return str;
 };
@@ -99,7 +101,28 @@ EoR.logs.create_table = function(){
       EoR.logs.delete_observation_log(id, function(){
         $("#log_tr_"+id).remove();
       });
+    })
+    .delegate("button.edit", "click", function(el){
+      var log = $(this).data("log");
+      EoR.logs.log_being_edited = log.id;
+      EoR.logs.populate_post_interface(log);
+      EoR.logs.show_post_interface();
     });
+};
+
+EoR.logs.populate_post_interface = function(log){
+  var div = $("#observation_logs .post_interface");
+  div.find(".note").val(log.note);
+  if(log.observed_date){
+    var obs_date = new Date(log.observed_date);
+    div.find(".observed_date").val(obs_date.getUTCFullYear() + "-" + (obs_date.getUTCMonth()+1) + "-" + obs_date.getUTCDate());
+  }  else
+    div.find(".observed_date").val(null);
+
+  // Tags
+  div.find(".obs_tags li").each(function(i,el){
+    $(el).find("input").prop("checked", !!(Math.pow(2,i) & log.tags) );
+  });
 };
 
 EoR.logs.create_post_interface = function(){
@@ -114,8 +137,9 @@ EoR.logs.create_post_interface = function(){
       .append( $("<button/>").attr("type", "button").addClass("btn btn-primary show_post")
         .text("Post Log")
         .click(function(e){
-          $("#observation_logs .tail_interface .bottom_buttons").hide();
-          $("#observation_logs .tail_interface .post_interface").show();
+          EoR.logs.log_being_edited = null;
+          EoR.logs.populate_post_interface({note:"", tag:0});
+          EoR.logs.show_post_interface();
         })
       )
     )
@@ -138,8 +162,7 @@ EoR.logs.create_post_interface = function(){
         .append( $("<button/>").attr("type", "button").addClass("btn btn-default")
           .text("Cancel")
           .click(function(e){
-            $("#observation_logs .tail_interface .bottom_buttons").show();
-            $("#observation_logs .tail_interface .post_interface").hide();
+            EoR.logs.hide_post_interface();
           })
         )
         .append( $("<button/>").attr("type", "button").addClass("btn btn-primary post")
@@ -162,7 +185,7 @@ EoR.logs.fetch_observation_logs = function(reset){
   }
 
   $("#observation_logs .loading").show();
-  $("#observation_logs .button").prop("disabled", false);
+  $("#observation_logs .btn").prop("disabled", true);
 
   var to_date = $("#observation_logs .fetch_interface .to_date").val(),
     from_date = $("#observation_logs .fetch_interface .from_date").val()
@@ -179,12 +202,23 @@ EoR.logs.fetch_observation_logs = function(reset){
           .append($("<td/>").text(o_d.getUTCFullYear() + "-" + (o_d.getUTCMonth()+1) + "-" + o_d.getUTCDate()))
           .append($("<td/>").text(v.author_user_name))
           .append($("<td/>").text(v.note))
-          .append($("<td/>").text(EoR.logs.get_tags_str_from_values(v.tags)))
+          .append($("<td/>").html(EoR.logs.get_tags_str_from_values(v.tags)))
           .append($("<td/>")
             .append( v.author_user_id == EoR.current_user.id ?
               $("<div>")
-                .append(  $("<button/>").attr("type", "button").addClass("btn btn-danger delete").text("Delete").data("log_id", v.id)
-                // EDIT BUTTON?
+                // Delete button
+                .append(  $("<button/>")
+                  .attr("type", "button")
+                  .addClass("btn btn-danger delete")
+                  .text("Delete")
+                  .data("log_id", v.id)
+                )
+                // Edit button
+                .append(  $("<button/>")
+                  .attr("type", "button")
+                  .addClass("btn btn-default edit")
+                  .text("Edit")
+                  .data("log", v)
                 )
               : ""
             )
@@ -201,7 +235,7 @@ EoR.logs.fetch_observation_logs = function(reset){
     },
     complete: function(){
       $("#observation_logs .loading").hide();
-      $("#observation_logs .button").prop("disabled", false);
+      $("#observation_logs .btn").prop("disabled", false);
     }
   });
 };
@@ -216,26 +250,25 @@ EoR.logs.post_observation_log = function(){
     return
   }
 
+  var put_id = EoR.logs.log_being_edited;
+
   $("#observation_logs .loading").show();
-  $("#observation_logs .button").prop("disabled", false);
+  $("#observation_logs .btn").prop("disabled", true);
   $.ajax({
-    url: "/api/observation_logs",
+    url: "/api/observation_logs" + (put_id?("/"+put_id):""),
     type: "json",
-    method: "POST",
+    method: put_id?"PUT":"POST",
     data: {observed_date: observed_date, note: note, tags: tags},
     success: function(data){
       EoR.logs.fetch_observation_logs(true);
-      $("#observation_logs .post_interface .observed_date").val("");
-      $("#observation_logs .post_interface .note").val("");
-      $("#observation_logs .tail_interface .bottom_buttons").show();
-      $("#observation_logs .tail_interface .post_interface").hide();
+      EoR.logs.hide_post_interface();
     },
     error: function(xhr, status, err){
       alert("error posting a new log");
     },
     complete: function(){
       $("#observation_logs .loading").hide();
-      $("#observation_logs .button").prop("disabled", false);
+      $("#observation_logs .btn").prop("disabled", false);
     }
   })
 };
@@ -266,6 +299,20 @@ EoR.logs.create_tag_interface = function(cls){
   });
   return ul;
 };
+
+EoR.logs.show_post_interface = function(){
+  $("#observation_logs .tail_interface .bottom_buttons").hide();
+  $("#observation_logs .fetch_interface").hide();
+  $("#observation_logs .logs_table").hide();
+  $("#observation_logs .tail_interface .post_interface").show();
+}
+
+EoR.logs.hide_post_interface = function(){
+  $("#observation_logs .tail_interface .bottom_buttons").show();
+  $("#observation_logs .fetch_interface").show();
+  $("#observation_logs .logs_table").show();
+  $("#observation_logs .tail_interface .post_interface").hide();
+}
 
 EoR.logs.init = function(){
   $("#observation_logs")
