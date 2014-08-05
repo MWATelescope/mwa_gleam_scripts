@@ -7,6 +7,7 @@ from eorlive.models.user import User
 from eorlive import db
 from eorlive import login_manager
 from flask.ext.login import login_required, login_user, logout_user, current_user
+from datetime import datetime
 
 # For now use POST /api/users with name,username,password,email,key to create new users
 
@@ -111,7 +112,7 @@ def show_users():
     return jsonify({"error": "you are not authorized"}), 403
 
   return jsonify({
-    'users': [u.asDict() for u in User.query.all()]
+    'users': [u.asDict() for u in User.query.order_by(User.id).all()]
   }), 200
 
 @app.route('/api/users/<int:id>', methods=['PUT'])
@@ -131,12 +132,15 @@ def edit_user(id):
   if request.form.get("reactivate") == "true":
     user.deactivated_date = None
   elif request.form.get("deactivate") == "true":
-    user.deactivated_date = datetime.now
+    user.deactivated_date = datetime.now()
 
   user.name = request.form.get("name", user.name)
   user.email = request.form.get("email", user.email)
-  if request.form.has_key("password"):  
+  if request.form.has_key("password"):
     user.password = hashlib.sha256(request.form.get("password")).hexdigest()
   user.admin_level = request.form.get("admin_level", user.admin_level)
+
+  db.session.add(user)
+  db.session.commit()
 
   return jsonify(user.asDict())

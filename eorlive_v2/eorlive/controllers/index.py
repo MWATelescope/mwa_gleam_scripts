@@ -4,7 +4,7 @@ from flask.ext.login import login_required, current_user
 
 @app.route('/')
 def index():
-  if not current_user.is_anonymous():
+  if not current_user.is_anonymous() and current_user.is_active():
     return render_template('index.html', current_user = jsonify(current_user.asDict()).get_data().decode('string-escape') )
   return render_template('login.html')
 
