@@ -18,6 +18,10 @@
         <ul class="nav navbar-nav">
           <li class="users"><a href="#">Users</a></li>
         </ul>
+        <ul class="nav navbar-nav navbar-right">
+          <li><span class="logging_in_msg nav-status">Logging in...</span></li>
+          <li><span class="logged_in_msg nav-status"></span></li>
+        </ul>
       </div><!--/.nav-collapse -->
 
     </div>
@@ -40,11 +44,13 @@
   <!--[if IE]><script type="text/javascript" src="{{ url_for('static', filename='js/excanvas.js') }}"></script><![endif]-->
   <script type="text/javascript" src="{{ url_for('static', filename='js/coolclock.js') }}"></script>
   <script type="text/javascript" src="{{ url_for('static', filename='js/eor.js') }}"></script>
+  <script type="text/javascript" src="{{ url_for('static', filename='js/eor.admin.js') }}"></script>
 
   <script type="text/javascript" src="https://www.google.com/jsapi"></script>
   <script type="text/javascript">
     var STATIC_PATH = "{{ url_for('static', filename='') }}";
     EoR.current_user = {{ current_user|safe }};
+    EoR.admin.init();
   </script>
 </body>
 
