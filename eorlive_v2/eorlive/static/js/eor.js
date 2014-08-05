@@ -22,16 +22,14 @@ EoR.init = function(){
   $(window).on('hashchange', hashChanged);
   hashChanged();
 
-  EoR.check_user(function(){
-    EoR.render_logged_in_message();
-    // Initiate content boxes
-    EoR.clock.init(); // Clocks widget
-    EoR.obs.init(); // Observation data from MIT database
-    EoR.img.init(); // Load Beam Images
-    EoR.graph.init(); // Load graphs
-    EoR.logs.init();
-    EoR.account.init(); // Account settings render
-  });
+  EoR.render_logged_in_message();
+  // Initiate content boxes
+  EoR.clock.init(); // Clocks widget
+  EoR.obs.init(); // Observation data from MIT database
+  EoR.img.init(); // Load Beam Images
+  EoR.graph.init(); // Load graphs
+  EoR.logs.init();
+  EoR.account.init(); // Account settings render
 };
 
 EoR.render_logged_in_message = function(){

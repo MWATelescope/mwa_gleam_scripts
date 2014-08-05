@@ -9,6 +9,8 @@ class User(db.Model):
   email = db.Column(db.String(128))
   password = db.Column(db.String(64))
   created_at = db.Column(db.DateTime)
+  admin_level = db.Column(db.Integer)
+  deactivated_date = db.Column(db.DateTime)
 
   def __init__(self, name, username, password, email):
     self.name = name
@@ -16,6 +18,7 @@ class User(db.Model):
     self.password = hashlib.sha256(password).hexdigest()
     self.email = email
     self.created_at = datetime.now()
+    self.admin_level = 0
 
   def asDict(self):
     return {
@@ -23,14 +26,16 @@ class User(db.Model):
       'name': self.name,
       'email': self.email,
       'username': self.username,
-      'created_at': self.created_at
+      'created_at': self.created_at,
+      'admin_level': self.admin_level,
+      'deactivated_date': self.deactivated_date,
     }
 
   def is_authenticated(self):
     return True
 
   def is_active(self):
-    return True
+    return self.deactivated_date is None
 
   def is_anonymous(self):
     return False

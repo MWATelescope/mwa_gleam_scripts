@@ -10,26 +10,6 @@ from flask.ext.login import login_required, login_user, logout_user, current_use
 
 # For now use POST /api/users with name,username,password,email,key to create new users
 
-@app.route('/api/users', methods=['POST'])
-def create_user():
-
-  # FOR NOW, LET'S USE A SECRET KEY FOR CREATING USERS
-  if request.form.get("key")!="21CM":
-    return jsonify({"error": "you are not authorized"}), 403
-
-  if not validate_req_params(request.form, ["name", "username", "password", "email"]):
-    return jsonify({"error": "required parameters not passed"}), 400
-
-  user = User(request.form["name"], request.form["username"], request.form["password"], request.form["email"])
-  db.session.add(user)
-
-  try:
-    db.session.commit()
-  except IntegrityError, e:
-    return jsonify({"error": "username already exists."})
-
-  return jsonify(user.asDict()), 201
-
 @app.route('/api/users/<int:id>', methods=['GET'])
 def show_user(id):
   user = User.query.filter_by(id=id).first()
@@ -79,3 +59,84 @@ def user_logout():
 @login_manager.user_loader
 def load_user(userid):
     return User.query.filter_by(id=userid).one()
+
+# ADMIN STUFF
+
+@app.route('/api/users', methods=['POST'])
+@login_required
+def create_user():
+
+  if current_user.admin_level < 1:
+    return jsonify({"error": "you are not authorized"}), 403
+
+  if not validate_req_params(request.form, ["name", "username", "password", "email"]):
+    return jsonify({"error": "required parameters not passed"}), 400
+
+  user = User(request.form["name"], request.form["username"], request.form["password"], request.form["email"])
+  db.session.add(user)
+
+  try:
+    db.session.commit()
+  except IntegrityError, e:
+    return jsonify({"error": "username already exists."})
+
+  return jsonify(user.asDict()), 201
+
+@app.route('/api/users/admin', methods=['POST'])
+def create_admin_user():
+
+  # Secret
+  if request.form.get("key")!="GiantEarthing":
+    return jsonify({"error": "you are not authorized"}), 403
+
+  if not validate_req_params(request.form, ["name", "username", "password", "email"]):
+    return jsonify({"error": "required parameters not passed"}), 400
+
+  user = User(request.form["name"], request.form["username"], request.form["password"], request.form["email"])
+  user.admin_level = 1
+  db.session.add(user)
+
+  try:
+    db.session.commit()
+  except IntegrityError, e:
+    return jsonify({"error": "username already exists."})
+
+  return jsonify(user.asDict()), 201
+
+@app.route('/api/users', methods=['GET'])
+@login_required
+def show_users():
+
+  if current_user.admin_level < 1:
+    return jsonify({"error": "you are not authorized"}), 403
+
+  return jsonify({
+    'users': [u.asDict() for u in User.query.all()]
+  }), 200
+
+@app.route('/api/users/<int:id>', methods=['PUT'])
+@login_required
+def edit_user(id):
+
+  if current_user.admin_level < 1:
+    return jsonify({"error": "you are not authorized"}), 403
+
+  user = User.query.filter_by(id=id).first()
+  if not user:
+    return "no such user", 404
+
+  if user.admin_level > 0:
+    return jsonify({"error": "you are not authorized"}), 403
+
+  if request.form.get("reactivate") == "true":
+    user.deactivated_date = None
+  elif request.form.get("deactivate") == "true":
+    user.deactivated_date = datetime.now
+
+  user.name = request.form.get("name", user.name)
+  user.email = request.form.get("email", user.email)
+  if request.form.has_key("password"):  
+    user.password = hashlib.sha256(request.form.get("password")).hexdigest()
+  user.admin_level = request.form.get("admin_level", user.admin_level)
+
+  return jsonify(user.asDict())

@@ -102,7 +102,8 @@
 
   <script type="text/javascript" src="https://www.google.com/jsapi"></script>
   <script type="text/javascript">
-    var STATIC_PATH = {{ url_for('static', filename='') }};
+    var STATIC_PATH = "{{ url_for('static', filename='') }}";
+    EoR.current_user = {{ current_user|safe }};
     EoR.init();
   </script>
 </body>
