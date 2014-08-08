@@ -23,6 +23,7 @@ def observation_log_get_post():
     author_user_id = current_user.id
     tags = int(request.form.get('tags') or 0)
     observation_log = ObservationLog(observed_date, author_user_id, note, tags)
+    observation_log.created_date = datetime.now()
     db.session.add(observation_log)
     db.session.commit()
     return jsonify(observation_log.asDict()), 201

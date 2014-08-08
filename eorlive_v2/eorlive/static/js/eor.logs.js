@@ -191,7 +191,7 @@ EoR.logs.fetch_observation_logs = function(reset){
     from_date = $("#observation_logs .fetch_interface .from_date").val()
   $.ajax({
     url: "/api/observation_logs?tags="+EoR.logs.saved_tags_value+"&limit="+EoR.logs.LIMIT+"&offset="+EoR.logs.offset+
-      "&from_data="+from_date + "&to_date="+to_date,
+      "&from_date="+from_date + "&to_date="+to_date,
     type: "json",
     method: "GET",
     success: function(data){
