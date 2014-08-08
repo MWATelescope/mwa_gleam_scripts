@@ -12,6 +12,21 @@ EoR.chartCursor2;
 EoR.graph.create_graph_container = function(){
   return $("<div/>")
     .addClass("graphs_container")
+    .append( $('<form/>').addClass("form-inline graph_date_range_form")
+      .append( $("<div/>")
+        .addClass("form-group form-horizontal")
+        .append('<label for="graph_date_range">Data Range:&nbsp;</label>')
+        .append( $("<select>").addClass("form-control").attr("id","graph_date_range")
+          .attr("name", "graph_date_range")
+          .append("<option value=1>Last Month</option>")
+          .append("<option value=3>Last 3 Months</option>")
+          .append("<option value=6>Last 6 Months</option>")
+          .append("<option value=12>Last Year</option>")
+          .append("<option value=0>All Time</option>")
+          .on('change', EoR.graph.fetch_data)
+        )
+      )
+    )
     .append( $("<div/>")
       .addClass("graph_container col-md-6")
       .append("<h4>Hours observed/scheduled</h4>")
@@ -30,14 +45,17 @@ EoR.graph.create_graph_container = function(){
 
 EoR.graph.fetch_data = function(){
   $("#graphs .loading").show();
-  $("#graphs .graphs_container").hide();
+  $("#graphs .graph_date_range_form").hide();
+  var last_x_months = $("#graph_date_range").val();
   $.ajax({
-    url: "/api/graph_data",
+    url: "/api/graph_data" + ((last_x_months>0)?("?last_x_months="+last_x_months):""),
     type: "json",
     method: "GET",
     success: function(data){
-      $("#graphs .graphs_container").show();
+      $("#graphs .graph_date_range_form").show();
       // Process Data
+      EoR.chartData1 = [];
+      EoR.chartData2 = [];
       $.each(data.graph_data, function(i,v){
         EoR.chartData1.push({
           date: new Date(v.created_date),
@@ -46,7 +64,7 @@ EoR.graph.fetch_data = function(){
           hours_with_data: v.hours_with_data,
           hours_with_uvfits: v.hours_with_uvfits
         });
-        if(v.data_transfer_rate){ // data_transfer_rate can be null sometimes. No need to push those. They don't mean 0.
+        if(v.data_transfer_rate !== null){ // data_transfer_rate can be null sometimes. No need to push those. They don't mean 0.
           EoR.chartData2.push({
             date: new Date(v.created_date),
             data_transfer_rate: v.data_transfer_rate
@@ -67,12 +85,14 @@ EoR.graph.fetch_data = function(){
 EoR.graph.render = function(){
 
   // Hours Chart
+  $("#_graph_0").empty();
   EoR.chart1 = new AmCharts.AmSerialChart();
   EoR.chart1.pathToImages = STATIC_PATH+"/img/";
   EoR.chart1.dataProvider = EoR.chartData1;
   EoR.chart1.categoryField = "date";
   EoR.chart1.balloon.bulletSize = 5;
   // Data transfer rate chart
+  $("#_graph_1").empty();
   EoR.chart2 = new AmCharts.AmSerialChart();
   EoR.chart2.pathToImages = STATIC_PATH+"/img/";
   EoR.chart2.dataProvider = EoR.chartData2;
@@ -184,7 +204,6 @@ EoR.graph.render = function(){
 };
 
 EoR.graph.init = function(){
-  $("#graphs").append(EoR.graph.create_graph_container().hide());
-  $("#graphs").append(EoR.create_loading());
+  $("#graphs").append(EoR.create_loading()).append(EoR.graph.create_graph_container());
   //EoR.graph.fetch_data();
 };

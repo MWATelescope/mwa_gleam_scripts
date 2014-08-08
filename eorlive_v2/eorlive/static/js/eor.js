@@ -20,7 +20,6 @@ EoR.init = function(){
     $(".navbar .nav.navbar-nav li."+content_id).addClass("active");
   }
   $(window).on('hashchange', hashChanged);
-  hashChanged();
 
   EoR.render_logged_in_message();
   // Initiate content boxes
@@ -31,8 +30,7 @@ EoR.init = function(){
   EoR.logs.init();
   EoR.account.init(); // Account settings render
 
-  EoR.obs.fetch_observations(EoR.obs.fetch_future_observation_counts);
-  EoR.graph.fetch_data();
+  hashChanged();
 };
 
 EoR.render_logged_in_message = function(){
@@ -83,13 +81,17 @@ EoR.render_user_info = function(){
 
 // Per Page Events
 EoR.onPageTransition = function(page_id){
-  console.log("onPageTransition  " + page_id);
+  //console.log("onPageTransition  " + page_id);
   var index = EoR.pages.indexOf(page_id);
   if(!page_id) page_id = "_null";
   var transitioned_to = EoR.transitioned_to[index];
 
   switch(page_id){
     case 'home':
+      if(!transitioned_to){
+        EoR.obs.fetch_observations(EoR.obs.fetch_future_observation_counts);
+        EoR.graph.fetch_data();
+      }
       break;
     case 'obs':
       break;
@@ -139,7 +141,10 @@ EoR.view_translate = function(to_id){
     in_class = is_left ? "pt-page-moveFromRight": "pt-page-moveFromLeft",
     out_class = is_left ? "pt-page-moveToLeft": "pt-page-moveToRight";
 
-  if (from.attr("id") == to_id) return;
+  if (from.attr("id") == to_id) {
+    EoR.onPageTransition(to_id);
+    return;
+  }
 
   EoR.isAnimating = true;
   EoR.endCurrPage = false;
