@@ -45,8 +45,8 @@ EoR.obs.fetch_observations = function(callback){
           .append("<td>"+v["observation_number"]+"</td>")
           .append("<td>"+v["obsname"]+"</td>")
           .append("<td>"+v["projectid"]+"</td>")
-          .append("<td>"+v["start_time"]+"</td>")
-          .append("<td>"+v["stop_time"]+"</td>")
+          .append("<td>"+(new Date(v["start_time"])).toISOString()+"</td>")
+          .append("<td>"+(new Date(v["stop_time"])).toISOString()+"</td>")
           .append("<td>"+v["files"]+"</td>")
         )
       });

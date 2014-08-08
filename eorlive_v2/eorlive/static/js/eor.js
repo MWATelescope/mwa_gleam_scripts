@@ -30,6 +30,9 @@ EoR.init = function(){
   EoR.graph.init(); // Load graphs
   EoR.logs.init();
   EoR.account.init(); // Account settings render
+
+  EoR.obs.fetch_observations(EoR.obs.fetch_future_observation_counts);
+  EoR.graph.fetch_data();
 };
 
 EoR.render_logged_in_message = function(){
@@ -89,10 +92,6 @@ EoR.onPageTransition = function(page_id){
     case 'home':
       break;
     case 'obs':
-      if(!transitioned_to) {
-        EoR.obs.fetch_observations(EoR.obs.fetch_future_observation_counts);
-        EoR.graph.fetch_data();
-      }
       break;
     case 'logs':
       if(!transitioned_to){

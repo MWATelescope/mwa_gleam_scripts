@@ -1,8 +1,20 @@
+html {
+  position: relative;
+  min-height: 100%;
+}
 body {
   padding-top: 50px;
 }
 button {
   margin: 2px 7px;
+}
+
+.footer {
+  width: 100%;
+  height: 50px;
+  background-color: #222;
+  border-color: #080808;
+  padding-top: 14px;
 }
 
 thead tr th{
@@ -24,6 +36,7 @@ div#home {
 .content_container {
   text-align: center;
   position: absolute;
+  padding-bottom: 50px !important;
 }
 
 /* CLOCK */

@@ -11,26 +11,32 @@ EoR.chartCursor2;
 
 EoR.graph.create_graph_container = function(){
   return $("<div/>")
-    .addClass("container graph_container")
-    .append("<h4>Hours observed/scheduled</h4>")
+    .addClass("graphs_container")
     .append( $("<div/>")
-      .attr("id", "_graph_0")
+      .addClass("graph_container col-md-6")
+      .append("<h4>Hours observed/scheduled</h4>")
+      .append( $("<div/>")
+        .attr("id", "_graph_0")
+      )
     )
-    .append("<h4>Data transfer rate (hours of data transfered per hour elapsed)</h4>")
     .append( $("<div/>")
-      .attr("id", "_graph_1")
-    )
+      .addClass("graph_container col-md-6")
+      .append("<h4>Data transfer rate (hours of data transfered per hour elapsed)</h4>")
+      .append( $("<div/>")
+        .attr("id", "_graph_1")
+      )
+    );
 };
 
 EoR.graph.fetch_data = function(){
   $("#graphs .loading").show();
-  $("#graphs .graph_container").hide();
+  $("#graphs .graphs_container").hide();
   $.ajax({
     url: "/api/graph_data",
     type: "json",
     method: "GET",
     success: function(data){
-      $("#graphs .graph_container").show();
+      $("#graphs .graphs_container").show();
       // Process Data
       $.each(data.graph_data, function(i,v){
         EoR.chartData1.push({
@@ -50,7 +56,7 @@ EoR.graph.fetch_data = function(){
       EoR.graph.render();
     },
     error: function(xhr, status, err){
-      $("#graphs .graph_container").append("<p>There had been an error fetching graph data...</p>");
+      $("#graphs .graphs_container").append("<p>There had been an error fetching graph data...</p>");
     },
     complete: function(){
       $("#graphs .loading").hide();
@@ -59,11 +65,16 @@ EoR.graph.fetch_data = function(){
 };
 
 EoR.graph.render = function(){
+
   // Hours Chart
+  EoR.chart1 = new AmCharts.AmSerialChart();
+  EoR.chart1.pathToImages = STATIC_PATH+"/img/";
   EoR.chart1.dataProvider = EoR.chartData1;
   EoR.chart1.categoryField = "date";
   EoR.chart1.balloon.bulletSize = 5;
   // Data transfer rate chart
+  EoR.chart2 = new AmCharts.AmSerialChart();
+  EoR.chart2.pathToImages = STATIC_PATH+"/img/";
   EoR.chart2.dataProvider = EoR.chartData2;
   EoR.chart2.categoryField = "date";
   EoR.chart2.balloon.bulletSize = 5;
@@ -173,10 +184,6 @@ EoR.graph.render = function(){
 };
 
 EoR.graph.init = function(){
-  EoR.chart1 = new AmCharts.AmSerialChart();
-  EoR.chart2 = new AmCharts.AmSerialChart();
-  EoR.chart1.pathToImages = STATIC_PATH+"/img/";
-  EoR.chart2.pathToImages = STATIC_PATH+"/img/";
   $("#graphs").append(EoR.graph.create_graph_container().hide());
   $("#graphs").append(EoR.create_loading());
   //EoR.graph.fetch_data();
