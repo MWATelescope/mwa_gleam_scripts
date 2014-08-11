@@ -59,7 +59,7 @@ def user_logout():
 
 @login_manager.user_loader
 def load_user(userid):
-    return User.query.filter_by(id=userid).one()
+    return User.query.filter_by(id=userid).first()
 
 # ADMIN STUFF
 

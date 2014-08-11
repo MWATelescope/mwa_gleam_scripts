@@ -31,9 +31,10 @@ vagrant ssh
 
 Vagrant supports lots of commands. Use `vagrant --help` for more details. The most useful would be `suspend` and `resume`.
 
-### DB Migration ###
+### DB Migration / Command Line User Management ###
 
 Database migration is managed by alembic (flask extention is called Flask-Migration). To create a new migration script, use the following command.
+(Make sure you 'sourced' the virtualenv if it runs in virtualenv and cd into the eorlive_v2 dir first)
 ```
 python -m eorlive db revision -m "create user table"
 ```
@@ -41,7 +42,21 @@ To run the migration to make the database schema up to date, use
 ```
 python -m eorlive db upgrade head
 ```
-(Make sure you 'sourced' the virtualenv if it runs in virtualenv)
+
+For initial user setup and maintenance. Use the instructions below.
+
+To create a admin user.
+```
+python -m eorlive user create_admin -n <name> -e <email> -u <username> -p <password>
+```
+To reset user password
+```
+python -m eorlive user reset_password -u <username> -p <password>
+```
+To set admin level (0 for regular user and 1 for admin user)
+```
+python -m eorlive user set_admin_level -u <username> -a <admin_level>
+```
 
 ### Deployment ###
 

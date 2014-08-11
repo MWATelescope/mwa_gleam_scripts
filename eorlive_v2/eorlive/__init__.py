@@ -30,6 +30,9 @@ mit_db_engine = db.get_engine(app, bind="mit")
 manager = Manager(app)
 manager.add_command('db', MigrateCommand)
 
+from user_command import UserCommand
+manager.add_command('user', UserCommand)
+
 login_manager = LoginManager()
 login_manager.init_app(app)
 
