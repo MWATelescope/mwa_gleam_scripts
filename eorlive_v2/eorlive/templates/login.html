@@ -46,12 +46,14 @@
     function login(){
       $("#login_btn").prop("disabled", true);
       $("#loading").show();
+      var un = $("#username").val();
       $.ajax({
         method: "POST",
         url: '/api/login',
         type: 'json',
-        data: {username: $("#username").val(), password: $("#password").val()},
+        data: {username: un, password: $("#password").val()},
         success: function(data){
+          save_username(un);
           window.location = "/";
         },
         error: function(xhr, status, err){
@@ -62,11 +64,27 @@
       })
     }
 
+    function save_username(username){
+      if(localStorage){
+        localStorage.setItem("username", username);
+      }
+    }
+
+    function load_username(){
+      if(localStorage){
+        return localStorage.getItem('username') || "";
+      }
+      return "";
+    }
+
     $("#password").bind("keypress", function(e){
       if(e.keyCode === 13){
             login();
         }
     });
+
+    $("#username").val(load_username());
+
   </script>
 </body>
 

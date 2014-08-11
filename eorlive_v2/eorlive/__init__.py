@@ -1,8 +1,9 @@
 from flask import Flask
 import os, calendar
-from datetime import datetime
+from datetime import datetime, timedelta
 
 app = Flask('eorlive')
+app.permanent_session_lifetime = timedelta(minutes=15)
 
 env = os.getenv('EOR_ENV', "dev")
 
