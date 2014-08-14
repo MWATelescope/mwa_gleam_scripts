@@ -58,6 +58,14 @@ EoR.img.create_img_slider = function(){
 
 EoR.img.init = function(){
   var div = $("#beam_image_container");
-  div.append(EoR.img.create_img_slider()).append(EoR.create_loading());
+  div
+    .append( $("<button/>").attr("type", "button").addClass("btn btn-primary refresh")
+      .text("Refresh")
+      .click(function(e){
+        EoR.img.fetch_images();
+      })
+    )
+    .append(EoR.img.create_img_slider())
+    .append(EoR.create_loading());
   EoR.img.fetch_images();
 };

@@ -204,6 +204,8 @@ EoR.graph.render = function(){
 };
 
 EoR.graph.init = function(){
-  $("#graphs").append(EoR.create_loading()).append(EoR.graph.create_graph_container());
+  $("#graphs")
+    .append(EoR.create_loading())
+    .append(EoR.graph.create_graph_container());
   //EoR.graph.fetch_data();
 };
