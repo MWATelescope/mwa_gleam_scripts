@@ -73,7 +73,7 @@ def observation_log_put_delete(id):
   if not observation_log:
     return "no such observation_log", 404
 
-  if observation_log.author_user_id != current_user.id:
+  if observation_log.author_user_id != current_user.id and not current_user.admin_level:
     return "you are not authorized to modify or delete this observation log", 403
 
   if request.method == 'DELETE':

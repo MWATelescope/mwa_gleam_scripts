@@ -204,7 +204,7 @@ EoR.logs.fetch_observation_logs = function(reset){
           .append($("<td/>").text(v.note))
           .append($("<td/>").html(EoR.logs.get_tags_str_from_values(v.tags)))
           .append($("<td/>")
-            .append( v.author_user_id == EoR.current_user.id ?
+            .append( v.author_user_id == EoR.current_user.id || (EoR.current_user.admin_level >= 1) ?
               $("<div>")
                 // Delete button
                 .append(  $("<button/>")
@@ -247,6 +247,11 @@ EoR.logs.post_observation_log = function(){
 
   if(!/^\d{4}[\/\-](0?[1-9]|1[012])[\/\-](0?[1-9]|[12][0-9]|3[01])$/.test(observed_date)){
     alert("Please enter a valid date in yyyy-mm-dd format");
+    return
+  }
+
+  if(!tags){
+    alert("Your log entry must contain at least one tag (most likely either fine or bad)");
     return
   }
 

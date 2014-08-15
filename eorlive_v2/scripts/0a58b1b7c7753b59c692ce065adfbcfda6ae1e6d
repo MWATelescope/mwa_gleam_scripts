@@ -1,0 +1,7 @@
+psycopg2
+Flask
+Flask-SQLAlchemy
+Flask-Migrate
+Flask-Script
+Flask-Login
+Flask-Cache
