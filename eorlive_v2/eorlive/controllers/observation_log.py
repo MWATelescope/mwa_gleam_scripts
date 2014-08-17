@@ -36,7 +36,8 @@ def observation_log_get_post():
     logs = []
 
     query = db.session.query(ObservationLog, User
-      ).filter(ObservationLog.author_user_id == User.id)
+      ).filter(ObservationLog.author_user_id == User.id
+      ).filter(ObservationLog.deleted_date == None)
 
     if tags > 0:
       query = query.filter(ObservationLog.tags.op('&')(tags) > 0)
@@ -77,7 +78,8 @@ def observation_log_put_delete(id):
     return "you are not authorized to modify or delete this observation log", 403
 
   if request.method == 'DELETE':
-    db.session.delete(observation_log)
+    observation_log.deleted_date = datetime.now()
+    db.session.add(observation_log)
     db.session.commit()
     return "{}", 200
   else:
