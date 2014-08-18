@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='css/bootstrap.min.css') }}">
+  <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='css/datepicker.css') }}">
+  <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='css/style.css') }}">
+
+  <title>EoR Observing Webpage</title>
+</head>
+
+<body>
+  <div class="navbar navbar-inverse navbar-fixed-top" role="navigation">
+    <div class="container">
+      <div class="navbar-header">
+        <a class="navbar-brand" href="#">EoR Observation Project</a>
+      </div>
+      <div class="collapse navbar-collapse">
+        <ul class="nav navbar-nav">
+          <li class="home"><a href="#">Overview</a></li>
+          <!-- <li class="obs"><a href="#obs">Observations</a></li> -->
+          <li class="logs"><a href="#logs">Logs</a></li>
+          <li class="links"><a href="#links">Useful Links</a></li>
+          <li class="account"><a href="#account">Account</a></li>
+        </ul>
+        <ul class="nav navbar-nav navbar-right">
+          <li><span class="logging_in_msg nav-status">Logging in...</span></li>
+          <li><span class="logged_in_msg nav-status"></span></li>
+        </ul>
+      </div><!--/.nav-collapse -->
+
+    </div>
+  </div>
+
+  <div class="container" id="content">
+
+    <!-- OVERVIEW AKA HOME-->
+    <div id="home" class="content_container container">
+      <h1>EoR - Observation Overview</h1>
+      <div class="clocks container"></div>
+      <div class="container" id="beam_image_container">
+        <h2>Beam Images</h2>
+      </div>
+      <h2>Observations</h2>
+      <div class="container" id="mit_observations"></div>
+      <h3>Graphs</h3>
+      <div class="" id="graphs"></div>
+    </div>
+
+    <!-- OBSERVATIONS -->
+    <div id="obs" class="content_container container" style="display:none;">
+
+    </div>
+
+    <!-- LOGS-->
+    <div id="logs" class="content_container container" style="display:none;">
+      <h2>Observation Logs</h2>
+      <p>For the old Google Doc based logs, visit here - <a href="/old_data" target="_blank">/old_data</a></p>
+      <div id="observation_logs"></div>
+    </div>
+
+    <!-- USEFUL LINKS-->
+    <div id="links" class="content_container container" style="display:none;">
+      <h2>Useful Links</h2>
+      <ul>
+        <li><a href="https://docs.google.com/spreadsheet/ccc?key=0Ate0sqkDCwhydFNsNmEzdVJGOFdHUUdsQXFidVYzY0E#gid=0" target="_blank">Observer's Schedule</a></li>
+        <li><a href="http://nagios.mwa128t.org/cgi-bin/nagios3/status.cgi" target="_blank">nagios</a></li>
+        <li><a href="http://mro.mwa128t.org/observation/observing_status/" target="_blank">Observation Status</a></li>
+        <li><a href="https://www.google.com/fusiontables/DataSource?docid=1poo8vJn8FHcwuZ0OlF-IGpOY5krFvOH-dSZIyPc" target="_blank"> Table of G0009 Obs</a></li>
+        <li><a href="http://mro.mwa128t.org/burst/live/" target="_blank">Tile Total Power</a></li>
+        <li><a href="http://telemetry.mwa128t.org" target="_blank">Autocorrelations</a></li>
+        <li><a href="http://ngas01.ivec.org/admin/observation/observationsetting/" target="_blank">ngas admin</a></li>
+      </ul>
+      <h2>Internal Links</h2>
+      <ul>
+        <li><a href="/legacy" target="_blank">Legacy EoR website</a></li>
+        <li><a href="/old_data" target="_blank">Page with old Google Doc based data (logs and fusion table charts)</a></li>
+        <li><a href="/admin" target="_blank">Admin Tools (for admin users only)</a></li>
+      </ul>
+    </div>
+
+    <!-- Account -->
+    <div id="account" class="content_container container" style="display:none;">
+      <h2>Account</h2>
+    </div>
+
+
+  </div><!-- /.container -->
+
+  <div class="footer navbar navbar-fixed-bottom">
+    <div class="container">
+      <p class="text-muted">EoR Live &copy; 2014</p>
+    </div>
+  </div>
+
+  <script type="text/javascript" src="{{ url_for('static', filename='js/jquery.js') }}"></script>
+  <script type="text/javascript" src="{{ url_for('static', filename='js/modernizr.custom.js') }}"></script>
+  <script type="text/javascript" src="{{ url_for('static', filename='js/bootstrap.min.js') }}"></script>
+  <script type="text/javascript" src="{{ url_for('static', filename='js/bootstrap-datepicker.js') }}"></script>
+  <!--[if IE]><script type="text/javascript" src="{{ url_for('static', filename='js/excanvas.js') }}"></script><![endif]-->
+  <script type="text/javascript" src="{{ url_for('static', filename='js/coolclock.js') }}"></script>
+  <script type="text/javascript" src="{{ url_for('static', filename='js/amcharts/amcharts.js') }}"></script>
+  <script type="text/javascript" src="{{ url_for('static', filename='js/amcharts/serial.js') }}"></script>
+  <script type="text/javascript" src="{{ url_for('static', filename='js/eor.js') }}"></script>
+  <script type="text/javascript" src="{{ url_for('static', filename='js/eor.clock.js') }}"></script>
+  <script type="text/javascript" src="{{ url_for('static', filename='js/eor.google.js') }}"></script>
+  <script type="text/javascript" src="{{ url_for('static', filename='js/eor.obs.js') }}"></script>
+  <script type="text/javascript" src="{{ url_for('static', filename='js/eor.img.js') }}"></script>
+  <script type="text/javascript" src="{{ url_for('static', filename='js/eor.graph.js') }}"></script>
+  <script type="text/javascript" src="{{ url_for('static', filename='js/eor.account.js') }}"></script>
+  <script type="text/javascript" src="{{ url_for('static', filename='js/eor.logs.js') }}"></script>
+
+  <script type="text/javascript" src="https://www.google.com/jsapi"></script>
+  <script type="text/javascript">
+    var STATIC_PATH = "{{ url_for('static', filename='') }}";
+    EoR.current_user = {{ current_user|safe }};
+    EoR.init();
+  </script>
+</body>
+
+
+
+</html>

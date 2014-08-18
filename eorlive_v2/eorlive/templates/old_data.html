@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='css/bootstrap.min.css') }}">
+  <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='css/style.css') }}">
+
+  <title>EoR Observing Webpage</title>
+</head>
+
+<body>
+  <div class="navbar navbar-inverse navbar-fixed-top" role="navigation">
+    <div class="container">
+      <div class="navbar-header">
+        <a class="navbar-brand" href="#">EoR - Old Data (Google Backed)</a>
+      </div>
+      <div class="collapse navbar-collapse">
+        <ul class="nav navbar-nav">
+          <li class="logs"><a href="#logs">Logs</a></li>
+          <li class="charts"><a href="#charts">Fusion Table Charts</a></li>
+        </ul>
+      </div><!--/.nav-collapse -->
+
+    </div>
+  </div>
+
+  <div class="container" id="content">
+
+    <!-- LOGS-->
+    <div id="logs" class="content_container container" style="">
+      <h2>Observation Logs</h2>
+    </div>
+
+    <!-- CHARTS-->
+    <div id="charts" class="content_container container" style="display:none;">
+      <h2>Fusion Table Charts</h2>
+      <div class="container" id="fb_graphs_container"></div>
+    </div>
+
+
+  </div><!-- /.container -->
+
+  <script type="text/javascript" src="{{ url_for('static', filename='js/jquery.js') }}"></script>
+  <script type="text/javascript" src="{{ url_for('static', filename='js/modernizr.custom.js') }}"></script>
+  <script type="text/javascript" src="{{ url_for('static', filename='js/bootstrap.min.js') }}"></script>
+  <!--[if IE]><script type="text/javascript" src="{{ url_for('static', filename='js/excanvas.js') }}"></script><![endif]-->
+  <script type="text/javascript" src="{{ url_for('static', filename='js/coolclock.js') }}"></script>
+  <script type="text/javascript" src="{{ url_for('static', filename='js/jquery.sheetrock.min.js') }}"></script>
+  <script type="text/javascript" src="{{ url_for('static', filename='js/eor.js') }}"></script>
+  <script type="text/javascript" src="{{ url_for('static', filename='js/eor.old.js') }}"></script>
+  <script type="text/javascript" src="{{ url_for('static', filename='js/eor.google.js') }}"></script>
+
+  <script type="text/javascript" src="https://www.google.com/jsapi"></script>
+  <script type="text/javascript">
+    var STATIC_PATH = "{{ url_for('static', filename='') }}";
+    EoR.init();
+  </script>
+</body>
+
+
+
+</html>
