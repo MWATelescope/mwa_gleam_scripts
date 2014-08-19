@@ -41,6 +41,7 @@ def trim_files():
   for i in range(0, len(images)):
     if i < MAX_FILES: continue
     fname = (images[i])
+    write_to_log("%r file deleted" %fname)
     os.remove(os.path.join(PATH_TO_PNGS, fname))
     deleted_files += 1
 
