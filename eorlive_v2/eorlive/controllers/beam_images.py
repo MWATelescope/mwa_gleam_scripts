@@ -19,7 +19,8 @@ def get_beam_images():
   offset = int(request.args.get('offset') or 0)
 
   curr = 0
-  for f in os.listdir(PNG_FILE_PATH):
+
+  for f in sorted(os.listdir(PNG_FILE_PATH), reverse=True):
     if f.endswith(".png"):
       if curr < offset:
         curr += 1
