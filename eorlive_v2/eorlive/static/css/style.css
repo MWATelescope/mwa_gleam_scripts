@@ -39,18 +39,15 @@ div#home {
   padding-bottom: 50px !important;
 }
 
-/* CLOCK */
-.clocks.container {
-
+span.link {
+  color: #428bca;
+  text-decoration: underline;
+  cursor: pointer;
 }
 
-.clocks.container .clock_div{
+h4.title-with-link {
   display: inline-block;
-  padding: 20px;
-}
-
-.clocks.container .clock_div canvas{
-  display: block;
+  margin: 10px;
 }
 
 /* BEAM IMAGES */

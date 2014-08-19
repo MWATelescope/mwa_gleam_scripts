@@ -59,8 +59,9 @@ EoR.img.create_img_slider = function(){
 EoR.img.init = function(){
   var div = $("#beam_image_container");
   div
-    .append( $("<button/>").attr("type", "button").addClass("btn btn-primary refresh")
-      .text("Refresh")
+    .append('<h4 class="title-with-link">Beam Images</h4>')
+    .append( $("<span/>").addClass("link refresh")
+      .text("refresh")
       .click(function(e){
         EoR.img.fetch_images();
       })
