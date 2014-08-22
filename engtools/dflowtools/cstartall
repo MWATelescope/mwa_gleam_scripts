@@ -1,3 +1,0 @@
-#!/bin/bash
-cd MandC/correlator/
-python ccncmd.py -s helios.mwa128t.org --command startall
