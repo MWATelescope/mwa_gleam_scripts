@@ -1,8 +1,1 @@
-A suite of little handy tools we developed during 128T Commissioning.
-So far as possible they depend on as little else of the infrastructure
-running so they can be used when the system is barely alive.
-
-The various executables and things here shuold be soft-linked into the /home/mwa/bin directory
-of the machine you intend to use them on (eg. helios or cerberus).
-
-
+All these deleted Aug 2014 since they can only be used on helios anyway. Look at the git past if you really want them.
