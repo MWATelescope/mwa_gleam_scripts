@@ -107,6 +107,10 @@ EoR.logs.create_table = function(){
       EoR.logs.log_being_edited = log.id;
       EoR.logs.populate_post_interface(log);
       EoR.logs.show_post_interface();
+    })
+    .delegate("button.post", "click", function(el){
+      window.location.hash = "logs";
+      EoR.logs.show_post_interface();
     });
 };
 
@@ -215,32 +219,44 @@ EoR.logs.fetch_observation_logs = function(reset){
   });
 };
 
-EoR.logs.create_table_row = function(v){
+EoR.logs.create_table_row = function(v, post_button){
+
+  var buttons = "";
+
+  if(post_button){
+    buttons = $("<div>")
+      // Delete button
+      .append(  $("<button/>")
+        .attr("type", "button")
+        .addClass("btn btn-primary post")
+        .text("Post New Log >>")
+        .data("log_id", v.id)
+      )
+  } else if(v.author_user_id == EoR.current_user.id || (EoR.current_user.admin_level >= 1)){
+    buttons = $("<div>")
+      // Delete button
+      .append(  $("<button/>")
+        .attr("type", "button")
+        .addClass("btn btn-danger delete")
+        .text("Delete")
+        .data("log_id", v.id)
+      )
+      // Edit button
+      .append(  $("<button/>")
+        .attr("type", "button")
+        .addClass("btn btn-default edit")
+        .text("Edit")
+        .data("log", v)
+      );
+  }
+
   return $("<tr/>").attr("id", "log_tr_"+v.id)
     .append($("<td/>").text(o_d.getUTCFullYear() + "-" + (o_d.getUTCMonth()+1) + "-" + o_d.getUTCDate()))
     .append($("<td/>").text(v.author_user_name))
     .append($("<td/>").text(v.note))
     .append($("<td/>").html(EoR.logs.get_tags_str_from_values(v.tags)))
-    .append($("<td/>")
-      .append( v.author_user_id == EoR.current_user.id || (EoR.current_user.admin_level >= 1) ?
-        $("<div>")
-          // Delete button
-          .append(  $("<button/>")
-            .attr("type", "button")
-            .addClass("btn btn-danger delete")
-            .text("Delete")
-            .data("log_id", v.id)
-          )
-          // Edit button
-          .append(  $("<button/>")
-            .attr("type", "button")
-            .addClass("btn btn-default edit")
-            .text("Edit")
-            .data("log", v)
-          )
-        : ""
-      )
-    )
+    .append($("<td/>").append( buttons)
+  );
 }
 
 EoR.logs.post_observation_log = function(){
@@ -327,12 +343,50 @@ EoR.logs.hide_post_interface = function(){
   $("#observation_logs .tail_interface .post_interface").hide();
 }
 
+/***********************
+********Latest Log******
+*************************/
+
+EoR.logs.fetch_latest_log = function(){
+
+  $("#latest_observation_log .loading").show();
+
+  $.ajax({
+    url: "/api/observation_logs/latest",
+    type: "json",
+    method: "GET",
+    success: function(data){
+      var tbody = $("#latest_observation_log .logs_table tbody");
+      tbody.empty();
+      o_d = new Date(data.observed_date);
+      tbody.append( EoR.logs.create_table_row(data,true));
+    },
+    error: function(xhr, status, err){
+      alert("an error occurred during fetching the latest log data");
+    },
+    complete: function(){
+      $("#latest_observation_log .loading").hide();
+    }
+  });
+};
+
 EoR.logs.init = function(){
   $("#observation_logs")
     .append(EoR.logs.create_fetch_interface())
     .append(EoR.logs.create_table())
     .append(EoR.create_loading().hide())
     .append(EoR.logs.create_post_interface());
+
+  $("#latest_observation_log")
+    .append('<h4 class="title-with-link">Latest Observation Log</h4>')
+    .append( $("<span/>").addClass("link refresh")
+      .text("refresh")
+      .click(function(e){
+        EoR.logs.fetch_latest_log(EoR.obs.fetch_future_observation_counts);
+      })
+    )
+    .append(EoR.logs.create_table())
+    .append(EoR.create_loading().hide());
 
   $("ul.obs_tags.fetch li input").each(function(i,el){
     $(el).prop("checked", true);

@@ -95,3 +95,17 @@ def observation_log_put_delete(id):
     observation_log.tags = int(request.form.get('tags', observation_log.tags))
     db.session.commit()
     return jsonify(observation_log.asDict()), 201
+
+@app.route('/api/observation_logs/latest', methods=['GET'])
+@login_required
+def latest_observation_log():
+
+  log, user = db.session.query(ObservationLog, User
+    ).filter(ObservationLog.author_user_id == User.id
+    ).filter(ObservationLog.deleted_date == None
+    ).order_by(desc(ObservationLog.observed_date)).first()
+
+  log_dict = log.asDict()
+  log_dict["author_user_name"] = user.name
+
+  return jsonify(log_dict)

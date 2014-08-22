@@ -106,11 +106,11 @@ div#logs .button_container {
   margin-bottom: 22px;
 }
 
-#observation_logs .logs_table tbody td span.fine{
+#latest_observation_log tbody span.fine, #observation_logs tbody span.fine{
   color: green;
 }
 
-#observation_logs .logs_table tbody td span.bad{
+#latest_observation_log tbody span.bad, #observation_logs tbody span.bad{
   color: red;
 }
 

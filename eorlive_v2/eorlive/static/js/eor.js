@@ -90,6 +90,7 @@ EoR.onPageTransition = function(page_id){
     case 'home':
       if(!transitioned_to){
         EoR.obs.fetch_observations(EoR.obs.fetch_future_observation_counts);
+        EoR.logs.fetch_latest_log();
         EoR.graph.fetch_data();
       }
       break;
