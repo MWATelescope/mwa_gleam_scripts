@@ -48,9 +48,9 @@ def user_login():
   password = request.form['password']
   user = User.query.filter_by(username=username,password=hashlib.sha256(password).hexdigest()).first()
   if not user:
-    return "Wrong username or password", 403
+    return "Wrong username or password", 400
   login_user(user)
-  return "login success", 201
+  return jsonify(current_user.asDict()), 201
 
 @app.route('/api/logout', methods=['GET', 'POST'])
 def user_logout():

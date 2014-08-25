@@ -20,11 +20,22 @@
           <!-- <li class="obs"><a href="#obs">Observations</a></li> -->
           <li class="logs"><a href="#logs">Logs</a></li>
           <li class="links"><a href="#links">Useful Links</a></li>
-          <li class="account"><a href="#account">Account</a></li>
+          <li class="account" id="menu_account" style="display:none;"><a href="#account">Account</a></li>
         </ul>
         <ul class="nav navbar-nav navbar-right">
           <li><span class="logging_in_msg nav-status">Logging in...</span></li>
           <li><span class="logged_in_msg nav-status"></span></li>
+          <li class="dropdown" id="menu_login" style="display:none;">
+            <a class="dropdown-toggle" href="#" data-toggle="dropdown" id="nav_login">Login</a>
+            <div class="dropdown-menu" style="padding:17px;">
+              <form class="form" id="form_login">
+                <input name="username" id="username" type="text" placeholder="Username" class="form-control">
+                <input name="password" id="password" type="password" placeholder="Password" class="form-control"><br>
+                <span class="error-msg" id="login_error_msg"></span><br/>
+                <button type="button" id="btn_login" class="btn btn-primary">Login</button>
+              </form>
+            </div>
+          </li>
         </ul>
       </div><!--/.nav-collapse -->
 
@@ -37,7 +48,6 @@
     <div id="home" class="content_container container">
       <div class="container" id="mit_observations"></div>
       <div class="container" id="latest_observation_log"></div>
-      <h4>Graphs</h4>
       <div class="" id="graphs"></div>
       <div class="container" id="beam_image_container">
       </div>
@@ -110,7 +120,7 @@
   <script type="text/javascript" src="https://www.google.com/jsapi"></script>
   <script type="text/javascript">
     var STATIC_PATH = "{{ url_for('static', filename='') }}";
-    EoR.current_user = {{ current_user|safe }};
+    EoR.current_user = null;
     EoR.init();
   </script>
 </body>

@@ -7,7 +7,6 @@ from flask.ext.login import login_required, current_user
 PNG_FILE_PATH = "/var/beam_images"
 
 @app.route('/api/beam_images', methods=['GET'])
-@login_required
 def get_beam_images():
   """
   Return files in the beam_images directories in an ordered manner.

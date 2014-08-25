@@ -50,6 +50,14 @@ h4.title-with-link {
   margin: 10px;
 }
 
+.error-msg {
+  color: red !important;
+}
+
+#form_login {
+  width: 200px;
+}
+
 /* BEAM IMAGES */
 
 #beam_image img{
@@ -58,6 +66,7 @@ h4.title-with-link {
 
 #beam_image {
   margin-bottom: 30px;
+  height: 400px;
 }
 
 #beam_image .carousel-indicators {

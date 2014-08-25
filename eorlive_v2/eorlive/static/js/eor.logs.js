@@ -222,8 +222,10 @@ EoR.logs.fetch_observation_logs = function(reset){
 EoR.logs.create_table_row = function(v, post_button){
 
   var buttons = "";
-
-  if(post_button){
+  if(!EoR.current_user){
+    // Not sure if we need to render anything. Probably not.
+  }
+  else if(post_button){
     buttons = $("<div>")
       // Delete button
       .append(  $("<button/>")
@@ -279,7 +281,7 @@ EoR.logs.post_observation_log = function(){
   $("#observation_logs .loading").show();
   $("#observation_logs .btn").prop("disabled", true);
   $.ajax({
-    url: "/api/observation_logs" + (put_id?("/"+put_id):""),
+    url: "/api/observation_logs" + (put_id?("/"+put_id):"/new"),
     type: "json",
     method: put_id?"PUT":"POST",
     data: {observed_date: observed_date, note: note, tags: tags},

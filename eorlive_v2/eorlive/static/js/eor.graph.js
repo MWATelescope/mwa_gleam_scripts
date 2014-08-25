@@ -205,6 +205,7 @@ EoR.graph.render = function(){
 
 EoR.graph.init = function(){
   $("#graphs")
+    .append("<h4>Graphs</h4>")
     .append(EoR.create_loading())
     .append(EoR.graph.create_graph_container());
   //EoR.graph.fetch_data();

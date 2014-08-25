@@ -5,7 +5,13 @@ EoR.transitioned_to = [false, false, false, false, false]; // keeps track of whe
 
 EoR.init = function(){
 
-  $.ajaxSetup({type:"json"});
+  $.ajaxSetup({type:"json",
+    statusCode: {
+      401: function(error){
+        EoR.unrender_user();
+      }
+    }
+  });
 
   // Handle hash change event and navbar component updates
   function hashChanged(){
@@ -14,6 +20,9 @@ EoR.init = function(){
       return;
     }
     var content_id = (window.location.hash.replace("#", "")) || "home";
+
+    if(content_id == "account" && !EoR.current_user) content_id = "home";
+
     if(EoR.pages.indexOf(content_id) < 0) return;
     EoR.view_translate(content_id);
     $(".navbar .nav.navbar-nav li").removeClass("active");
@@ -21,24 +30,48 @@ EoR.init = function(){
   }
   $(window).on('hashchange', hashChanged);
 
-  EoR.render_logged_in_message();
+  $("#password").bind("keypress", function(e){
+    if(e.keyCode === 13){
+      EoR.login();
+    }
+  });
+
+  $("#username").val(load_username());
+
+  $("#btn_login").bind("click", EoR.login);
+
   // Initiate content boxes
   EoR.clock.init(); // Clocks widget
   EoR.obs.init(); // Observation data from MIT database
   EoR.img.init(); // Load Beam Images
   EoR.graph.init(); // Load graphs
   EoR.logs.init();
-  EoR.account.init(); // Account settings render
-
   hashChanged();
+
+  EoR.check_user();
 };
 
-EoR.render_logged_in_message = function(){
-  $(".navbar .logging_in_msg").remove();
-  $(".navbar .logged_in_msg").empty()
+EoR.show_logged_in_message = function(){
+  $(".navbar .logging_in_msg").hide();
+  $("#menu_login").hide();
+  $("#menu_account").show();
+  $(".navbar .logged_in_msg").show().empty()
     .append("Hello " + EoR.current_user.name + " (")
     .append($("<a/>").attr("href", "#").text("Log out").click(EoR.logout))
     .append(")");
+};
+
+EoR.show_logging_in = function(){
+  $("#menu_login").hide();
+  $(".navbar .logged_in_msg").hide();
+  $("#menu_account").hide();
+  $(".navbar .logging_in_msg").show();
+};
+
+EoR.show_log_in_ui = function(){
+  $(".navbar .logging_in_msg").hide();
+  $(".navbar .logged_in_msg").hide();
+  $("#menu_login").show();
 };
 
 EoR.create_loading = function(){
@@ -47,18 +80,39 @@ EoR.create_loading = function(){
 
 
 EoR.check_user = function(cb){
+  EoR.show_logging_in();
   $.ajax({
     method: "GET",
     url: "/api/current_user",
     type: "json",
     success: function(data){
       EoR.current_user = data;
-      if(cb) cb();
+      EoR.render_user();
     },
     error: function(xhr, status, err){
-      window.location = "/login";
+      EoR.unrender_user();
     }
   });
+};
+
+EoR.render_user = function(){
+  EoR.account.init(); // Account settings render
+  EoR.show_logged_in_message();
+  EoR.logs.fetch_observation_logs(true);
+  EoR.logs.fetch_latest_log();
+  $("#menu_account").show();
+  $("#login_error_msg").text("").hide();
+  $("#password").val("");
+};
+
+EoR.unrender_user = function(){
+  EoR.current_user = null;
+  EoR.show_log_in_ui();
+  EoR.logs.fetch_observation_logs(true);
+  EoR.logs.fetch_latest_log();
+  $("#menu_account").hide();
+  $("#login_error_msg").text("").hide();
+  $("#password").val("");
 };
 
 EoR.logout = function(e){
@@ -66,14 +120,55 @@ EoR.logout = function(e){
     method: "POST",
     url: "/api/logout",
     type: "json",
-    success: function(data){
-      window.location = "/login";
-    },
+    success: EoR.unrender_user,
     error: function(xhr, status, err){
       alert("something went wrong...");
     }
   });
 };
+
+EoR.login = function(){
+  var un = $("#username").val(), pw = $("#password").val();
+
+  if(!un || !pw){
+    $("#login_error_msg").text("Please type in your username and password").show();
+    return;
+  }
+
+  EoR.show_logging_in();
+
+  $.ajax({
+    method: "POST",
+    url: '/api/login',
+    type: 'json',
+    data: {username: un, password: pw},
+    success: function(data){
+      save_username(un);
+      EoR.current_user = data;
+      EoR.render_user();
+    },
+    error: function(xhr, status, err){
+      $("#login_error_msg").text("Wrong username or password.").show();
+      $("#password").val("");
+      EoR.show_log_in_ui();
+    }
+  })
+};
+
+function save_username(username){
+  if(localStorage){
+    localStorage.setItem("username", username);
+  }
+}
+
+function load_username(){
+  if(localStorage){
+    return localStorage.getItem('username') || "";
+  }
+  return "";
+}
+
+
 
 EoR.render_user_info = function(){
 
@@ -90,7 +185,7 @@ EoR.onPageTransition = function(page_id){
     case 'home':
       if(!transitioned_to){
         EoR.obs.fetch_observations(EoR.obs.fetch_future_observation_counts);
-        EoR.logs.fetch_latest_log();
+        //EoR.logs.fetch_latest_log();
         EoR.graph.fetch_data();
       }
       break;
@@ -98,7 +193,7 @@ EoR.onPageTransition = function(page_id){
       break;
     case 'logs':
       if(!transitioned_to){
-        EoR.logs.fetch_observation_logs(true);
+        //EoR.logs.fetch_observation_logs(true);
       }
       break;
     case 'links':
