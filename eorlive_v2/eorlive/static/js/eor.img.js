@@ -7,7 +7,7 @@ EoR.img.fetch_images = function(callback){
     div_inner = div.find(".carousel-inner"),
     loading = div.find(".loading");
 
-  div_outer.hide();
+  div_outer.css('visibility', 'hidden');
   loading.show();
 
   ol.empty();
@@ -38,7 +38,7 @@ EoR.img.fetch_images = function(callback){
     },
     complete: function(){
       loading.hide();
-      div_outer.show();
+      div_outer.css('visibility', 'visible');
       if(callback){callback();}
     }
   });
@@ -53,14 +53,15 @@ EoR.img.create_img_slider = function(){
       '</a>' +
       '<a class="right carousel-control" href="#beam_image" role="button" data-slide="next">' +
       '<span class="glyphicon glyphicon-chevron-right"></span>' +
-      '</a>').hide();
+      '</a>').css("visibility","hidden");
 };
 
 EoR.img.init = function(){
   var div = $("#beam_image_container");
   div
-    .append( $("<button/>").attr("type", "button").addClass("btn btn-primary refresh")
-      .text("Refresh")
+    .append('<h4 class="title-with-link">Beam Images</h4>')
+    .append( $("<span/>").addClass("link refresh")
+      .text("refresh")
       .click(function(e){
         EoR.img.fetch_images();
       })

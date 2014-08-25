@@ -9,6 +9,7 @@ class ObservationLog(db.Model):
   author_user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
   note = db.Column(db.Text)
   tags = db.Column(db.Integer, nullable=False, default=0)
+  deleted_date = db.Column(db.DateTime)
 
   def __init__(self, observed_date, author_user_id, note, tags):
     self.observed_date = observed_date

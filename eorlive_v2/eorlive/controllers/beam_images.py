@@ -7,7 +7,6 @@ from flask.ext.login import login_required, current_user
 PNG_FILE_PATH = "/var/beam_images"
 
 @app.route('/api/beam_images', methods=['GET'])
-@login_required
 def get_beam_images():
   """
   Return files in the beam_images directories in an ordered manner.
@@ -19,7 +18,8 @@ def get_beam_images():
   offset = int(request.args.get('offset') or 0)
 
   curr = 0
-  for f in os.listdir(PNG_FILE_PATH):
+
+  for f in sorted(os.listdir(PNG_FILE_PATH), reverse=True):
     if f.endswith(".png"):
       if curr < offset:
         curr += 1

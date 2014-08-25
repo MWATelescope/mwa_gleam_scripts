@@ -4,7 +4,6 @@ from eorlive import db, mit_db_engine, cache
 from flask.ext.login import login_required, current_user
 
 @app.route('/api/mit_data/observations', methods=['GET'])
-@login_required
 @cache.cached(timeout=600) # Cached for 10 minutes
 def get_current_and_past_observations():
 
@@ -42,7 +41,6 @@ def get_current_and_past_observations():
   return jsonify({"observations": observations})
 
 @app.route('/api/mit_data/future_observation_counts', methods=['GET'])
-@login_required
 @cache.cached(timeout=600) # Cached for 10 minutes
 def get_future_observation_counts():
   query = """
