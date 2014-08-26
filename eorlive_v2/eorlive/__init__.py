@@ -3,7 +3,7 @@ import os, calendar
 from datetime import datetime, timedelta
 
 app = Flask('eorlive')
-app.permanent_session_lifetime = timedelta(minutes=15)
+app.permanent_session_lifetime = timedelta(hours=24)
 
 env = os.getenv('EOR_ENV', "dev")
 

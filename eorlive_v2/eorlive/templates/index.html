@@ -20,11 +20,22 @@
           <!-- <li class="obs"><a href="#obs">Observations</a></li> -->
           <li class="logs"><a href="#logs">Logs</a></li>
           <li class="links"><a href="#links">Useful Links</a></li>
-          <li class="account"><a href="#account">Account</a></li>
+          <li class="account" id="menu_account" style="display:none;"><a href="#account">Account</a></li>
         </ul>
         <ul class="nav navbar-nav navbar-right">
           <li><span class="logging_in_msg nav-status">Logging in...</span></li>
           <li><span class="logged_in_msg nav-status"></span></li>
+          <li class="dropdown" id="menu_login" style="display:none;">
+            <a class="dropdown-toggle" href="#" data-toggle="dropdown" id="nav_login">Login</a>
+            <div class="dropdown-menu" style="padding:17px;">
+              <form class="form" id="form_login">
+                <input name="username" id="username" type="text" placeholder="Username" class="form-control">
+                <input name="password" id="password" type="password" placeholder="Password" class="form-control"><br>
+                <span class="error-msg" id="login_error_msg"></span><br/>
+                <button type="button" id="btn_login" class="btn btn-primary">Login</button>
+              </form>
+            </div>
+          </li>
         </ul>
       </div><!--/.nav-collapse -->
 
@@ -35,15 +46,11 @@
 
     <!-- OVERVIEW AKA HOME-->
     <div id="home" class="content_container container">
-      <h1>EoR - Observation Overview</h1>
-      <div class="clocks container"></div>
-      <div class="container" id="beam_image_container">
-        <h2>Beam Images</h2>
-      </div>
-      <h2>Observations</h2>
       <div class="container" id="mit_observations"></div>
-      <h3>Graphs</h3>
+      <div class="container" id="latest_observation_log"></div>
       <div class="" id="graphs"></div>
+      <div class="container" id="beam_image_container">
+      </div>
     </div>
 
     <!-- OBSERVATIONS -->
@@ -53,14 +60,13 @@
 
     <!-- LOGS-->
     <div id="logs" class="content_container container" style="display:none;">
-      <h2>Observation Logs</h2>
-      <p>For the old Google Doc based logs, visit here - <a href="/old_data" target="_blank">/old_data</a></p>
+      <h3>Observation Logs</h3>
       <div id="observation_logs"></div>
     </div>
 
     <!-- USEFUL LINKS-->
     <div id="links" class="content_container container" style="display:none;">
-      <h2>Useful Links</h2>
+      <h3>Useful Links</h3>
       <ul>
         <li><a href="https://docs.google.com/spreadsheet/ccc?key=0Ate0sqkDCwhydFNsNmEzdVJGOFdHUUdsQXFidVYzY0E#gid=0" target="_blank">Observer's Schedule</a></li>
         <li><a href="http://nagios.mwa128t.org/cgi-bin/nagios3/status.cgi" target="_blank">nagios</a></li>
@@ -70,7 +76,7 @@
         <li><a href="http://telemetry.mwa128t.org" target="_blank">Autocorrelations</a></li>
         <li><a href="http://ngas01.ivec.org/admin/observation/observationsetting/" target="_blank">ngas admin</a></li>
       </ul>
-      <h2>Internal Links</h2>
+      <h3>Internal Links</h3>
       <ul>
         <li><a href="/legacy" target="_blank">Legacy EoR website</a></li>
         <li><a href="/old_data" target="_blank">Page with old Google Doc based data (logs and fusion table charts)</a></li>
@@ -80,7 +86,7 @@
 
     <!-- Account -->
     <div id="account" class="content_container container" style="display:none;">
-      <h2>Account</h2>
+      <h3>Account</h3>
     </div>
 
 
@@ -88,7 +94,10 @@
 
   <div class="footer navbar navbar-fixed-bottom">
     <div class="container">
-      <p class="text-muted">EoR Live &copy; 2014</p>
+      <div>
+        <span class="text-muted">EoR Live &copy; 2014</span>
+        <span class="text-muted pull-right" id="utc_time">UTC Time: --:--</span>
+      </div>
     </div>
   </div>
 
@@ -97,7 +106,6 @@
   <script type="text/javascript" src="{{ url_for('static', filename='js/bootstrap.min.js') }}"></script>
   <script type="text/javascript" src="{{ url_for('static', filename='js/bootstrap-datepicker.js') }}"></script>
   <!--[if IE]><script type="text/javascript" src="{{ url_for('static', filename='js/excanvas.js') }}"></script><![endif]-->
-  <script type="text/javascript" src="{{ url_for('static', filename='js/coolclock.js') }}"></script>
   <script type="text/javascript" src="{{ url_for('static', filename='js/amcharts/amcharts.js') }}"></script>
   <script type="text/javascript" src="{{ url_for('static', filename='js/amcharts/serial.js') }}"></script>
   <script type="text/javascript" src="{{ url_for('static', filename='js/eor.js') }}"></script>
@@ -112,7 +120,7 @@
   <script type="text/javascript" src="https://www.google.com/jsapi"></script>
   <script type="text/javascript">
     var STATIC_PATH = "{{ url_for('static', filename='') }}";
-    EoR.current_user = {{ current_user|safe }};
+    EoR.current_user = null;
     EoR.init();
   </script>
 </body>
