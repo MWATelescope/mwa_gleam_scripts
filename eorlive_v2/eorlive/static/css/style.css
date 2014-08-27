@@ -39,18 +39,27 @@ div#home {
   padding-bottom: 50px !important;
 }
 
-/* CLOCK */
-.clocks.container {
-
+span.link {
+  color: #428bca;
+  text-decoration: underline;
+  cursor: pointer;
 }
 
-.clocks.container .clock_div{
+h4.title-with-link {
   display: inline-block;
-  padding: 20px;
+  margin: 10px;
 }
 
-.clocks.container .clock_div canvas{
-  display: block;
+.error-msg {
+  color: red !important;
+}
+
+#form_login {
+  width: 200px;
+}
+
+.date-cell {
+  white-space: nowrap;
 }
 
 /* BEAM IMAGES */
@@ -61,6 +70,7 @@ div#home {
 
 #beam_image {
   margin-bottom: 30px;
+  height: 400px;
 }
 
 #beam_image .carousel-indicators {
@@ -109,11 +119,11 @@ div#logs .button_container {
   margin-bottom: 22px;
 }
 
-#observation_logs .logs_table tbody td span.fine{
+#latest_observation_log tbody span.fine, #observation_logs tbody span.fine{
   color: green;
 }
 
-#observation_logs .logs_table tbody td span.bad{
+#latest_observation_log tbody span.bad, #observation_logs tbody span.bad{
   color: red;
 }
 

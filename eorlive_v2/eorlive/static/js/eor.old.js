@@ -23,3 +23,20 @@ EoR.init = function(){
   hashChanged();
   EoR.google.init(); // Logs and Graphs based on Google APIs
 };
+
+// Per Page Events
+EoR.onPageTransition = function(page_id){
+  //console.log("onPageTransition  " + page_id);
+  var index = EoR.pages.indexOf(page_id);
+  if(!page_id) page_id = "_null";
+  var transitioned_to = EoR.transitioned_to[index];
+
+  switch(page_id){
+    case 'charts':
+      break;
+    case 'logs':
+      break;
+  }
+
+  EoR.transitioned_to[index] = true;
+}

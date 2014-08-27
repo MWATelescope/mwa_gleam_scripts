@@ -31,7 +31,8 @@ vagrant ssh
 
 Vagrant supports lots of commands. Use `vagrant --help` for more details. The most useful would be `suspend` and `resume`.
 
-### DB Migration / Command Line User Management ###
+
+### DB Migration ###
 
 Database migration is managed by alembic (flask extention is called Flask-Migration). To create a new migration script, use the following command.
 (Make sure you 'sourced' the virtualenv if it runs in virtualenv and cd into the eorlive_v2 dir first)
@@ -42,6 +43,9 @@ To run the migration to make the database schema up to date, use
 ```
 python -m eorlive db upgrade head
 ```
+For more information and documentation about the migrations, please see Google Alembic and take a look at their docs.
+
+### Command Line User Management ###
 
 For initial user setup and maintenance. Use the instructions below.
 
@@ -60,12 +64,17 @@ python -m eorlive user set_admin_level -u <username> -a <admin_level>
 
 ### Deployment ###
 
-Right now, I'm using rsync commend to copy files to instances.
+Right now, we're simply using rsync commend to copy files to target instances.
 
 For example,
 
 ```
 rsync -avL --progress --exclude='.git/' -e "ssh -i <path to EoR.pem file>" ./MWA_Tools ubuntu@<hostname>:
+```
+
+When server side changes had been made, it might be necessary to reset the apache server by using the following command while connected to the server via ssh,
+```
+sudo service apache2 restart
 ```
 
 This can be improved later.
@@ -84,3 +93,16 @@ export EOR_ENV=stage
 echo 'EOR_ENV=stage' >> /etc/environment
 
 ```
+
+### Front-end Notes ###
+
+The frontend is currently built using Boostrap and jQuery with heavy DOM injections and manipulation.
+It might be a good idea to use Jinja (Flask templating engine) and partial templating for mark ups (or converting the whole thing to an Angular app).
+Overall, there is a lot of room for improvement in the front end. Features are isolated into separate javascript files. See static/js directory.
+To change order or placements of widgets, one can just move the respetable div with id=id_of_feature in the templates/index.html.
+
+### Back-end Notes ###
+
+- **Scripts** - see eorlive/scripts directory where some important scripts are stored. Readme file in that directory provides explanation to each script.
+- **Apache Configs** - eorlive/server_configs has apache server configs. They are all for Apache 2.4, and they won't work in Apache 2.2 because of rules have changed. When these files are updated, copy them to instances' apache2 config dir.
+- **Cronjob** - see eorlive/server_configs/crontab to get some hint on how to set up cron jobs for image creation and graph data fetching.
