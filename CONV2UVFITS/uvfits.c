@@ -36,6 +36,21 @@
 
 #define MAX_CSIZE 8
 
+/* create a mapping for the index of the various items that are in the visibilities. Since there are optional
+   items, the index of an item in the group can change
+*/
+typedef struct {
+    int u;
+    int v;
+    int w;
+    int date;
+    int date0;  // try to support the non-standard CASA double-date format where this is the base date
+    int bl;
+    int su;
+    int fq;
+} ptype_mapping;
+
+
 /* private function prototypes */
 static int writeAntennaData(fitsfile *fptr, uvdata *data);
 static int writeFQData(fitsfile *fptr, uvdata *data);
@@ -48,6 +63,7 @@ void addGroupRow(uvdata *obj, uvReadContext *iter);
 
 /* private global vars */
 static int debug=0;
+static ptype_mapping ptype_map;
 
 /******************************
  ! NAME:      uvfitsSetDebugLevel(
@@ -90,7 +106,7 @@ int readUVFITSOpenInit(char *filename, uvdata **data, fitsfile **outfptr) {
     fits_get_num_hdus(fptr,&num_hdu,&status);
     if(debug) fprintf(stdout,"readUVFITSOpenInit: there are %d HDUs\n",num_hdu);
     if (num_hdu > 2) {
-        fprintf(stderr,"readUVFITSOpenInit WARNING: %s appears to be a multi-source file. This is not supported yet.\n",filename);
+        fprintf(stderr,"readUVFITSOpenInit WARNING: %s appears to be a multi-source or multi-IF file. This is poorly supported.\n",filename);
         //    return 1;
     }
     fits_get_hdu_type(fptr,&hdu_type,&status);
@@ -99,16 +115,16 @@ int readUVFITSOpenInit(char *filename, uvdata **data, fitsfile **outfptr) {
     }
 
     /* get dimensions of vis data */
-    fits_get_img_param(fptr,6,&bitpix,&naxis,naxes,&status);
+    fits_get_img_param(fptr,MAX_CSIZE,&bitpix,&naxis,naxes,&status);
+    if(status!=0) {
+        fits_report_error(stderr,status);
+        fprintf(stderr,"%s: failed to get img params.\n",__func__);
+        return status;
+    }
 
     if (debug) {
         fprintf(stdout,"readUVFITSOpenInit: NAXIS is %d\n",naxis);
         for(i=0;i<naxis;i++) fprintf(stdout,"\tNAXIS%d is %d\n",i+1,(int)naxes[i]);
-    }
-    if (status !=0 ) {
-        fits_report_error(stderr,status);
-        fprintf(stderr,"readUVFITSOpenInit: status %d after get img params\n",status);
-        return status;
     }
     if (naxis > 7) {
         fprintf(stderr,"ERROR: NAXIS is %d. Extra image dimensions aren't supported yet\n",(int)naxis);
@@ -195,11 +211,12 @@ int readUVFITSOpenInit(char *filename, uvdata **data, fitsfile **outfptr) {
 ******************************/
 int readUVFITSInitIterator(char *filename, uvdata **data, uvReadContext **iterator) {
     fitsfile *fptr=NULL;
-    int i,status=0,max_bl,grp_row_size;
+    int i,status=0,max_bl,grp_row_size,found_obsra=0;
     char temp[84]="";
     uvReadContext *iter=NULL;
 
     /* init */
+    memset(&ptype_map,'\0',sizeof(ptype_mapping));
 
     /* open the file and get basic info*/
     status = readUVFITSOpenInit(filename, data, &fptr);
@@ -210,28 +227,32 @@ int readUVFITSInitIterator(char *filename, uvdata **data, uvReadContext **iterat
     assert(iter != NULL);
     *iterator = iter;
     iter->fptr = fptr;
+    iter->base_date = -1;   // set this sentinel for check below.
 
     /* find out how many groups there are. There is one group for each source,time,baseline combination.
        we don't know how many baselines there are yet- have to work this out while reading the data.
        The rows must be time ordered or everything will break.  */
     fits_read_key(fptr,TSTRING,"GROUPS",temp,NULL,&status);
     if (temp[0] != 'T') {
-        fprintf(stderr,"readUVFITSInitIterator: GROUPS fits keyword not set. This is not a uvfits file.\n");
+        fprintf(stderr,"%s: GROUPS fits keyword not set. This is not a uvfits file.\n",__func__);
         return -1;
     }
     fits_read_key(fptr,TINT,"PCOUNT",&(iter->pcount),NULL,&status);
     fits_read_key(fptr,TINT,"GCOUNT",&(iter->gcount),NULL,&status);
-    fits_read_key(fptr,TSTRING,"OBJECT",(*data)->source->name,NULL,&status);
-    fits_read_key(fptr,TDOUBLE,"OBSRA",&((*data)->source->ra),NULL,&status);
-    fits_read_key(fptr,TDOUBLE,"OBSDEC",&((*data)->source->dec),NULL,&status);
-    if (status !=0) {
-        fprintf(stderr,"readUVFITSInitIterator WARNING: status %d while getting basic keywords.\n",status);
-        fits_clear_errmsg();
-        status=0;
-    }
     if (iter->pcount==0 || iter->gcount==0) {
         fprintf(stderr,"ERROR: pcount: %d, gcount %d. Cannot be zero\n",iter->pcount,iter->gcount);
         return -1;
+    }
+    fits_read_key(fptr,TSTRING,"OBJECT",(*data)->source->name,NULL,&status);
+    fits_read_key(fptr,TDOUBLE,"OBSDEC",&((*data)->source->dec),NULL,&status);
+    fits_read_key(fptr,TDOUBLE,"OBSRA",&((*data)->source->ra),NULL,&status);
+    if (status !=0) {
+        fprintf(stderr,"%s WARNING: status %d while getting object keywords.\n",__func__,status);
+        fits_clear_errmsg();
+        status=0;
+    }
+    else {
+        found_obsra=1;
     }
 
     /* get the details of the observations PTYPE/CTYPE keyword from header*/
@@ -260,23 +281,39 @@ int readUVFITSInitIterator(char *filename, uvdata **data, uvReadContext **iterat
         /* remember the stuff we care about */
         if (strncmp("DATE",typedesc,4)==0) {
             iter->base_date = temp_pzero;
+            // handle 2nd occurance of DATE field which can be in non-standard CASA format
+            // in this case, the first DATE is what should be in the CRVALs in the header, which is the
+            // base date that the offsets in the visibilities are added to to get the JD
+            // so copy over the index of the previous occurrance of DATE for date0
+            if (ptype_map.date != 0) {
+                ptype_map.date0 = ptype_map.date;
+            }
+            ptype_map.date = i;
         }
         if (strncmp("UU",typedesc,2)==0) {
             iter->pscal[0] = temp_pscal;
             iter->pzero[0] = temp_pzero;
+            ptype_map.u = i;
         }
         if (strncmp("VV",typedesc,2)==0) {
             iter->pscal[1] = temp_pscal;
             iter->pzero[1] = temp_pzero;
+            ptype_map.v = i;
         }
         if (strncmp("WW",typedesc,2)==0) {
             iter->pscal[2] = temp_pscal;
             iter->pzero[2] = temp_pzero;
+            ptype_map.w = i;
+        }
+        if (strncmp("BASELINE",typedesc,8)==0) {
+            ptype_map.bl = i;
+        }
+        if (strncmp("FREQSEL",typedesc,7)==0) {
+            ptype_map.fq = i;
         }
     }
-    if(iter->base_date == 0.0) {
-        fprintf(stderr,"ERROR: no JD read from PTYPE keywords in header.\n");
-        return -1;
+    if(iter->base_date < 0.0) {
+        fprintf(stderr,"ERROR: no JD base date read from PTYPE keywords in header.\n");
     }
 
     /* get the CTYPEs, which start at CRVAL2 */
@@ -310,10 +347,18 @@ int readUVFITSInitIterator(char *filename, uvdata **data, uvReadContext **iterat
         if (strncmp("STOKES",typedesc,6)==0) {
             (*data)->pol_type = crval;
         }
-        /* RA and DEC should be in the OBSRA and OBSDEC fields already */
+        /* RA and DEC might be in the OBSRA and OBSDEC fields already */
         if (strncmp("RA",typedesc,2)==0) {
+            if (found_obsra) {
+                fprintf(stderr,"%s: WARNING: overwriting OBSRA (%g) with CTYPE (%g)\n",__func__,(*data)->source->ra,crval);
+            }
+            (*data)->source->ra = crval;
         }
         if (strncmp("DEC",typedesc,3)==0) {
+            if (found_obsra) {
+                fprintf(stderr,"%s: WARNING: overwriting OBSDEC (%g) with CTYPE (%g)\n",__func__,(*data)->source->dec,crval);
+            }
+            (*data)->source->dec = crval;
         }
         if (strncmp("IF",typedesc,2)==0) {
         }
@@ -331,7 +376,7 @@ int readUVFITSInitIterator(char *filename, uvdata **data, uvReadContext **iterat
 
     if ((*data)->weightdata==NULL || (*data)->visdata==NULL || (*data)->baseline==NULL || 
         (*data)->u==NULL || (*data)->v==NULL || (*data)->w==NULL || (*data)->date==NULL ) {
-        fprintf(stderr,"readUVFITSInitIterator: no malloc for vis data\n");
+        fprintf(stderr,"%s: no malloc for vis data\n",__func__);
         return -1;
     }
 
@@ -345,7 +390,7 @@ int readUVFITSInitIterator(char *filename, uvdata **data, uvReadContext **iterat
     (*data)->v[0] = calloc(max_bl,sizeof(double));
     (*data)->w[0] = calloc(max_bl,sizeof(double));
     if ((*data)->visdata[0]==NULL || (*data)->weightdata[0]==NULL || (*data)->baseline[0]==NULL) {
-        fprintf(stderr,"readUVFITSInitIterator: No malloc for vis data\n");
+        fprintf(stderr,"%s: No malloc for vis data\n",__func__);
       return -1;
     }
 
@@ -353,7 +398,7 @@ int readUVFITSInitIterator(char *filename, uvdata **data, uvReadContext **iterat
     iter->grp_row = malloc(sizeof(float)*grp_row_size);
     iter->grp_par = malloc(sizeof(float)*iter->pcount);
     if (iter->grp_row==NULL || iter->grp_par==NULL) {
-        fprintf(stderr,"readUVFITSInitIterator: no malloc for group row or params\n");
+        fprintf(stderr,"%s: no malloc for group row or params\n",__func__);
         return -1;
     }
 
@@ -373,11 +418,16 @@ void addGroupRow(uvdata *obj, uvReadContext *iter) {
     long out_ind;
 
     j = obj->n_baselines[time_index];
-    obj->baseline[time_index][j] = iter->grp_par[3];
-    obj->date[time_index] = iter->grp_par[4]+iter->base_date;
-    obj->u[time_index][j] = iter->grp_par[0]*iter->pscal[0] + iter->pzero[0];
-    obj->v[time_index][j] = iter->grp_par[1]*iter->pscal[1] + iter->pzero[1];
-    obj->w[time_index][j] = iter->grp_par[2]*iter->pscal[2] + iter->pzero[2];
+    obj->baseline[time_index][j] = iter->grp_par[ptype_map.bl];
+    obj->date[time_index] = iter->grp_par[ptype_map.date]+iter->base_date;
+    // handle special non-standard CASA dates
+    if (ptype_map.date0 != 0) {
+        obj->date[time_index] = (double) iter->grp_par[ptype_map.date] + (double) iter->grp_par[ptype_map.date0];
+        //printf("Date: %f, date0: %f\n",iter->grp_par[ptype_map.date],iter->grp_par[ptype_map.date0]);
+    }
+    obj->u[time_index][j] = iter->grp_par[ptype_map.u]*iter->pscal[0] + iter->pzero[0];
+    obj->v[time_index][j] = iter->grp_par[ptype_map.v]*iter->pscal[1] + iter->pzero[1];
+    obj->w[time_index][j] = iter->grp_par[ptype_map.w]*iter->pscal[2] + iter->pzero[2];
 
     if (debug>1) fprintf(stdout,"Adding vis. (u,v,w): %g,%g,%g. Bl: %f. Time: %f. N_baselines: %d\n",
                 obj->u[time_index][j], obj->v[time_index][j], obj->w[time_index][j], obj->baseline[time_index][j],
@@ -906,8 +956,8 @@ int writeUVFITSiterator(char *filename, uvdata *data, uvWriteContext **iter) {
     /* Write a keyword; must pass pointers to values */
     fits_update_key(fptr,TSTRING, "OBJECT", data->source->name, NULL, &status);
     dtemp = data->source->ra*15.0;    // FITS uses degrees for all angles
-    fits_update_key(fptr,TDOUBLE, "OBSRA", &dtemp, NULL, &status);
-    fits_update_key(fptr,TDOUBLE, "OBSDEC", &(data->source->dec), NULL, &status);
+    fits_update_key(fptr,TDOUBLE, "OBSRA", &dtemp, "deprecated. Use CTYPE RA key instead", &status);
+    fits_update_key(fptr,TDOUBLE, "OBSDEC", &(data->source->dec), "deprecated. Use CTYPE DEC key instead", &status);
     fits_update_key(fptr,TSTRING, "TELESCOP", data->array->name, NULL, &status);
     fits_update_key(fptr,TSTRING, "INSTRUME", data->array->instrument , NULL, &status);
     temp=2000.0;
@@ -1692,7 +1742,7 @@ int readFQTable(fitsfile *fptr,uvdata *obj) {
     // Check the number of rows matches the IFs already read, and the IF parameter matches also
     if(nrows != obj->n_IF || num_IF != obj->n_IF) {
         fprintf(stderr,
-                "readFQTable: ERROR: n_ows in IF table or NO_IF value does not match number of IFs in main data\n");
+                "readFQTable: ERROR: n_rows in IF table or NO_IF value does not match number of IFs in main data\n");
         status = -1; goto EXIT;
     }
    
