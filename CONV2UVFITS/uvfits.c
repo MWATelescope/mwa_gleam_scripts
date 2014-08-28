@@ -36,20 +36,6 @@
 
 #define MAX_CSIZE 8
 
-/* create a mapping for the index of the various items that are in the visibilities. Since there are optional
-   items, the index of an item in the group can change
-*/
-typedef struct {
-    int u;
-    int v;
-    int w;
-    int date;
-    int date0;  // try to support the non-standard CASA double-date format where this is the base date
-    int bl;
-    int su;
-    int fq;
-} ptype_mapping;
-
 
 /* private function prototypes */
 static int writeAntennaData(fitsfile *fptr, uvdata *data);
@@ -63,7 +49,6 @@ void addGroupRow(uvdata *obj, uvReadContext *iter);
 
 /* private global vars */
 static int debug=0;
-static ptype_mapping ptype_map;
 
 /******************************
  ! NAME:      uvfitsSetDebugLevel(
@@ -216,7 +201,6 @@ int readUVFITSInitIterator(char *filename, uvdata **data, uvReadContext **iterat
     uvReadContext *iter=NULL;
 
     /* init */
-    memset(&ptype_map,'\0',sizeof(ptype_mapping));
 
     /* open the file and get basic info*/
     status = readUVFITSOpenInit(filename, data, &fptr);
@@ -285,31 +269,31 @@ int readUVFITSInitIterator(char *filename, uvdata **data, uvReadContext **iterat
             // in this case, the first DATE is what should be in the CRVALs in the header, which is the
             // base date that the offsets in the visibilities are added to to get the JD
             // so copy over the index of the previous occurrance of DATE for date0
-            if (ptype_map.date != 0) {
-                ptype_map.date0 = ptype_map.date;
+            if (iter->ptype_map.date != 0) {
+                iter->ptype_map.date0 = iter->ptype_map.date;
             }
-            ptype_map.date = i;
+            iter->ptype_map.date = i;
         }
         if (strncmp("UU",typedesc,2)==0) {
             iter->pscal[0] = temp_pscal;
             iter->pzero[0] = temp_pzero;
-            ptype_map.u = i;
+            iter->ptype_map.u = i;
         }
         if (strncmp("VV",typedesc,2)==0) {
             iter->pscal[1] = temp_pscal;
             iter->pzero[1] = temp_pzero;
-            ptype_map.v = i;
+            iter->ptype_map.v = i;
         }
         if (strncmp("WW",typedesc,2)==0) {
             iter->pscal[2] = temp_pscal;
             iter->pzero[2] = temp_pzero;
-            ptype_map.w = i;
+            iter->ptype_map.w = i;
         }
         if (strncmp("BASELINE",typedesc,8)==0) {
-            ptype_map.bl = i;
+            iter->ptype_map.bl = i;
         }
         if (strncmp("FREQSEL",typedesc,7)==0) {
-            ptype_map.fq = i;
+            iter->ptype_map.fq = i;
         }
     }
     if(iter->base_date < 0.0) {
@@ -418,16 +402,16 @@ void addGroupRow(uvdata *obj, uvReadContext *iter) {
     long out_ind;
 
     j = obj->n_baselines[time_index];
-    obj->baseline[time_index][j] = iter->grp_par[ptype_map.bl];
-    obj->date[time_index] = iter->grp_par[ptype_map.date]+iter->base_date;
+    obj->baseline[time_index][j] = iter->grp_par[iter->ptype_map.bl];
+    obj->date[time_index] = iter->grp_par[iter->ptype_map.date]+iter->base_date;
     // handle special non-standard CASA dates
-    if (ptype_map.date0 != 0) {
-        obj->date[time_index] = (double) iter->grp_par[ptype_map.date] + (double) iter->grp_par[ptype_map.date0];
-        //printf("Date: %f, date0: %f\n",iter->grp_par[ptype_map.date],iter->grp_par[ptype_map.date0]);
+    if (iter->ptype_map.date0 != 0) {
+        obj->date[time_index] = (double) iter->grp_par[iter->ptype_map.date] + (double) iter->grp_par[iter->ptype_map.date0];
+        //printf("Date: %f, date0: %f\n",iter->grp_par[iter->ptype_map.date],iter->grp_par[iter->ptype_map.date0]);
     }
-    obj->u[time_index][j] = iter->grp_par[ptype_map.u]*iter->pscal[0] + iter->pzero[0];
-    obj->v[time_index][j] = iter->grp_par[ptype_map.v]*iter->pscal[1] + iter->pzero[1];
-    obj->w[time_index][j] = iter->grp_par[ptype_map.w]*iter->pscal[2] + iter->pzero[2];
+    obj->u[time_index][j] = iter->grp_par[iter->ptype_map.u]*iter->pscal[0] + iter->pzero[0];
+    obj->v[time_index][j] = iter->grp_par[iter->ptype_map.v]*iter->pscal[1] + iter->pzero[1];
+    obj->w[time_index][j] = iter->grp_par[iter->ptype_map.w]*iter->pscal[2] + iter->pzero[2];
 
     if (debug>1) fprintf(stdout,"Adding vis. (u,v,w): %g,%g,%g. Bl: %f. Time: %f. N_baselines: %d\n",
                 obj->u[time_index][j], obj->v[time_index][j], obj->w[time_index][j], obj->baseline[time_index][j],
