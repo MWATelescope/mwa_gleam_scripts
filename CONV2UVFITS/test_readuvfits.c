@@ -83,7 +83,7 @@ int main(int argc, char *argv[]) {
     /* print a few vis values */
     for (i=0; i<10; i++) {
         int f,p;
-        fprintf(stdout,"u,v,w: %g,%g,%g. Baseline: %f.\n",data_new->u[0][i],data_new->v[0][i],data_new->w[0][i],data_new->baseline[0][i]);
+        fprintf(stdout,"u,v,w: %g,%g,%g. Baseline: %.6f.\n",data_new->u[0][i],data_new->v[0][i],data_new->w[0][i],data_new->baseline[0][i]);
         for (f=0; f<data_new->n_freq; f++) {
             fprintf(stdout,"Freq %g ",data_new->cent_freq +data_new->freq_delta*(f-data_new->n_freq/2));
             for(p=0; p<data_new->n_pol; p++) {

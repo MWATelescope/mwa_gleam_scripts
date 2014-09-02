@@ -253,7 +253,7 @@ EoR.logs.create_table_row = function(v, post_button){
   }
 
   return $("<tr/>").attr("id", "log_tr_"+v.id)
-    .append($("<td/>").text(o_d.getUTCFullYear() + "-" + (o_d.getUTCMonth()+1) + "-" + o_d.getUTCDate()))
+    .append($("<td/>").addClass("date-cell").text(o_d.getUTCFullYear() + "-" + (o_d.getUTCMonth()+1) + "-" + o_d.getUTCDate()))
     .append($("<td/>").text(v.author_user_name))
     .append($("<td/>").text(v.note))
     .append($("<td/>").html(EoR.logs.get_tags_str_from_values(v.tags)))
