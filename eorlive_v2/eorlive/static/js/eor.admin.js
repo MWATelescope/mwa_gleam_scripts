@@ -1,7 +1,44 @@
-EoR.admin = {};
 
+/***************************************************
+ Replace some functions and properties in EoR module
+****************************************************/
 EoR.pages = ["users"];
 EoR.transitioned_to = [false];
+
+EoR.logout = function(e){
+  $.ajax({
+    method: "POST",
+    url: "/api/logout",
+    type: "json",
+    success: function(){
+      window.location = "/";
+    },
+    error: function(xhr, status, err){
+      alert("something went wrong...");
+    }
+  });
+};
+
+EoR.onPageTransition = function(page_id){
+  //console.log("onPageTransition  " + page_id);
+  var index = EoR.pages.indexOf(page_id);
+  if(!page_id) page_id = "_null";
+  var transitioned_to = EoR.transitioned_to[index];
+
+  switch(page_id){
+    case 'users':
+      break;
+  }
+
+  EoR.transitioned_to[index] = true;
+}
+
+
+/*****************************
+ EoR admin module starts here
+*****************************/
+
+EoR.admin = {};
 
 EoR.admin.init = function(){
 
@@ -22,7 +59,7 @@ EoR.admin.init = function(){
   $(window).on('hashchange', hashChanged);
   hashChanged();
 
-  EoR.render_logged_in_message();
+  EoR.show_logged_in_message();
 
   EoR.admin.render_users_ui();
   EoR.admin.fetch_users();
