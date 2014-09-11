@@ -98,6 +98,21 @@ typedef struct _uvdata {
     fq_table *fq;         /* pointer to array of FQ table for multi-IF data */
 } uvdata;
 
+/* create a mapping for the index of the various items that are in the visibilities. Since there are optional
+   items, the index of an item in the group can change so this maps the item to the index in the group.
+*/
+typedef struct {
+    int u;
+    int v;
+    int w;
+    int date;
+    int date0;  // try to support the non-standard CASA double-date format where this is the base date
+    int bl;
+    int su;
+    int fq;
+} ptype_mapping;
+
+
 /* context data structure for iterative reading of UVFITS files */
 typedef struct {
     int pcount,gcount,grp_index;
@@ -105,6 +120,7 @@ typedef struct {
     double base_date;         // date in PZERO5 which is the JD of the obs.
     float *grp_par, *grp_row;
     void *fptr;
+    ptype_mapping ptype_map;
 } uvReadContext;
 
 /* context data structure for iterative writing of UVFITS files */
