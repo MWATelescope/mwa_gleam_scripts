@@ -22,8 +22,18 @@ cfitsio_pkg_result=$?
 if [ $cfitsio_pkg_result -ne 0 ] && [ -z $CFITSIO ]
 then
   echo '$CFITSIO is not set, using internal CFITSIO'
-  export CFITSLIB=../cfitsio/
-  export CFITSINC=../cfitsio/
+  if [[ ! $CFITSLIB ]]
+  then
+      export CFITSLIB=../cfitsio/
+  else
+      "CFITSLIB environment variable set to $CFITSLIB; overwriting default"
+  fi
+  if [[ ! $CFITSINC ]]
+  then
+      export CFITSINC=../cfitsio/
+  else
+      "CFITSINC environment variable set to $CFITSINC; overwriting default"
+  fi
   cd cfitsio
   ./configure
   make
