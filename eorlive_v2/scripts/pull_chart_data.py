@@ -163,7 +163,7 @@ def update():
   # UVFITS hours
   total_uvfits_hours = float (send_mwa_query(
     '''
-    SELECT COUNT(*) FROM uvfits_location WHERE version = 3 AND subversion = 1
+    SELECT COUNT(*) FROM uvfits_location WHERE version = 4 AND subversion = 1
     ''').fetchone()[0] ) * 112. / 3600.
 
   write_to_log("total_uvvits_hours query ran in %f seconds" %profile())
