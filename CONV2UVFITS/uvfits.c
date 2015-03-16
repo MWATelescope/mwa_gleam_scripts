@@ -1204,12 +1204,24 @@ int writeAntennaData(fitsfile *fptr, uvdata *data) {
 
     /* create a new binary table */
     fits_create_tbl(fptr,BINARY_TBL,0, 11 ,col_names, col_format,col_units,"AIPS AN", &status);
+    if (status) {
+        fits_report_error(stderr,status);
+        fprintf(stderr,"%s: failed to create antenna table\n",__func__);
+        return status;
+    }
 
     /* write table header info */
     fits_update_key(fptr,TDOUBLE,"ARRAYX", &(data->array->xyz_pos[0]), NULL, &status);
     fits_update_key(fptr,TDOUBLE,"ARRAYY", &(data->array->xyz_pos[1]), NULL, &status);
     fits_update_key(fptr,TDOUBLE,"ARRAYZ", &(data->array->xyz_pos[2]), NULL, &status);
-    fits_update_key(fptr,TFLOAT,"FREQ", &(data->cent_freq) , NULL, &status);
+    fits_update_key(fptr,TFLOAT,"FREQ", &(data->cent_freq) , "[Hz]", &status);
+    if (status) {
+        fits_report_error(stderr,status);
+        fprintf(stderr,"%s: WARNING: failed to add array/freq keywords to antenna table\n",__func__);
+        fprintf(stderr,"%s: vals were: ARRAY X,Y,Z: %g,%g,%g freq: %g\n",__func__, data->array->xyz_pos[0],
+                    data->array->xyz_pos[1], data->array->xyz_pos[2], data->cent_freq);
+        fits_clear_errmsg(); status=0;
+    }
 
     /* GSTIAO is the GST at zero hours in the time system of TIMSYS (i.e. UTC) */
     mjd = trunc(data->date[0] - 2400000.5);
@@ -1239,10 +1251,10 @@ int writeAntennaData(fitsfile *fptr, uvdata *data) {
     fits_update_key(fptr,TINT,"FREQID",&itemp, NULL, &status);
     temp= slaDat(mjd);
     fits_update_key(fptr,TDOUBLE,"IATUTC",&temp , NULL, &status);
-
     if (status) {
-        fprintf(stderr,"writeAntennaData: status %d writing header info\n",status);
-        return status;
+        fits_report_error(stderr,status);
+        fprintf(stderr,"%s: WARNING: failed to add keywords to antenna table\n",__func__);
+        fits_clear_errmsg(); status=0;
     }
 
     /* write data row by row. CFITSIO automatically adjusts the size of the table */
