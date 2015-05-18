@@ -139,7 +139,7 @@ then
                         dependency="$depend=afterok:${dljobnum}"
                     else
 # Make it dependent on anything that's already downloading, to avoid hammering the storage server
-                        lastdljob=`squeue -u $USER | grep dl_  | sort | tail -1 | awk '{print $1}'`
+                        lastdljob=`$qsub -u $USER | grep dl_  | sort | tail -1 | awk '{print $1}'`
                         if [[ $lastdljob != "" ]]
                         then
                             dependency="$depend=afterany:$lastdljob"
