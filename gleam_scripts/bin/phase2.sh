@@ -58,9 +58,11 @@ if [[ $scheduler == "slurm" ]]
 then
     qsub="sbatch"
     depend="--dependency"
+    qstat="squeue"
 else
     qsub="qsub"
     depend="-W depend"
+    qstat="qstat"
 fi
 
 # Chose a batch size that compromises number of jobs submitted to queue and /short space used
@@ -139,7 +141,7 @@ then
                         dependency="$depend=afterok:${dljobnum}"
                     else
 # Make it dependent on anything that's already downloading, to avoid hammering the storage server
-                        lastdljob=`$qsub -u $USER | grep dl_  | sort | tail -1 | awk '{print $1}'`
+                        lastdljob=`$qstat -u $USER | grep dl_  | sort | tail -1 | awk '{print $1}'`
                         if [[ $lastdljob != "" ]]
                         then
                             dependency="$depend=afterany:$lastdljob"
