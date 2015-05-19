@@ -301,18 +301,20 @@ then
                 fi
             fi
         fi
-    fi
 # Don't use the initial image to get the threshold -- use the testfile, which is either from the
 # observation you got the solutions from, or from the previous run
-    if [[ -e testfile.fits ]]
-    then
         newthreshold=`fitshdr testfile.fits 2>>/dev/null | grep WSCTHRES | awk '{print $NF}'`
-        imsize=`fitshdr testfile.fits 2>>/dev/null | grep NAXIS1 | awk '{print $3}'`
     else
-        echo "No testfile so having to guess clean threshold -- trying 20mJy!"
-        newthreshold=0.02
-        echo "No testfile so having to guess image size -- trying 4000px!"
-        imsize=4000
+        if [[ -e testfile.fits ]]
+        then
+            newthreshold=`fitshdr testfile.fits 2>>/dev/null | grep WSCTHRES | awk '{print $NF}'`
+            imsize=`fitshdr testfile.fits 2>>/dev/null | grep NAXIS1 | awk '{print $3}'`
+        else
+            echo "No testfile so having to guess clean threshold -- trying 20mJy!"
+            newthreshold=0.02
+            echo "No testfile so having to guess image size -- trying 4000px!"
+            imsize=4000
+        fi
     fi
     # super-deep clean with sub-bands
     for robust in $robusts
