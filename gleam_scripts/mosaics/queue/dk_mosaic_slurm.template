@@ -18,8 +18,8 @@
 #SBATCH --time=12:00:00
 #SBATCH --nodes=1
 #SBATCH --mem=HOSTMEMgb
-#SBATCH --output=QUEUEDIR/OUTPUT.o%j_%a
-#SBATCH --error=QUEUEDIR/OUTPUT.e%j_%a
+#SBATCH --output=QUEUEDIR/OUTPUT.o%A_%a
+#SBATCH --error=QUEUEDIR/OUTPUT.e%A_%a
 #SBATCH --array=0-3
 
 aprun="aprun -n 1 -d NCPUS "
