@@ -99,9 +99,13 @@ then
     docal="False"
 # To get the deconvolution threshold
     testfile=`ls ${solobs}_${freq}_XX_r*.0_v2.0.fits | head -1`
+    if [[ ! -e $testfile ]]
+    then
+        testfile=`ls ${solobs}/${solobs}_${freq}_XX_r*.0_v2.0.fits | head -1`
+    fi
     if [[ -e $testfile ]]
     then
-        mv $testfile $obsnum/testfile.fits
+        cp $testfile $obsnum/testfile.fits
     fi
     if [[ -e $solobs/solutions.bin ]]
     then
