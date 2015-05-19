@@ -1,3 +1,5 @@
+#!/bin/bash
+
 # Substituted by phase2.sh
 obsnum=OBSNUM
 datadir=DATADIR
@@ -5,15 +7,10 @@ absmem=HOSTMEM
 proj=PROJ
 chan=CHAN
 ncpus=NCPUS
+solobs=SOLOBS
 
 # Significance of sources to search for
 nsigma=8
-# Significance of sources to trust for rescaling factor
-nsigma_clip_init=30
-nsigma_clip_deep=100
-# Allowable RMS in picking sources for rescaling factor (Jy)
-rms_init=1.0
-rms_deep=0.5
 # Polarisations to generate using pbcorrect
 pols="I Q U V"
 # Polarisations to rescale
@@ -94,6 +91,31 @@ then
 else
     echo "No tarball provided; exiting."
     exit 1
+fi
+
+# Try to get solutions from another observation, if you're going to use them
+if [ ! -z ${solobs+x} ]
+then
+    docal="False"
+# To get the deconvolution threshold
+    testfile=`ls ${solobs}_${freq}_XX_r*.0_v2.0.fits | head -1`
+    if [[ -e $testfile ]]
+    then
+        mv $testfile $obsnum/testfile.fits
+    fi
+    if [[ -e $solobs/solutions.bin ]]
+    then
+        cp $solobs/solutions.bin $obsnum/$solobs-solutions.bin
+        cp $solobs/peel_test.txt $obsnum/$solobs-peel_test.txt
+    elif [[ -e ${solobs}_phase2.tar.gz ]]
+    then
+        tar -I pigz -xf ${solobs}_phase2.tar.gz $solobs/solutions.bin $solobs/peel_test.txt
+        cp $solobs/solutions.bin $obsnum/$solobs-solutions.bin
+        cp $solobs/peel_test.txt $obsnum/$solobs-peel_test.txt
+    else
+        echo "No solutions.bin file from $solobs could be found!"
+        exit 1
+    fi
 fi
 
 if [[ -d $obsnum ]]
@@ -205,7 +227,7 @@ then
         pyhead.py -u IMAGERMS $rms ${root}.fits
         if [[ ! -e ${root}_comp.vot ]]
         then
-            echo "Aegean failed to run on the initial image, so source-rescaling will fail. Terminating the job now."
+            echo "Aegean failed to run on the initial image, so self-calibration will fail. Terminating the job now."
             exit 1
         fi
 
@@ -243,17 +265,50 @@ then
 
         rms=`rms_measure.py -f ${obsnum}_initial-YY-residual.fits`
         newthreshold=`echo "$rms * 3" | bc -l`
-    else
-        if [[ -e testfile.fits ]]
+    elif [[ ! -z ${solobs+x} ]]
+    then
+# Use transferred solutions from another observation
+# Slightly different order: apply the good solutions before peeling
+# Apply to CORRECTED_DATA if the old dataset got peeled, DATA otherwise
+        if grep -q "Peel out source" $solobs-peel_test.txt
         then
-            newthreshold=`fitshdr testfile.fits 2>>/dev/null | grep WSCTHRES | awk '{print $NF}'`
-            imsize=`fitshdr testfile.fits 2>>/dev/null | grep NAXIS1 | awk '{print $3}'`
-        else
-            echo "No testfile so having to guess clean threshold -- trying 20mJy!"
-            newthreshold=0.02
-            echo "No testfile so having to guess image size -- trying 4000px!"
-            imsize=4000
+            caldatacolumn="-datacolumn CORRECTED_DATA"
         fi
+        time applysolutions $caldatacolumn -copy ${obsnum}.ms $solobs-solutions.bin
+    # Re-run flagger to catch any broken channels after self-calibration
+        aoflagger -v -column CORRECTED_DATA ${obsnum}.ms
+
+        if grep -q "Peel out source" peel_test.txt
+        then
+            # Check to see whether it's double sources, first
+            if grep -q "Runner-up source" peel_test.txt
+            then
+                echo "Double sources detected: no peeling, but image size increased to 5000."
+                imsize=5000
+            else
+                src=`grep "Peel out source" peel_test.txt  | awk '{print $NF}'`
+                dist=`grep $src peel_test.txt  | grep distance | awk '{print $4}' | awk 'BEGIN {FS="="} {print int($2)}'`
+                maxdist=`echo "2200 / $chan" | bc -l | awk '{print int($1)}'`
+                if [[ $dist -gt $maxdist ]]
+                then
+                    autoprocess -noselfcal -go $model ${obsnum}.ms
+                else
+                    echo "Source $src will lie within the imaged field-of-view so doesn't need peeling."
+                fi
+            fi
+        fi
+    fi
+# Don't use the initial image to get the threshold -- use the testfile, which is either from the
+# observation you got the solutions from, or from the previous run
+    if [[ -e testfile.fits ]]
+    then
+        newthreshold=`fitshdr testfile.fits 2>>/dev/null | grep WSCTHRES | awk '{print $NF}'`
+        imsize=`fitshdr testfile.fits 2>>/dev/null | grep NAXIS1 | awk '{print $3}'`
+    else
+        echo "No testfile so having to guess clean threshold -- trying 20mJy!"
+        newthreshold=0.02
+        echo "No testfile so having to guess image size -- trying 4000px!"
+        imsize=4000
     fi
     # super-deep clean with sub-bands
     for robust in $robusts
@@ -267,7 +322,7 @@ then
         else
             dec=`get_central_dec.py -f ${obsnum}_deeper-MFS-XX-image.fits --round`
         fi
-# After imaging, make and rescale the polarised images
+# After imaging, make the polarised images
         # Generate sub-channel beams
         for subchan in $subchans
         do
@@ -337,7 +392,7 @@ then
             copy_metafitsheader.py -v -m ${obsnum}_deeper-0001-${pol}-image.fits -i ${obsnum}_deeper-MFS-${pol}-image.fits
         done
 
-# Source-finding and rescaling
+# Source-finding
 # Do all the calculations on the Stokes I MFS images, and apply to all pols and all sub-bands
         root=${obsnum}_deeper-MFS-I-image
         $aprun aegean_snapshot.sh ${root}.fits bane compress

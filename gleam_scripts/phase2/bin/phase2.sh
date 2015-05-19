@@ -74,17 +74,37 @@ then
     filelist=$1
     proj=$2
     chan=$3
-# Do we do all of the self-cal, or just download a calibrated measurement set?
-    if [ -z ${4+x} ]
+# Do we do all of the self-cal from scratch, download a self-calibrated ms, or use a transferred solution from another observation?
+# Download a self-calibrated measurement set
+    if [[ $4 == "phase2" ]]
     then
         phase="_phase2"
+        solobs=""
+# Do all of the self-cal from scratch
+    elif [[ $4 == "self" ]]
+    then
+        phase=""
+        solobs=""
+# Use a transferred solution from another observation
     else
         phase=""
+        solobs=$4
     fi
 
     if [[ ! -d $datadir/$proj ]]
     then
         mkdir $datadir/$proj
+    fi
+
+# If we need a solution from another observation, get that downloading
+    if [[ ! -d $datadir/$proj/$solobs && ! -e $datadir/$proj/${solobs}_phase2.tar.gz ]]
+    then
+        dlscript="dl_${solobs}.sh"
+        cat dl_icrar_${scheduler}.template  | sed "s;GROUPQ;${groupq};g" | sed "s;COPYQ;${copyq};g" | sed "s;QUEUEDIR;${queuedir};g" | sed "s;OUTPUT;${dlscript};g" > $dlscript
+        cat dl_icrar_head.template  | sed "s;PROJ;${proj};g" | sed "s;DATADIR;$datadir;g" | sed "s;CHAN;${chan};g" | sed "s;PHASE;${phase};g" >> $dlscript
+        cat dl_scald_body.template | sed "1,25s;SOLOBS;${solobs};g" >> dl_$solobs.sh
+# Only one observation, so no worries about dependencies
+        $qsub $dlscript
     fi
 
     if [[ -e $filelist ]]
@@ -123,7 +143,7 @@ then
             if [[ ! -e $datadir/$proj/${obsnum}_images.tar ]]
             then
                 cat phase2_${scheduler}.template | sed "1,25s;GROUPQ;${groupq};g" | sed "1,25s;STANDARDQ;${standardq};g" | sed "1,25s;HOSTMEM;${hostmem};g" | sed "1,25s;NCPUS;${ncpus};g" | sed "1,25s;HOMEDIR;${HOME};g" | sed "1,25s;OUTPUT;p2_${obsident};" > p2_${obsident}.sh
-                cat phase2_body.template | sed "1,25s;HOSTMEM;${hostmem};g" | sed "1,25s;NCPUS;${ncpus};g" | sed "1,25s;OBSNUM;${obsnum};g" |  sed "1,25s;DATADIR;${datadir};g" | sed "1,25s;PROJ;${proj};g" | sed "1,25s;CHAN;${chan};g" >> p2_${obsident}.sh
+                cat phase2_body.template | sed "1,25s;HOSTMEM;${hostmem};g" | sed "1,25s;NCPUS;${ncpus};g" | sed "1,25s;OBSNUM;${obsnum};g" |  sed "1,25s;DATADIR;${datadir};g" | sed "1,25s;PROJ;${proj};g" | sed "1,25s;CHAN;${chan};g" | sed "1,25s;SOLOBS;${solobs};g" >> p2_${obsident}.sh
                 (( img+=1 ))
             fi
             cat up_icrar_body.template | sed "s;OBSNUM;${obsnum};g" |  sed "s;DATADIR;${datadir};g"  | sed "s;PROJ;${proj};g" | sed "s;NGASCOMMANDS;$ngascommands;g" | sed "s;NGASTESTCOMMANDS;${ngastestcommands};g" >> up_${batchident}_${l}.sh
