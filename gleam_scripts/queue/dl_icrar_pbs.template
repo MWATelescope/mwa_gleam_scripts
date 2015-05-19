@@ -1,9 +1,0 @@
-#!/bin/bash -l
-
-# Download calibrated measurement set
-
-#PBS -P GROUPQ
-#PBS -q COPYQ
-#PBS -l walltime=10:00:00
-#PBS -l ncpus=1
-#PBS -l mem=100mb
