@@ -1,0 +1,105 @@
+date=DATE
+chan=CHAN
+version=VERSION
+datadir=DATADIR
+imagedir=IMAGEDIR
+proj=PROJ
+
+cd $datadir/$proj
+
+subchans="0 1 2 3"
+
+q="select mwas.starttime, mwas.obsname
+from mwa_setting as mwas
+join rf_stream as rfs using (starttime)
+join schedule_metadata as sm on (mwas.starttime = sm.observation_number)
+where mwas.starttime between gps_seconds('$date') and
+                              gps_seconds('$date')+86400 and
+mwas.projectid='G0008'
+and mwas.mode='HW_LFILES'
+and mwas.obsname LIKE 'FDS_DE%'
+and rfs.frequencies[24] - rfs.frequencies[1] = 23
+and rfs.frequencies[13] = $chan
+order by starttime asc;"
+
+obslist=`psql -A -t -c "$q" | tr "|" " " | awk '{print $1}'`
+
+if [[ $obslist == "" ]]
+then
+    echo "No observations in list."
+    exit 1
+fi
+
+if [[ ! -d ${date} ]]
+then
+    mkdir ${date}
+fi
+if [[ ! -d ${date}/${chan} ]]
+then
+    mkdir ${date}/${chan}
+fi
+
+cd ${date}/${chan}
+for subchan in $subchans
+do
+    if [[ ! -d subchan$subchan ]]
+    then
+        mkdir subchan$subchan
+    else
+        if [[ -e subchan$subchan/download.log ]]
+        then
+            rm subchan$subchan/download.log
+        fi
+    fi
+done
+
+for file in $obslist
+do
+    for subchan in $subchans
+    do
+        cd subchan$subchan
+
+        if ! ls mosaic* 1>> /dev/null 2>> /dev/null
+        then
+
+            lochan=`echo "($chan*1.2799270072)-(30.72/2)+(7.68*($subchan))" | bc -l | awk 'BEGIN {FS="."} {printf("%03d",$1)}'`
+            hichan=`echo "($chan*1.2799270072)-(30.72/2)+(7.68*($subchan+1))" | bc -l | awk 'BEGIN {FS="."} {printf("%03d",$1)}'`
+    # almost entirely right but I can't get 119 MHz...
+            if [[ $hichan == "119" ]]
+            then
+                hichan=118
+            fi
+            if [[ $lochan == "119" ]]
+            then
+                lochan=118
+            fi
+
+            fitsimages="${file}_${lochan}-${hichan}MHz_I_r-1.0_v${version}.fits ${file}_${lochan}-${hichan}MHz_XX_r-1.0_v${version}.fits ${file}_${lochan}-${hichan}MHz_YY_r-1.0_v${version}.fits "
+            for fitsimage in $fitsimages
+            do
+                if [[ ! -e $fitsimage ]]
+                then
+                    if [[ -e $imagedir/$proj/$file/$fitsimage ]]
+                    then
+                        echo "Copying $fitsimage from $imagedir/$proj/$file." | tee -a download.log
+                        cp $imagedir/$proj/$file/$fitsimage ./
+                    else
+                        echo "Downloading $fitsimage." | tee -a download.log
+                        wget --quiet -O $fitsimage  http://store04.icrar.org:7777/RETRIEVE?file_id=$fitsimage
+                    fi
+                else
+                    echo "Using existing version of $fitsimage." | tee -a download.log
+                fi
+                if [[ ! -e $fitsimage || ! -s $fitsimage ]]
+                then
+                    echo "$fitsimage failed to download..."
+                    rm $fitsimage
+                fi
+            done
+            cd ../
+        else
+            echo "Mosaics already exist for ${date}/${chan}/subchan${subchan} ; not downloading extra images."
+        fi
+    done
+done
+

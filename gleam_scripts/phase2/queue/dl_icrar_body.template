@@ -1,0 +1,32 @@
+obsnum=OBSNUM
+
+if [[ ! -e ${obsnum}${phase}.tar.gz && ! -d ${obsnum} ]]
+then
+    wget --quiet -O ${obsnum}${phase}.tar.gz http://store04.icrar.org:7777/RETRIEVE?file_id=${obsnum}${phase}.tar.gz
+    if [[ ! -s ${obsnum}${phase}.tar.gz ]]
+    then
+        echo "Latest version of the ${obsnum} tarball had zero size; please check the trig server!"
+        rm ${obsnum}${phase}.tar.gz
+    else
+        if [[ ${phase} == "_phase2" ]]
+        then
+            testfile=${obsnum}_${freq}_XX_r-1.0_v2.0.fits
+            wget --quiet -O  $testfile  http://store04.icrar.org:7777/RETRIEVE?file_id=$testfile
+            if [[ ! -s $testfile ]]
+            then
+                rm $testfile
+                testfile=${obsnum}_${freq}_XX_r0.0_v2.0.fits
+                wget --quiet -O  $testfile  http://store04.icrar.org:7777/RETRIEVE?file_id=$testfile
+            fi
+            if [[ ! -s $testfile ]]
+            then
+                echo "Could not download a test image for the Phase 2 observation ${obsnum}; will not be able to clean to a particular threshold."
+                rm $testfile
+            fi
+        fi
+    fi
+else
+    echo "${obsnum}${phase}.tar.gz or ${obsnum} already exists!"
+    ls -hltd ${obsnum}*
+fi
+

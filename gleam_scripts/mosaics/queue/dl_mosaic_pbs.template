@@ -1,0 +1,10 @@
+#!/bin/bash
+
+# Download images ready to mosaic
+
+#PBS -W group_list=GROUPQ
+#PBS -q COPYQ
+#PBS -l walltime=05:00:00
+#PBS -l mem=100mb
+
+module load python/2.6.9 numpy/1.6.2 scipy/0.11.0 openmpi astropy blist
