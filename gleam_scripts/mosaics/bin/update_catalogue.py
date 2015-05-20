@@ -27,6 +27,8 @@ parser.add_option('--bimage',dest="bimage",default=None,
                   help="Input minor axis (b) image to use (default = catalogue_b.fits).")
 parser.add_option('--paimage',dest="paimage",default=None,
                   help="Input position angle (pa) image to use (default = catalogue_pa.fits).")
+parser.add_option('--avcat',dest="avcat",default=None,
+                  help="Input PSF catalogue to use instead of PSF images (default = catalogue_psf.vot).")
 parser.add_option('--output',dest="output",default=None,
                   help="Output catalogue file (default = catalogue_mod.vot).")
 (options, args) = parser.parse_args()
@@ -38,22 +40,25 @@ if not os.path.exists(options.catalogue):
     sys.exit(1)
 else:
     catfile=options.catalogue
-    if options.psfimage:
-        psfimage=options.psfimage
+    if options.avcat:
+        avcat=catfile.replace('_comp.vot','_psf.vot')
     else:
-        psfimage=catfile.replace('_comp.vot','_int_peak.fits')
-    if options.aimage:
-        aimage=options.aimage
-    else:
-        aimage=catfile.replace('_comp.vot','_a.fits')
-    if options.bimage:
-        bimage=options.bimage
-    else:
-        bimage=catfile.replace('_comp.vot','_b.fits')
-    if options.paimage:
-        paimage=options.paimage
-    else:
-        paimage=catfile.replace('_comp.vot','_pa.fits')
+        if options.psfimage:
+            psfimage=options.psfimage
+        else:
+            psfimage=catfile.replace('_comp.vot','_int_peak.fits')
+        if options.aimage:
+            aimage=options.aimage
+        else:
+            aimage=catfile.replace('_comp.vot','_a.fits')
+        if options.bimage:
+            bimage=options.bimage
+        else:
+            bimage=catfile.replace('_comp.vot','_b.fits')
+        if options.paimage:
+            paimage=options.paimage
+        else:
+            paimage=catfile.replace('_comp.vot','_pa.fits')
     if options.output:
         output=options.output
     else:
@@ -64,33 +69,46 @@ else:
 table = parse_single_table(catfile)
 data = table.array
 
-psf_in = fits.open(psfimage)
-w = wcs.WCS(psf_in[0].header,naxis=2)
+if options.avcat:
+    psf_table = parse_single_table(avcat)
+    psf_data = psf_table.array
+    psf_ratio=np.average(a=(psf_data['int_flux']/psf_data['peak_flux']),weights=(np.power(psf_data['peak_flux']/psf_data['local_rms'],2)))
+    print "Simply scaling the integrated fluxes by a direction-independent factor of "+str(psf_ratio)
+    data['int_flux']/=psf_ratio
+    vot = Table(data)
+    # description of this votable
+    vot.description = "Corrected for position-independent PSF variation"
+    writetoVO(vot, output)
 
-unmara, unmadec = np.array(data['ra']).tolist(), np.array(data['dec']).tolist()
-rapix, decpix = w.wcs_world2pix(unmara,unmadec,1)
-raintpix, decintpix = np.array(np.round(rapix),dtype=int), np.array(np.round(decpix),dtype=int)
-raclip, decclip = np.clip(raintpix,0,psf_in[0].data.shape[1]-1), np.clip(decintpix,0,psf_in[0].data.shape[0]-1)
-# Yes, it's bonkers that the wcs is the other way round compared to the fits file
-psf_ratio = psf_in[0].data[decclip,raclip]
+else:
+    psf_in = fits.open(psfimage)
+    w = wcs.WCS(psf_in[0].header,naxis=2)
 
-# Scale the integrated fluxes
-data['int_flux']/=psf_ratio
-vot = Table(data)
+    unmara, unmadec = np.array(data['ra']).tolist(), np.array(data['dec']).tolist()
+    rapix, decpix = w.wcs_world2pix(unmara,unmadec,1)
+    raintpix, decintpix = np.array(np.round(rapix),dtype=int), np.array(np.round(decpix),dtype=int)
+    raclip, decclip = np.clip(raintpix,0,psf_in[0].data.shape[1]-1), np.clip(decintpix,0,psf_in[0].data.shape[0]-1)
+    # Yes, it's bonkers that the wcs is the other way round compared to the fits file
+    psf_ratio = psf_in[0].data[decclip,raclip]
 
-# Get the PSF information
-a_in = fits.open(aimage)
-b_in = fits.open(bimage)
-pa_in = fits.open(paimage)
-a = a_in[0].data[decclip,raclip]
-b = b_in[0].data[decclip,raclip]
-pa = pa_in[0].data[decclip,raclip]
+    # Get the PSF information
+    a_in = fits.open(aimage)
+    b_in = fits.open(bimage)
+    pa_in = fits.open(paimage)
+    a = a_in[0].data[decclip,raclip]
+    b = b_in[0].data[decclip,raclip]
+    pa = pa_in[0].data[decclip,raclip]
 
-# Add the PSF columns
-vot.add_column(Column(data=a,name='a_psf'))
-vot.add_column(Column(data=b,name='b_psf'))
-vot.add_column(Column(data=pa,name='pa_psf'))
+    # Scale the integrated fluxes
+    data['int_flux']/=psf_ratio
 
-# description of this votable
-vot.description = "Corrected for PSF variation"
-writetoVO(vot, output)
+    vot = Table(data)
+
+    # Add the PSF columns
+    vot.add_column(Column(data=a,name='a_psf'))
+    vot.add_column(Column(data=b,name='b_psf'))
+    vot.add_column(Column(data=pa,name='pa_psf'))
+
+    # description of this votable
+    vot.description = "Corrected for position-dependent PSF variation"
+    writetoVO(vot, output)
