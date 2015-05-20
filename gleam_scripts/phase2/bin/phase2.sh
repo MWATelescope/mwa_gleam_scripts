@@ -78,15 +78,18 @@ then
 # Download a self-calibrated measurement set
     if [[ $4 == "phase2" ]]
     then
+        echo "Simply imaging existing Phase 2 measurement sets."
         phase="_phase2"
         solobs=""
 # Do all of the self-cal from scratch
     elif [[ $4 == "self" ]]
     then
+        echo "Running fresh self-cal using Phase 1 measurement sets."
         phase=""
         solobs=""
 # Use a transferred solution from another observation
     else
+        echo "Using transferred solutions from observation $4"
         phase=""
         solobs=$4
     fi

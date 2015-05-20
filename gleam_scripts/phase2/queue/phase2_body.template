@@ -76,25 +76,30 @@ then
     mkdir pbeams
 fi
 
-if [[ -e ${obsnum}.tar.gz && ! -e ${osbnum}_phase2.tar.gz ]]
+if [[ ! -d ${obsnum} ]]
 then
-    $aprun tar -I pigz -xf ${obsnum}.tar.gz
-    rm ${obsnum}.tar.gz
-    docal="True"
-elif [[ -e ${obsnum}_phase2.tar.gz ]]
-then
-    $aprun tar -I pigz -xf ${obsnum}_phase2.tar.gz
-    rm ${obsnum}_phase2.tar.gz
-    docal="False"
-    testfile=`ls ${obsnum}_${freq}_XX_r*.0_v2.0.fits`
-    mv $testfile ${obsnum}/testfile.fits
+    if [[ -e ${obsnum}.tar.gz && ! -e ${osbnum}_phase2.tar.gz ]]
+    then
+        $aprun tar -I pigz -xf ${obsnum}.tar.gz
+        rm ${obsnum}.tar.gz
+        docal="True"
+    elif [[ -e ${obsnum}_phase2.tar.gz ]]
+    then
+        $aprun tar -I pigz -xf ${obsnum}_phase2.tar.gz
+        rm ${obsnum}_phase2.tar.gz
+        docal="False"
+        testfile=`ls ${obsnum}_${freq}_XX_r*.0_v2.0.fits`
+        mv $testfile ${obsnum}/testfile.fits
+    else
+        echo "No tarball provided; exiting."
+        exit 1
+    fi
 else
-    echo "No tarball provided; exiting."
-    exit 1
+    echo "Resuming from existing directory."
 fi
 
 # Try to get solutions from another observation, if you're going to use them
-if [ ! -z ${solobs+x} ]
+if [[ ${solobs} != "" ]]
 then
     docal="False"
 # To get the deconvolution threshold
@@ -269,7 +274,7 @@ then
 
         rms=`rms_measure.py -f ${obsnum}_initial-YY-residual.fits`
         newthreshold=`echo "$rms * 3" | bc -l`
-    elif [[ ! -z ${solobs+x} ]]
+    elif [[ ${solobs} != "" ]]
     then
 # Use transferred solutions from another observation
 # Slightly different order: apply the good solutions before peeling
