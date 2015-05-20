@@ -3,7 +3,9 @@
 __author__ = "PaulHancock"
 
 import sys
-#sys.path.insert(1,'/home/hancock/alpha/Aegean')
+import os
+home=os.environ['HOME']
+sys.path.insert(1,home+'/bin/')
 import numpy as np
 from AegeanTools import catalogs, flags
 from astropy.coordinates import SkyCoord
@@ -68,7 +70,7 @@ def filter_region(table,region):
     return table
 
 if __name__ == '__main__':
-    infile,outfile = sys.argv[-2]
+    infile,outfile = sys.argv[-2:]
     #table = load('test.vot')
     #table = load('Week2_223-231MHz_comp.vot')
     table = load(infile)
