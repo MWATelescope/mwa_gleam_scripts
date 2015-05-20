@@ -236,7 +236,7 @@ def filter(data,params,gridsize,stepsize):
     (gx,gy) = np.mgrid[minx:maxx+stepsize:stepsize,miny:maxy+stepsize:stepsize]
     for i,p in enumerate(params):
         interpolated_params.append(griddata(xypoints,param_values[:,i],(gx,gy),method='linear'))
-    print interpolated_params[-1][3:5,3:5]
+    #print interpolated_params[-1][3:5,3:5]
     return interpolated_params
 
 # End of function definitions
@@ -244,6 +244,7 @@ def filter(data,params,gridsize,stepsize):
 # Read the VO table and start processing
 
 if options.usemrc:
+    psfvot=re.sub("_comp.vot","_psf.vot",inputfile)
     catdir=os.environ['MWA_CODE_BASE']+'/MWA_Tools/catalogues'
     MRCvot=catdir+"/MRC.vot"
     VLSSrvot=catdir+"/VLSSr.vot"
@@ -262,14 +263,16 @@ if options.usemrc:
     os.system('stilts tmatch2 matcher=sky params=30 in1=vlssr_crop.vot in2=temp_crop.vot out=temp_vlssr_match.vot values1="_RAJ2000 _DEJ2000" values2="ra dec" ofmt=votable')
     os.system('stilts tpipe in=temp_vlssr_match.vot cmd=\'keepcols "ra dec peak_flux err_peak_flux int_flux err_int_flux local_rms a err_a b err_b pa_2 err_pa flags"\' out='+Vmatchvot)
 # Concatenate the two tables together
-    os.system('stilts tcat in='+Mmatchvot+' in='+Vmatchvot+' out=psf_sources.vot')
+    os.system('stilts tcat in='+Mmatchvot+' in='+Vmatchvot+' out='+psfvot)
 
-    #os.remove('temp_crop.vot')
-    #os.remove('mrc_crop.vot')
-    #os.remove('temp_mrc_match.vot')
-    #os.remove('vlssr_crop.vot')
-    #os.remove('temp_vlssr_match.vot')
-    table = parse_single_table('psf_sources.vot')
+    os.remove('temp_crop.vot')
+    os.remove('mrc_crop.vot')
+    os.remove('temp_mrc_match.vot')
+    os.remove('vlssr_crop.vot')
+    os.remove('temp_vlssr_match.vot')
+    os.remove(Mmatchvot)
+    os.remove(Vmatchvot)
+    table = parse_single_table(psfvot)
 else:
     table = parse_single_table(inputfile)
 data = table.array
