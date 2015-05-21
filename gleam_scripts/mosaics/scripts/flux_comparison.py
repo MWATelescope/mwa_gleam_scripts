@@ -37,9 +37,11 @@ print 'Before '+input_mosaic+': '+str(datetime.datetime.now())
 # Checking if fluxdentable exists
 
 if options.int:
-    check_file = os.path.exists(input_mosaic+'_fluxdentable_int.fits')
+    suffix="int"
+    check_file = os.path.exists(input_mosaic+'_fluxdentable_'+suffix+'.fits')
 else:
-    check_file = os.path.exists(input_mosaic+'_fluxdentable_peak.fits')
+    suffix="peak"
+    check_file = os.path.exists(input_mosaic+'_fluxdentable_'+suffix+'.fits')
 
 if not check_file:
 
@@ -313,16 +315,12 @@ if not check_file:
         col7, col8, col9, col10, col11, col12, col23, col24, col28, col29, col42])#, col22])
     
     tbhdu = fits.new_table(cols)
-    if options.int:
-        tbhdu.writeto(input_mosaic+'_fluxdentable_int.fits', clobber = True) 
-        print 'Wrote to '+input_mosaic+'_fluxdentable_int.fits'
-    else:
-        tbhdu.writeto(input_mosaic+'_fluxdentable_peak.fits', clobber = True) 
-        print 'Wrote to '+input_mosaic+'_fluxdentable_peak.fits'
+    tbhdu.writeto(input_mosaic+'_fluxdentable_'+suffix+'.fits', clobber = True) 
+    print 'Wrote to '+input_mosaic+'_fluxdentable+'+suffix+'.fits'
 else:
     print input_mosaic+'_fluxdentable* exists. Will not recalculate errors but read in existing table.'
 
-hdulist = fits.open(input_mosaic+'_fluxdentable.fits')
+hdulist = fits.open(input_mosaic+'_fluxdentable_'+suffix+'.fits')
 tbdata = hdulist[1].data
 hdulist.close()
 dec = np.array(tbdata['Dec'])
