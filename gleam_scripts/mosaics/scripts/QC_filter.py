@@ -3,13 +3,22 @@
 __author__ = "PaulHancock"
 
 import sys
-import os
+# GammaCrucis
+#sys.path.insert(1,'/home/hancock/alpha/Aegean') 
+# Galaxy
 home=os.environ['HOME']
 sys.path.insert(1,home+'/bin/')
+
 import numpy as np
 from AegeanTools import catalogs, flags
-from astropy.coordinates import SkyCoord
+from AegeanTools.regions import Region
+from astropy.coordinates import SkyCoord, Angle
+from astropy.io.votable import writeto as writetoVO
 import astropy.units as u
+try:
+    import cPickle as pickle
+except ImportError:
+    import pickle
 
 def load(filename):
     print "load",filename
@@ -18,7 +27,9 @@ def load(filename):
 
 def save(table,filename):
     print "save",filename
-    catalogs.save_catalog(filename,catalogs.table_to_source_list(table))
+    writetoVO(table,filename)
+    #catalogs.save_catalog(filename,catalogs.table_to_source_list(table))
+
 
 def filter_RADEC(table):
     print "RADEC filter"
@@ -31,6 +42,7 @@ def filter_RADEC(table):
                 good.append(i)
     return table[good]
 
+
 def filter_GalacticPlane(table):
     """
     Filter out sources that have |b|<10\deg, consistent with the SUMSS/MGPS-2 division
@@ -42,17 +54,20 @@ def filter_GalacticPlane(table):
     good = np.where(b>=bmax)
     return  table[good]
 
+
 def filter_flags(table):
     """
 
     """
     return table
 
+
 def filter_residual(table):
     """
     """
 
     return table
+
 
 def filter_intpeak(table):
     """
@@ -63,18 +78,55 @@ def filter_intpeak(table):
     return table[good]
 
 
-def filter_region(table,region):
+def make_mim():
     """
-    Return only sources that are within the given region.
     """
-    return table
+    srclist = {}
+    for l in open('sources_to_clip.dat').readlines():
+        if l.startswith('#'):
+            continue
+        name = l.split()[0]
+        ra = ' '.join(l.split()[1:4])
+        dec = ' '.join(l.split()[4:7])
+        pos = SkyCoord(Angle(ra,u.hour),Angle(dec,u.degree))
+        srclist[name] = (pos.ra.degree,pos.dec.degree)
+    for k in srclist.keys():
+        if k=='LMC':
+            radius = 4
+        elif k =='SMC':
+            radius = 1.5
+        else:
+            radius = 5./60
+        v = srclist[k]
+        print 'MIMAS.py +c {0} {1} {2} -o {3}.mim'.format(v[0],v[1],radius,k)
+    everything = srclist.keys()
+    print "MIMAS.py ",
+    for e in everything:
+        print "+r {0}.mim".format(e),
+    print " -o all.mim"
+    print "MIMAS.py +r south.mim -r all.mim -o masked.mim"
+    print "MIMAS.py --mim2fits masked.mim masked.fits"
+    return
+
+
+def filter_region(table,regionfile):
+    """
+    """
+    print "Filtering from file {0}".format(regionfile)
+    r = pickle.load(open(regionfile,'r'))
+    print r.get_area()
+    bad = r.sky_within(table['ra'],table['dec'],degin=True)
+    good = np.bitwise_not(bad)
+    return table[good]
+
 
 if __name__ == '__main__':
+    #make_mim()
+    #sys.exit()
     infile,outfile = sys.argv[-2:]
-    #table = load('test.vot')
-    #table = load('Week2_223-231MHz_comp.vot')
     table = load(infile)
     table = filter_RADEC(table)
     table = filter_GalacticPlane(table)
     table = filter_intpeak(table)
+    table = filter_region(table,'all.mim')
     save(table,outfile)
