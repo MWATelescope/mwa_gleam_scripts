@@ -1,0 +1,59 @@
+cd DATADIR/PROJ
+
+if [[ -d OBSNUM/OBSNUM.ms ]]
+then
+  if [[ ! -d OBSNUM/OBSNUM.cal ]]
+  then
+      numfits=`ls -d OBSNUM/OBSNUM*.fits | wc -l`
+      if [[ $numfits -lt 20 ]]
+      then
+          echo "Fits images did not generate correctly! OBSNUM needs manual intervention."
+          exit 1
+      elif [[ $numfits -gt 20 ]]
+      then
+          echo "There are more images than expected for OBSNUM. Please check before archiving."
+          exit 1
+      fi
+      size=`du -s OBSNUM/OBSNUM.ms | awk '{print $1}'`
+      if [[ $size -gt 20000000 ]]
+      then
+# Delete model data column for all except calibrators
+        cd OBSNUM
+        echo "vis='OBSNUM.ms'" > delmod.py
+        echo "delmod(vis=vis,otf=True,scr=True)" >> delmod.py
+        DATADIR/casapy-42.0.28322-021-1-64b/casapy --nologger -c delmod.py
+        cd ../
+      fi
+  fi
+  time tar -I pigz --exclude=*.image --exclude=*.psf --exclude=*.residual --exclude=*.flux --exclude=*.model --exclude=OBSNUM*.fits -cf OBSNUM.tar.gz OBSNUM*
+else
+  echo "OBSNUM.ms does not exist!"
+  exit 1
+fi
+if [[ -e OBSNUM.tar.gz ]]
+then
+  NGASCOMMANDS OBSNUM.tar.gz | tee ngas_test_OBSNUM.txt
+else
+  echo "Error creating the tarball!"
+  exit 1
+fi
+if grep -q "SUCCESS" ngas_test_OBSNUM.txt
+then
+  rm -rf OBSNUM 1>> archive.log 2>> archive.log
+else
+  echo "Error uploading via NGAS!"
+  exit 1
+fi
+rm ngas_test_OBSNUM.txt
+curl store04.icrar.org:7777/STATUS?file_id=OBSNUM.tar.gz > test_OBSNUM.txt
+filesize=`grep FileSize test_OBSNUM.txt | awk 'BEGIN {FS="FileSize=\""} {print $2}' | awk 'BEGIN {FS="\""} {print $1}'`
+if [[ $filesize -gt 0 ]]
+then
+  echo "NGAS upload successful; removing tarball."
+  rm OBSNUM.tar.gz
+  rm test_OBSNUM.txt
+else
+  echo "File upload to NGAS failed! Keeping tarball."
+  exit 1
+fi
+

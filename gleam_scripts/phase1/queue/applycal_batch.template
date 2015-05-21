@@ -1,0 +1,12 @@
+#!/bin/bash
+
+# Apply calibration to the data
+
+#PBS -W group_list=GROUPQ
+#PBS -q STANDARDQ
+#PBS -l walltime=08:00:00,mem=10gb
+
+module load python/2.6.9 numpy/1.6.2 scipy/0.11.0 openmpi matplotlib
+
+cd DATADIR/PROJ/
+DATADIR/casapy-42.0.28322-021-1-64b/casapy --nologger -c applycal_IDENT.py 1>> output.log 2>> error.log

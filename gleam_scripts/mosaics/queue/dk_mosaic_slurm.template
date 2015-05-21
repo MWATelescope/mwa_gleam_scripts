@@ -1,0 +1,25 @@
+#!/bin/bash
+
+# Mosaic Dec strips, including:
+# - QA
+# - source-finding on I snapshots
+# - pairwise flux corrections
+# - swarp mosaicking
+# - modify headers to include FREQ, BMAJ, BMIN, BPA
+# - rename mosaics to sensible filenames
+# - source-finding on XX and YY mosaics
+# - combining XX and YY into a single recomb mosaic
+# - source-finding on recomb mosaics
+# - Dec-dependent flux corrections
+# - source-finding on flux-corrected mosaics
+
+#SBATCH --account=GROUPQ
+#SBATCH --partition=STANDARDQ
+#SBATCH --time=12:00:00
+#SBATCH --nodes=1
+#SBATCH --mem=HOSTMEMgb
+#SBATCH --output=QUEUEDIR/OUTPUT.o%A_%a
+#SBATCH --error=QUEUEDIR/OUTPUT.e%A_%a
+#SBATCH --array=0-3
+
+aprun="aprun -n 1 -d NCPUS "

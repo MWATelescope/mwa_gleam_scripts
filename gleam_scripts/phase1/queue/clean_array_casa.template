@@ -1,0 +1,114 @@
+#!/usr/bin/python
+# CASA template to clean the data
+# Exports with PV keywords
+# Also adds the delays to the fits file
+
+import re, os, pyfits
+from math import *
+from subprocess import call
+from casa_fixhdr import casa_fixhdr
+from add_delays import add_delays
+from add_weighting import add_weighting
+
+vis='OBSNUM.ms'
+root=re.sub('.ms','',vis)
+
+# Get frequency range
+ms.open(vis)
+rec = ms.getdata(['axis_info'])
+F =rec['axis_info']['freq_axis']['chan_freq'].squeeze()/1e6
+ms.close()
+startchan=0
+endchan=len(F)
+
+# Set destination commands depending on computer
+computer="COMPUTER"
+if computer=="fornax":
+  dest_commands="ngamsCClient -host store04.icrar.org -port 7777 -cmd QARCHIVE -mimeType application/octet-stream -fileUri "
+
+# Lots of hardcodes at the moment
+version="1.0"
+niter=40000
+imsize=[4000,4000]
+cell=['0.75arcmin', '0.75arcmin']
+# Only a conservative intial threshold
+thresh=0.2
+threshold=str(thresh)+'Jy'
+# How many sigma do we clean down to?
+sigma=5.0
+# Found that we could reduce this without much degradation
+cyclefactor=1.5
+uvrange="0.00~3.0klambda"
+antoption="!Tile105;!Tile101;!Tile032;!Tile085"
+weighting='briggs'
+
+# Iterators
+# I is meaningless and can be synthesised more properly from XX and YY weighted by the beam model
+#pols=["XX","YY","I"]
+pols=["XX","YY"]
+# Decided 18/12/2013 at the GLEAM meeting after the NZ meeting that robust 1.0 is worthless and -1.0 offers better noise performance than -2.0 (uniform)
+#robusts=[-2.0,-1.0,0.0,1.0]
+robusts=[-1.0,0.0]
+
+# To unset subbands, just comment out subbandwidth and the rest of the code will cope
+subbandwidth=192
+
+try:
+  subchanstarts=range(startchan,endchan-1,subbandwidth)
+  subchanends=range(subbandwidth-1,endchan,subbandwidth)
+  subchans=True
+except:
+  subchanstarts=[]
+  subchanends=[]
+  subchans=False
+
+# And one big full-bandwidth clean
+subchanstarts+=[startchan]
+subchanends+=[endchan-1]
+
+# Iterate over polarisations
+for stokes in pols:
+
+# Iterate over weighting schemes:
+ for robust in robusts:
+
+# Iterate over frequencies
+    for i in range(0,len(subchanstarts)):
+# reupload old files for now -- co-ordinates were wrong
+      resend=False
+      chanstart=subchanstarts[i]
+      chanend=subchanends[i]
+      spw='0:'+str(chanstart)+'~'+str(chanend)
+      freqrange="{0:03.0f}-{1:03.0f}MHz".format(F[chanstart],F[chanend])
+      imagename=root+'_'+freqrange+'_'+stokes+'_r'+str(robust)+'_v'+version
+      if os.path.exists(imagename+'.image'):
+        current_max=imstat(imagename=imagename+'.residual')['max'][0]
+        if current_max==0.0:
+           print imagename+' seems to have cleaned badly, since its max residual is zero. Restarting...'
+           rmtables(imagename+'*')
+           current_max=100.0  
+        else:
+           print imagename+'.image has already been created, and has been cleaned down to '+str(current_max)+'Jy.'
+      else:
+        print imagename+'.image starting from scratch.'
+        rmtables(imagename+'*')
+        current_max=100.0  
+      if thresh < current_max:  
+         print 'Cleaning further, down to a threshold of '+threshold
+         clean(vis=vis, imagename=imagename, gridmode='widefield', psfmode='clark', imagermode='csclean', wprojplanes=1, facets=1, niter=niter, imsize=imsize, cell=cell, threshold=threshold, stokes=stokes, mode='mfs', selectdata=True, uvrange=uvrange, antenna=antoption, weighting=weighting,nterms=1,cyclefactor=cyclefactor,robust=robust,spw=spw,usescratch=False)
+         resend=True
+
+      new_thresh=sigma*(imstat(imagename=imagename+'.residual',box='0,0,200,200')['rms'][0])
+      current_max=imstat(imagename=imagename+'.residual')['max'][0]
+      new_threshold=str(new_thresh)+'Jy'
+      if new_thresh < current_max:
+        print 'Cleaning further, down to a '+str(sigma)+'sigma threshold of '+new_threshold
+        clean(vis=vis, imagename=imagename, gridmode='widefield', psfmode='clark', imagermode='csclean', wprojplanes=1, facets=1, niter=niter, imsize=imsize, cell=cell, threshold=new_threshold, stokes=stokes, mode='mfs', selectdata=True, uvrange=uvrange, antenna=antoption, weighting=weighting,nterms=1,cyclefactor=cyclefactor,robust=robust,spw=spw,usescratch=False)
+        resend=True
+
+      if resend:
+        fitsimage=casa_fixhdr(imagename=imagename+'.image')
+        add_delays('OBSNUM',fitsimage)
+        add_weighting(fitsimage,robust)
+        call(dest_commands.split()+[fitsimage])
+      

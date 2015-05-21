@@ -1,0 +1,138 @@
+#!/usr/bin/env python
+
+# Applying the polynominal correction derived from decfluxdependence_derive.py.
+# Note that this should be run from directory structure that is above saving directories.
+
+import numpy as np
+import matplotlib as plt
+import scipy.optimize as opt
+import scipy.stats as stats
+from astropy.io import fits
+from astropy import wcs
+from optparse import OptionParser
+import os
+import sys
+import re
+
+usage="Usage: %prog [options] <file>\n"
+parser = OptionParser(usage=usage)
+parser.add_option('--mosaic',type="string", dest="mosaic",
+                    help="The filename of the mosaic you want to read in.")
+#parser.add_option('--zenith',action="store_true",dest="zenith",default=False,
+#                    help="Calculate correction for the special case of zenith.")
+(options, args) = parser.parse_args()
+
+input_mosaic = options.mosaic
+
+header = fits.getheader(input_mosaic+'.fits')
+try:
+    freq_obs = header['CRVAL3']/1e6
+    modheader=True
+except:
+    freq_obs = header['FREQ']/1e6
+    modheader=False
+Dec_strip = header['CRVAL2']
+
+# Week 1.1
+# 20130808 +1.6 -- Some GP at start
+# 20130809 -55
+# 20130810 -27 -- Good.
+# 20130817 +18.6  --- Cygnus at start, ionosphere at the end
+# 20130818 -72
+# 20130822 -13 -- Fine.
+# 20130825 -40
+
+# Week 1.2
+# 20131105 -13 -- Fine
+# 20131106 -40
+# 20131107 +1.6 -- Fine
+# 20131108 -55
+# 20131111 +18.6 -- Fine
+# 20131112 -72
+# 20131125 -27 Crab is a contaminant for middle channels -- but still gives lower reduced chi2 than week 1.1
+
+# Week 1.3
+# 20140303 -27 -- 1/3rd of fibre flagged on Rec 6 (don't transfer these sols)
+# 20140304 -13 -- Fine.
+# 20140306 +1.6 -- 1/3rd of fibre flagged on Rec 6 (don't transfer these sols)
+# 20140308 +18.6 -- Virgo A very tough (don't transfer these sols)
+# 20140309 -72 -- unknown
+# 20140316 -40 -- only between GP and CenA
+# 20140317 -55 -- only between GP and CenA
+# So get ALL of these solutions from other weeks
+
+week=input_mosaic.split("_")[1][0:6]
+
+if Dec_strip == -40. or Dec_strip == -55. or Dec_strip == -72. or week != "201311":
+    if Dec_strip == -40. or Dec_strip == -13.:
+        input_mosaic_polyfit = re.sub("201[0-9]{5}","20131105",input_mosaic)
+        poly_path = re.sub("201[0-9]{5}","20131105",os.getcwd())
+    if Dec_strip == -55. or Dec_strip == 1.6 or Dec_strip == 2.0:
+        input_mosaic_polyfit = re.sub("201[0-9]{5}","20131107",input_mosaic)
+        poly_path = re.sub("201[0-9]{5}","20131107",os.getcwd())
+    if Dec_strip == -72. or Dec_strip == 18.6 or Dec_strip == 19.0:
+        input_mosaic_polyfit = re.sub("201[0-9]{5}","20131111",input_mosaic)
+        poly_path = re.sub("201[0-9]{5}","20131111",os.getcwd())
+    if Dec_strip == -26.7 or Dec_strip == -27.0:
+        input_mosaic_polyfit = re.sub("201[0-9]{5}","20131125",input_mosaic)
+        poly_path = re.sub("201[0-9]{5}","20131125",os.getcwd())
+    hdulist = fits.open(poly_path+'/'+input_mosaic_polyfit+'_poly_coefficients.fits')
+    print 'Using corrections from '+poly_path+'/'+input_mosaic_polyfit+'_poly_coefficients.fits'
+else:
+    hdulist = fits.open(input_mosaic+'_poly_coefficients.fits')
+
+dec_zenith = -26.7
+
+hdulist.verify('fix')
+tbdata = hdulist[1].data
+hdulist.close()
+
+a  = np.array(tbdata['a'])
+b  = np.array(tbdata['b'])
+c  = np.array(tbdata['c'])
+d  = np.array(tbdata['d'])
+e  = np.array(tbdata['d'])
+
+# Fixing header problem. Removing third axis.
+if modheader:
+    outfile = input_mosaic+"_fixedheader.fits"
+    data = fits.open(input_mosaic+'.fits')
+    del data[0].header['CRPIX3']
+    del data[0].header['CRVAL3']
+    del data[0].header['CDELT3']
+    del data[0].header['CUNIT3']
+    del data[0].header['CTYPE3']
+    data.writeto(outfile,clobber=True)
+
+    hdu_in=fits.open(input_mosaic+'_fixedheader.fits')
+else:
+    hdu_in=fits.open(input_mosaic+'.fits')
+
+    # wcs in format [x,y,stokes,freq]; stokes and freq are length 1 if they exist
+w=wcs.WCS(hdu_in[0].header)
+
+#create an array but don't set the values (they are random)
+indexes = np.empty( (hdu_in[0].data.shape[0]*hdu_in[0].data.shape[1],2),dtype=int)
+#since I know exactly what the index array needs to look like I can construct
+# it faster than list comprehension would allow
+#we do this only once and then recycle it
+idx = np.array([ (j,0) for j in xrange(hdu_in[0].data.shape[1])])
+j=hdu_in[0].data.shape[1]
+for i in xrange(hdu_in[0].data.shape[0]):
+    idx[:,1]=i
+    indexes[i*j:(i+1)*j] = idx
+#put ALL the pixles into our vectorized functions and minimised our overheads
+ra,dec = w.wcs_pix2world(indexes,1).transpose()
+if Dec_strip == -26.7 or Dec_strip == -27.0:
+# Dealing with special case of zenith
+    reshapedcorr=a[0]
+elif Dec_strip == -40. or Dec_strip == -55. or Dec_strip == -72.:
+    # Reflecting cubic around the x-axis and shifting to new centre dec
+    corr=(-d[4]*np.power((dec-(2*dec_zenith)),3)+c[4]*np.power((dec-(2*dec_zenith)),2)-b[4]*((dec-(2*dec_zenith)))+a[4])
+    reshapedcorr=corr.reshape(hdu_in[0].data.shape[0],hdu_in[0].data.shape[1])
+else:
+    corr=(d[4]*np.power(dec,3)+c[4]*np.power(dec,2)+b[4]*(dec)+a[4])
+    reshapedcorr=corr.reshape(hdu_in[0].data.shape[0],hdu_in[0].data.shape[1])
+hdu_in[0].data=np.array(reshapedcorr*hdu_in[0].data,dtype=np.float32)
+hdu_in.writeto(input_mosaic+'_polyapplied.fits',clobber=True)
+hdu_in.close(input_mosaic+'_polyapplied.fits')
