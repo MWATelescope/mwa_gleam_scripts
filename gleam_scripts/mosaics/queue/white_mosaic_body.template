@@ -78,7 +78,7 @@ $aprun aegean.sh ${week}_white_lownoise.fits bane compress
 # No weight mosaic (frequency is the same, but noise varies over the image)
 if [[ ! -e ${week}_white_noweight.fits ]]
 then
-    $aprun swarp -c ../noweight.swarp mosaic*ed.fits -IMAGEOUT_NAME ${week}_white_noweight.fits -WEIGHTOUT_NAME ${week}_white_noweight.weight.fits  -PROJECTION_TYPE ZEA
+    $aprun swarp -c ../noweight.swarp mosaic*ed.fits -IMAGEOUT_NAME ${week}_white_noweight.fits -WEIGHTOUT_NAME ${week}_white_noweight.weight.fits
     fits_trim.py ${week}_white_noweight.fits temp.fits
     mv temp.fits ${week}_white_noweight.fits
     fits_trim.py ${week}_white_noweight.weight.fits temp.fits
