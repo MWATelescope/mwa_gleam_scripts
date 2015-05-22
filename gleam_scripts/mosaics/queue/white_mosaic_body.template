@@ -7,6 +7,8 @@ week=WEEK
 
 cd $datadir/$proj/$week
 
+fiducial_freq="170-177MHz"
+
 list=`ls -d *MHz`
 
 # Giant mosaic
@@ -22,12 +24,15 @@ do
     fi
 done
 
+# Get list of frequencies and zenith psf from the header of the final mosaic, which itself should be using the zenith PSF
+bmaj=`pyhead.py -p BMAJ ${fiducial_freq}/${week}_${fiducial_freq}.fits | awk '{print $3}'`
+bmin=`pyhead.py -p BMIN ${fiducial_freq}/${week}_${fiducial_freq}.fits | awk '{print $3}'`
+
 if [[ ! -d white ]]
 then
     mkdir white
 fi
 cd white
-
 
 for freq in $freqs
 do
@@ -40,8 +45,8 @@ do
         then
 # Load and convolve-down all of the images -- to their local projection
             root=`echo $localname | awk 'BEGIN {FS="_"} {print $1"_"$2}'`
-            echo "Using ${root}_170-177MHz_r-1.0_recomb_polyapplied.fits to convolve $localname"
-            convbeam=`pyhead.py -p BMAJ ../170-177MHz/${root}_170-177MHz_r-1.0_recomb_polyapplied.fits | awk '{print $3*3600}'`
+            echo "Using ${root}_${fiducial_freq}_r-1.0_recomb_polyapplied.fits to convolve $localname"
+            convbeam=`pyhead.py -p BMAJ ../${fiducial_freq}/${root}_${fiducial_freq}_r-1.0_recomb_polyapplied.fits | awk '{print $3*3600}'`
             echo "Convolving $file."
             imname=`basename $file | sed "s/.fits/.im/"`
             fits_unmask.py -i $file -o temp.fits
@@ -73,6 +78,10 @@ then
     mv temp.fits ${week}_white_lownoise.fits
     fits_trim.py ${week}_white_lownoise.weight.fits temp.fits
     mv temp.fits ${week}_white_lownoise.weight.fits
+# Update with zenith 170-177MHz beam
+    pyhead.py -u BMAJ $bmaj ${week}_white_lownoise.fits
+    pyhead.py -u BMIN $bmin ${week}_white_lownoise.fits
+    pyhead.py -u BPA 0.0 ${week}_white_lownoise.fits
 fi
 
 $aprun aegean.sh ${week}_white_lownoise.fits bane compress
@@ -85,6 +94,10 @@ then
     mv temp.fits ${week}_white_noweight.fits
     fits_trim.py ${week}_white_noweight.weight.fits temp.fits
     mv temp.fits ${week}_white_noweight.weight.fits
+# Update with zenith 170-177MHz beam
+    pyhead.py -u BMAJ $bmaj ${week}_white_noweight.fits
+    pyhead.py -u BMIN $bmin ${week}_white_noweight.fits
+    pyhead.py -u BPA 0.0 ${week}_white_noweight.fits
 fi
 
 $aprun aegean.sh ${week}_white_lownoise.fits bane compress
