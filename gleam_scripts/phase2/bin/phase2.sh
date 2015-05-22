@@ -135,7 +135,7 @@ then
             obsnum=${obslist[$n]}
             echo "Current observation: $obsnum , n = $n"
             obsident=`echo $obsnum | awk '{print substr($1,6,5)}'`
-            if [[ ! -d $datadir/$proj/$obsum && ! -e $datadir/$proj/$obsnum.tar.gz && ! -e $datadir/$proj/${obsnum}_phase2.tar.gz && ! -e $datadir/$proj/${obsnum}_images.tar && ! -e $datadir/$proj/${obsnum}_images_v2.1.tar ]]
+            if [[ ! -d $datadir/$proj/${obsnum} && ! -e $datadir/$proj/$obsnum.tar.gz && ! -e $datadir/$proj/${obsnum}_phase2.tar.gz && ! -e $datadir/$proj/${obsnum}_images.tar && ! -e $datadir/$proj/${obsnum}_images_v2.1.tar ]]
             then 
                 cat dl_icrar_body.template | sed "1,25s;OBSNUM;${obsnum};g"  >> dl_${batchident}_${l}.sh
                 (( dl+=1 ))
