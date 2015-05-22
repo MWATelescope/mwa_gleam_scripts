@@ -22,11 +22,11 @@ do
     fi
 done
 
-if [[ ! -d white_lownoise ]]
+if [[ ! -d white ]]
 then
-    mkdir white_lownoise
+    mkdir white
 fi
-cd white_lownoise
+cd white
 
 convbeam=`pyhead.py -p BMAJ ../170-177MHz/${week}_170-177MHz.fits | awk '{print $3*3600}'`
 
@@ -39,24 +39,17 @@ do
         localname=`basename $file`
         if [[ ! -e $localname ]]
         then
-# Load and convolve-down the highest-frequency images
-            if [[ $startfreq -gt 199 ]]
-            then
-                echo "Convolving $file."
-                imname=`basename $file | sed "s/.fits/.im/"`
-                fits_unmask.py -i $file -o temp.fits
-                fits op=xyin in=temp.fits out=$imname
-                rm temp.fits
-                puthd in=$imname/bunit value="JY/BEAM"
-                convol map=$imname options="final" fwhm=$convbeam pa=0.0 out=temp.im
-                fits op=xyout in=temp.im out=$localname
-                rm -rf temp.im
-                echo "Writing $localname."
-            else
-# Just link the lower-frequency mosaics
-                echo "Linking $file."
-                ln -s $file
-            fi
+# Load and convolve-down all of the images
+            echo "Convolving $file."
+            imname=`basename $file | sed "s/.fits/.im/"`
+            fits_unmask.py -i $file -o temp.fits
+            fits op=xyin in=temp.fits out=$imname
+            rm temp.fits
+            puthd in=$imname/bunit value="JY/BEAM"
+            convol map=$imname options="final" fwhm=$convbeam pa=0.0 out=temp.im
+            fits op=xyout in=temp.im out=$localname
+            rm -rf temp.im
+            echo "Writing $localname."
         fi
    done
 # Link all of the rms images without worrying about convolution
@@ -70,11 +63,27 @@ do
    done
 done
 
-$aprun swarp -c ../noweight.swarp mosaic*ed.fits -IMAGEOUT_NAME ${week}_white_lownoise.fits -WEIGHTOUT_NAME ${week}_white_lownoise.weight.fits  -PROJECTION_TYPE ZEA
-fits_trim.py ${week}_white_lownoise.fits temp.fits
-mv temp.fits ${week}_white_lownoise.fits
-fits_trim.py ${week}_white_lownoise.weight.fits temp.fits
-mv temp.fits ${week}_white_lownoise.weight.fits
+# Low noise mosaic (noise is reduced, but frequency varies over the image)
+if [[ ! -e ${week}_white_lownoise.fits ]]
+then
+    $aprun swarp -c ../weight.swarp mosaic*ed.fits -IMAGEOUT_NAME ${week}_white_lownoise.fits -WEIGHTOUT_NAME ${week}_white_lownoise.weight.fits  -PROJECTION_TYPE ZEA
+    fits_trim.py ${week}_white_lownoise.fits temp.fits
+    mv temp.fits ${week}_white_lownoise.fits
+    fits_trim.py ${week}_white_lownoise.weight.fits temp.fits
+    mv temp.fits ${week}_white_lownoise.weight.fits
+fi
+
+$aprun aegean.sh ${week}_white_lownoise.fits bane compress
+
+# No weight mosaic (frequency is the same, but noise varies over the image)
+if [[ ! -e ${week}_white_noweight.fits ]]
+then
+    $aprun swarp -c ../noweight.swarp mosaic*ed.fits -IMAGEOUT_NAME ${week}_white_noweight.fits -WEIGHTOUT_NAME ${week}_white_noweight.weight.fits  -PROJECTION_TYPE ZEA
+    fits_trim.py ${week}_white_noweight.fits temp.fits
+    mv temp.fits ${week}_white_noweight.fits
+    fits_trim.py ${week}_white_noweight.weight.fits temp.fits
+    mv temp.fits ${week}_white_noweight.weight.fits
+fi
 
 $aprun aegean.sh ${week}_white_lownoise.fits bane compress
 

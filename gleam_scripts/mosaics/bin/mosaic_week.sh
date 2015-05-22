@@ -72,7 +72,6 @@ fi
 if [[ ! -e $datadir/$proj/$week/mosaic.swarp ]]
 then
     cat weight.swarp.template | sed "s/TARGETRA/$ra/" > $datadir/$proj/$week/weight.swarp
-    cat noweight.swarp.template | sed "s/TARGETRA/$ra/" > $datadir/$proj/$week/noweight.swarp
 fi
 
 swarpscript=swarp_${week}.sh
