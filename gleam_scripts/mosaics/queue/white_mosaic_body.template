@@ -28,7 +28,6 @@ then
 fi
 cd white
 
-convbeam=`pyhead.py -p BMAJ ../170-177MHz/${week}_170-177MHz.fits | awk '{print $3*3600}'`
 
 for freq in $freqs
 do
@@ -39,7 +38,10 @@ do
         localname=`basename $file`
         if [[ ! -e $localname ]]
         then
-# Load and convolve-down all of the images
+# Load and convolve-down all of the images -- to their local projection
+            root=`echo $localname | awk 'BEGIN {FS="_"} {print $1"_"$2}'`
+            echo "Using ${root}_170-177MHz_r-1.0_recomb_polyapplied.fits to convolve $localname"
+            convbeam=`pyhead.py -p BMAJ ../170-177MHz/${root}_170-177MHz_r-1.0_recomb_polyapplied.fits | awk '{print $3*3600}'`
             echo "Convolving $file."
             imname=`basename $file | sed "s/.fits/.im/"`
             fits_unmask.py -i $file -o temp.fits
