@@ -13,11 +13,11 @@ then
     hostmem="32"
     rootdir=/short/${groupq}
     ncpus=16
-    # While store04 wasn't available to the outside world
-    #ngascommands="ngamsCClient_17092014 -host store02.icrar.org -port 7777 -mimeType application/octet-stream -cmd PARCHIVE -nexturl http://store04.icrar.org:7777/QARCHIVE -fileUri "
+    # While store06 wasn't available to the outside world
+    #ngascommands="ngamsCClient_17092014 -host store02.icrar.org -port 7777 -mimeType application/octet-stream -cmd PARCHIVE -nexturl http://store06.icrar.org:7777/QARCHIVE -fileUri "
     #ngastestcommands="curl store02.icrar.org:7777/STATUS?file_id="
-    ngascommands="ngamsCClient_17092014 -host store04.icrar.org -port 7777 -cmd QARCHIVE -mimeType application/octet-stream -fileUri "
-    ngastestcommands="curl store04.icrar.org:7777/STATUS?file_id="
+    ngascommands="ngamsCClient_17092014 -host store06.icrar.org -port 7777 -cmd QARCHIVE -mimeType application/octet-stream -fileUri "
+    ngastestcommands="curl store06.icrar.org:7777/STATUS?file_id="
     scheduler="pbs"
     copyqsub="qsub"
 elif [[ "${HOST:0:4}" == "gala" ]]
@@ -28,8 +28,8 @@ then
     hostmem="64"
     rootdir=/scratch/${groupq}
     ncpus=20
-    ngascommands="ngamsCClient -host store04.icrar.org -port 7777 -cmd QARCHIVE -mimeType application/octet-stream -fileUri "
-    ngastestcommands="curl store04.icrar.org:7777/STATUS?file_id="
+    ngascommands="ngamsCClient -host store06.icrar.org -port 7777 -cmd QARCHIVE -mimeType application/octet-stream -fileUri "
+    ngastestcommands="curl store06.icrar.org:7777/STATUS?file_id="
     scheduler="slurm"
 # Makes dependencies impossible!
 #    copyqsub="sbatch -M zeus"
@@ -44,8 +44,8 @@ else
     hostmem="70"
     rootdir=/scratch/${groupq}
     ncpus=12
-    ngascommands="ngamsCClient_17092014 -host store04.icrar.org -port 7777 -cmd QARCHIVE -mimeType application/octet-stream -fileUri "
-    ngastestcommands="curl store04.icrar.org:7777/STATUS?file_id="
+    ngascommands="ngamsCClient_17092014 -host store06.icrar.org -port 7777 -cmd QARCHIVE -mimeType application/octet-stream -fileUri "
+    ngastestcommands="curl store06.icrar.org:7777/STATUS?file_id="
     scheduler="pbs"
     copyqsub="qsub"
 fi
@@ -68,7 +68,7 @@ fi
 # Chose a batch size that compromises number of jobs submitted to queue and /short space used
 batchsize=10
 
-if [[ $1 ]] && [[ $2 ]]
+if [[ $1 ]] && [[ $2 ]] #&& [[ $3 ]] && [[ $4 ]]
 then
 
     filelist=$1
@@ -135,23 +135,24 @@ then
             obsnum=${obslist[$n]}
             echo "Current observation: $obsnum , n = $n"
             obsident=`echo $obsnum | awk '{print substr($1,6,5)}'`
-            if [[ ! -e $datadir/$proj/$obsnum.tar.gz && ! -e $datadir/$proj/${obsnum}_phase2.tar.gz && ! -e $datadir/$proj/${obsnum}_images.tar ]]
+            if [[ ! -d $datadir/$proj/$obsum && ! -e $datadir/$proj/$obsnum.tar.gz && ! -e $datadir/$proj/${obsnum}_phase2.tar.gz && ! -e $datadir/$proj/${obsnum}_images.tar && ! -e $datadir/$proj/${obsnum}_images_v2.1.tar ]]
             then 
                 cat dl_icrar_body.template | sed "1,25s;OBSNUM;${obsnum};g"  >> dl_${batchident}_${l}.sh
                 (( dl+=1 ))
             else
-                echo "Tarballs already exist for ${obsnum}:"
-                ls $datadir/$proj/${obsnum}*tar*
+                echo "Data already exists for ${obsnum}:"
+                ls -d $datadir/$proj/${obsnum}*
             fi
-            if [[ ! -e $datadir/$proj/${obsnum}_images.tar ]]
+            if [[ ! -e $datadir/$proj/${obsnum}_images.tar && ! -e $datadir/$proj/${obsnum}_images_v2.1.tar ]]
             then
+                echo "Generating imaging script."
                 cat phase2_${scheduler}.template | sed "1,25s;GROUPQ;${groupq};g" | sed "1,25s;STANDARDQ;${standardq};g" | sed "1,25s;HOSTMEM;${hostmem};g" | sed "1,25s;NCPUS;${ncpus};g" | sed "1,25s;HOMEDIR;${HOME};g" | sed "1,25s;OUTPUT;p2_${obsident};" > p2_${obsident}.sh
                 cat phase2_body.template | sed "1,25s;HOSTMEM;${hostmem};g" | sed "1,25s;NCPUS;${ncpus};g" | sed "1,25s;OBSNUM;${obsnum};g" |  sed "1,25s;DATADIR;${datadir};g" | sed "1,25s;PROJ;${proj};g" | sed "1,25s;CHAN;${chan};g" | sed "1,25s;SOLOBS;${solobs};g" >> p2_${obsident}.sh
                 (( img+=1 ))
             fi
+            echo "Generating upload script."
             cat up_icrar_body.template | sed "s;OBSNUM;${obsnum};g" |  sed "s;DATADIR;${datadir};g"  | sed "s;PROJ;${proj};g" | sed "s;NGASCOMMANDS;$ngascommands;g" | sed "s;NGASTESTCOMMANDS;${ngastestcommands};g" >> up_${batchident}_${l}.sh
             val=`expr \( $n + 1 \) % $batchsize`
-            echo "test value = $val"
 # Submit if you've accumulated 10 jobs, or this is the last observation
             if [[ $val -eq 0 || $n -eq $lengthlimit ]]
             then
@@ -207,7 +208,10 @@ then
                     updependency="afterany"
                 fi
 # Submit the upload script -- dependent on all self-cal jobs running correctly
-                echo $updependency
+                if [[ $updependency == "afterany" ]]
+                then
+                    updependency=""
+                fi
                 upjobnum=`$copyqsub $depend=$updependency up_${batchident}_${l}.sh | awk '{print $NF}'`
                 ((l+=1))
     # Start a new batch
