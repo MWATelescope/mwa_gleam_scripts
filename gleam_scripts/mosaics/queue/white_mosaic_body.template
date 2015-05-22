@@ -1,0 +1,81 @@
+
+# Eventually edit to include R,G,B, but leave for now
+
+datadir=DATADIR
+proj=PROJ
+week=WEEK
+
+cd $datadir/$proj/$week
+
+list=`ls -d *MHz`
+
+# Giant mosaic
+
+freqs=""
+
+for file in $list
+do
+    startfreq=`basename $file |  awk 'BEGIN {FS="-"} {print $1}'`
+    if [[ $startfreq -gt 169 ]]
+    then
+        freqs="$freqs "$file
+    fi
+done
+
+if [[ ! -d white_lownoise ]]
+then
+    mkdir white_lownoise
+fi
+cd white_lownoise
+
+convbeam=`pyhead.py -p BMAJ ../170-177MHz/${week}_170-177MHz.fits | awk '{print $3*3600}'`
+
+for freq in $freqs
+do
+    for file in ../${freq}/mosaic*ied.fits
+    do
+        startfreq=`echo $freq | awk 'BEGIN {FS="-"} {print $1}'`
+        echo $startfreq
+        localname=`basename $file`
+        if [[ ! -e $localname ]]
+        then
+# Load and convolve-down the highest-frequency images
+            if [[ $startfreq -gt 199 ]]
+            then
+                echo "Convolving $file."
+                imname=`basename $file | sed "s/.fits/.im/"`
+                fits_unmask.py -i $file -o temp.fits
+                fits op=xyin in=temp.fits out=$imname
+                rm temp.fits
+                puthd in=$imname/bunit value="JY/BEAM"
+                convol map=$imname options="final" fwhm=$convbeam pa=0.0 out=temp.im
+                fits op=xyout in=temp.im out=$localname
+                rm -rf temp.im
+                echo "Writing $localname."
+            else
+# Just link the lower-frequency mosaics
+                echo "Linking $file."
+                ln -s $file
+            fi
+        fi
+   done
+# Link all of the rms images without worrying about convolution
+   for file in ../${freq}/mosaic*oid.fits
+   do
+       localname=`basename $file`
+       if [[ ! -h $localname ]]
+       then
+           ln -s $file
+       fi
+   done
+done
+
+$aprun swarp -c ../noweight.swarp mosaic*ed.fits -IMAGEOUT_NAME ${week}_white_lownoise.fits -WEIGHTOUT_NAME ${week}_white_lownoise.weight.fits  -PROJECTION_TYPE ZEA
+fits_trim.py ${week}_white_lownoise.fits temp.fits
+mv temp.fits ${week}_white_lownoise.fits
+fits_trim.py ${week}_white_lownoise.weight.fits temp.fits
+mv temp.fits ${week}_white_lownoise.weight.fits
+
+$aprun aegean.sh ${week}_white_lownoise.fits bane compress
+
+exit 0
