@@ -41,7 +41,11 @@ if not os.path.exists(options.catalogue):
 else:
     catfile=options.catalogue
     if options.avcat:
-        avcat=catfile.replace('_comp.vot','_psf.vot')
+        if os.path.exists(options.avcat):
+            avcat=options.avcat
+        else:
+            avcat=catfile.replace('_comp.vot','_psf.vot')
+            print "Using default avcat: "+avcat
     else:
         if options.psfimage:
             psfimage=options.psfimage

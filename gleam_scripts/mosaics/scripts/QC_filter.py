@@ -2,12 +2,15 @@
 
 __author__ = "PaulHancock"
 
+import os
 import sys
 # GammaCrucis
 #sys.path.insert(1,'/home/hancock/alpha/Aegean') 
 # Galaxy
 home=os.environ['HOME']
 sys.path.insert(1,home+'/bin/')
+#mwa_code_base=os.environ['MWA_CODE_BASE']
+#sys.path.insert(1,mwa_code_base+'MWA_Tools/gleam_scripts/mosaics/scripts/')
 
 import numpy as np
 from AegeanTools import catalogs, flags
@@ -33,8 +36,8 @@ def save(table,filename):
 
 def filter_RADEC(table):
     print "RADEC filter"
-    ramin,ramax = 0,360
-    decmin,decmax = -73,20
+    ramin,ramax = 0,120
+    decmin,decmax = -90,30
     good = []
     for i,row in enumerate(table):
         if ramin<=row['ra']<=ramax:
@@ -123,10 +126,10 @@ def filter_region(table,regionfile):
 if __name__ == '__main__':
     #make_mim()
     #sys.exit()
-    infile,outfile = sys.argv[-2:]
+    infile,outfile,mimtable = sys.argv[-3:]
     table = load(infile)
     table = filter_RADEC(table)
     table = filter_GalacticPlane(table)
     table = filter_intpeak(table)
-    table = filter_region(table,'all.mim')
+    table = filter_region(table,mimtable)
     save(table,outfile)

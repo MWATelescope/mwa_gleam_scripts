@@ -52,7 +52,7 @@ if not check_file:
     except:
         freq_obs = header['FREQ']/1e6
 
-    os.system('stilts tmatch2 matcher=skyellipse in1=$MWA_CODE_BASE/marco_all_VLSSsrcs.fits in2='+input_mosaic+'.vot out=marco_all_VLSSsrcs+'+input_mosaic+'.fits values1="RAJ2000 DEJ2000 MajAxis MinAxis PA" values2="ra dec a b pa" params=20')
+    os.system('stilts tmatch2 matcher=skyellipse in1=$MWA_CODE_BASE/marco_all_VLSSsrcs.fits in2='+input_mosaic+'_comp.vot out=marco_all_VLSSsrcs+'+input_mosaic+'.fits values1="RAJ2000 DEJ2000 MajAxis MinAxis PA" values2="ra dec a b pa" params=20')
 
     hdulist = fits.open('marco_all_VLSSsrcs+'+input_mosaic+'.fits')
     hdulist.verify('fix')

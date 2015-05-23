@@ -35,8 +35,12 @@ parser.add_option('--initsize',dest="initsize",default=None,
                   help="Specify initial histogram bin size in degrees (default = no initial gridding)")
 parser.add_option('--input',dest="input",default=None,
                   help="Input VO table to characterise.")
-parser.add_option('--plot',action="store_true",dest="make_plots",default=True,
-                  help="Make psf plots? (default = True)")
+parser.add_option('--noisolate',action="store_false",dest="isolate",default=True,
+                  help="Don't exclude sources near other sources? (will exclude by default)")
+parser.add_option('--noplot',action="store_false",dest="make_plots",default=True,
+                  help="Turn off psf plots? (on by default)")
+parser.add_option('--noresiduals',action="store_false",dest="residuals",default=True,
+                  help="Turn off exclusion by residuals from elliptical fit? (on by default)")
 parser.add_option('--output',dest="output",default=None,
                   help="Output png file -- default is input_psf.png")
 (options, args) = parser.parse_args()
@@ -241,41 +245,59 @@ def filter(data,params,gridsize,stepsize):
 
 # End of function definitions
 
+sparse=inputfile
 # Read the VO table and start processing
+if options.isolate:
+    sparse=re.sub("_comp.vot","_isolated_comp.vot",inputfile)
+    os.system('stilts tmatch1 matcher=sky values="ra dec" params=600 \
+               action=keep0 in='+inputfile+' out='+sparse)
 
 if options.usemrc:
     psfvot=re.sub("_comp.vot","_psf.vot",inputfile)
     catdir=os.environ['MWA_CODE_BASE']+'/MWA_Tools/catalogues'
     MRCvot=catdir+"/MRC.vot"
     VLSSrvot=catdir+"/VLSSr.vot"
-# Get rid of crazy-bright sources and really super-extended sources
-    os.system('stilts tpipe in='+inputfile+' cmd=\'select ((local_rms<1.0)&&((int_flux/peak_flux)<2))\' out=temp_crop.vot')
+# GLEAM: Get rid of crazy-bright sources, really super-extended sources, and sources with high residuals after fit
+    os.system('stilts tpipe in='+sparse+' cmd=\'select ((local_rms<1.0)&&((int_flux/peak_flux)<2)&&((residual_std/peak_flux)<0.02))\' out=temp_crop.vot')
 # MRC: get point like sources (MFLAG is blank)
-    Mmatchvot=re.sub("_comp.vot","_MRC.vot",inputfile)
-    os.system('stilts tpipe in='+MRCvot+' cmd=\'select NULL_MFLAG\' cmd=\'addcol PA_MRC "0.0"\' out=mrc_crop.vot')
-# Match with MRC
+    Mmatchvot=re.sub("_comp.vot","_MRC.vot",sparse)
+    os.system('stilts tpipe in='+MRCvot+' cmd=\'select NULL_MFLAG\' cmd=\'addcol PA_MRC "0.0"\' out=mrc_temp.vot')
+# Use only isolated sources
+    os.system('stilts tmatch1 matcher=sky values="_RAJ2000 _DEJ2000" params=600 \
+               action=keep0 in=mrc_temp.vot out=mrc_crop.vot')
+# Match GLEAM with MRC
     os.system('stilts tmatch2 matcher=skyellipse params=30 in1=mrc_crop.vot in2=temp_crop.vot out=temp_mrc_match.vot values1="_RAJ2000 _DEJ2000 e_RA2000 e_DE2000 PA_MRC" values2="ra dec a b pa" ofmt=votable')
+# Keep only basic aegean headings
     os.system('stilts tpipe in=temp_mrc_match.vot cmd=\'keepcols "ra dec peak_flux err_peak_flux int_flux err_int_flux local_rms a err_a b err_b pa err_pa flags"\' out='+Mmatchvot)
 
 # VLSSr: get point-like sources (a and b are < 86", same resolution as MRC); only sources North of Dec +20
-    Vmatchvot=re.sub("_comp.vot","_VLSSr.vot",inputfile)
-    os.system('stilts tpipe in='+VLSSrvot+' cmd=\'select ((MajAx<.02389)&&(MinAx<0.2389)&&(_DEJ2000>20)) \' out=vlssr_crop.vot')
+    Vmatchvot=re.sub("_comp.vot","_VLSSr.vot",sparse)
+    os.system('stilts tpipe in='+VLSSrvot+' cmd=\'select ((MajAx<.02389)&&(MinAx<0.2389)&&(_DEJ2000>20)) \' out=vlssr_temp.vot')
+# Use only isolated sources
+    os.system('stilts tmatch1 matcher=sky values="_RAJ2000 _DEJ2000" params=600 \
+               action=keep0 in=vlssr_temp.vot out=vlssr_crop.vot')
+# Match GLEAM with VLSSr
     os.system('stilts tmatch2 matcher=sky params=30 in1=vlssr_crop.vot in2=temp_crop.vot out=temp_vlssr_match.vot values1="_RAJ2000 _DEJ2000" values2="ra dec" ofmt=votable')
+# Keep only basic aegean headings
     os.system('stilts tpipe in=temp_vlssr_match.vot cmd=\'keepcols "ra dec peak_flux err_peak_flux int_flux err_int_flux local_rms a err_a b err_b pa_2 err_pa flags"\' out='+Vmatchvot)
-# Concatenate the two tables together
+# Concatenate the MRC and VLSSr matched tables together
     os.system('stilts tcat in='+Mmatchvot+' in='+Vmatchvot+' out='+psfvot)
 
     os.remove('temp_crop.vot')
+    os.remove('mrc_temp.vot')
     os.remove('mrc_crop.vot')
     os.remove('temp_mrc_match.vot')
+    os.remove('vlssr_temp.vot')
     os.remove('vlssr_crop.vot')
     os.remove('temp_vlssr_match.vot')
     os.remove(Mmatchvot)
     os.remove(Vmatchvot)
+
     table = parse_single_table(psfvot)
+    data = table.array
 else:
-    table = parse_single_table(inputfile)
-data = table.array
+    table = parse_single_table(sparse)
+    data = table.array
 
 x=data['ra']
 
@@ -322,6 +344,7 @@ agrid=filter(data[mask],param_names,gridsize,stepsize)
 vot = Table(data[mask])
 vot.description = "Sources selected for PSF calculation."
 writetoVO(vot, outputvot)
+
 
 # Plotting
 if options.make_plots:
