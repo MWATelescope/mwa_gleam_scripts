@@ -1,0 +1,137 @@
+#!/bin/bash
+
+# Eventually edit to include R,G,B, but leave for now
+
+datadir=DATADIR
+proj=PROJ
+week=WEEK
+
+cd $datadir/$proj/$week
+
+fiducial_freq="170-177MHz"
+
+list=`ls -d *MHz`
+
+# Giant mosaic
+
+freqs=""
+
+for file in $list
+do
+    startfreq=`basename $file |  awk 'BEGIN {FS="-"} {print $1}'`
+    if [[ $startfreq -gt 169 ]]
+    then
+        freqs="$freqs "$file
+    fi
+done
+
+# Get list of frequencies and zenith psf from the header of the final mosaic, which itself should be using the zenith PSF
+bmaj=`pyhead.py -p BMAJ ${fiducial_freq}/${week}_${fiducial_freq}.fits | awk '{print $3}'`
+bmin=`pyhead.py -p BMIN ${fiducial_freq}/${week}_${fiducial_freq}.fits | awk '{print $3}'`
+echo "Final resolution will be $bmaj x $bmin deg."
+
+if [[ ! -d white ]]
+then
+    mkdir white
+fi
+cd white
+
+for freq in $freqs
+do
+    for file in ../${freq}/${week}_${freq}.fits
+    do
+# Load and convolve-down all of the Week images, setting up for the no-weight run
+        localname=`basename $file`
+        if [[ ! -e $localname ]]
+        then
+            if [[ $localname != "${week}_${fiducial_freq}.fits" ]]
+            then
+                convbeam=`pyhead.py -p BMAJ ../${fiducial_freq}/${week}_${fiducial_freq}.fits | awk '{print $3*3600}'`
+                echo "Convolving $file to resolution of $convbeam arcsec."
+                imname=`basename $file | sed "s/.fits/.im/"`
+                fits_unmask.py -i $file -o temp.fits
+                fits op=xyin in=temp.fits out=$imname
+                rm temp.fits
+                puthd in=$imname/bunit value="JY/BEAM"
+                convol map=$imname options="final" fwhm=$convbeam out=temp.im
+                fits op=xyout in=temp.im out=$localname
+                rm -rf temp.im
+                echo "Writing $localname."
+            else
+                echo "$localname is already at the lowest resolution; linking instead."
+                ln -s $file
+            fi
+        fi
+    done
+
+    for file in ../${freq}/mosaic*ied.fits
+    do
+        localname=`basename $file`
+        if [[ ! -e $localname ]]
+        then
+# Load and convolve-down all of the individual mosaics, setting up for the weighted run
+            root=`echo $localname | awk 'BEGIN {FS="_"} {print $1"_"$2}'`
+            echo "Using ${root}_${fiducial_freq}_r-1.0_recomb_polyapplied.fits to convolve $localname"
+            if [[ "$localname" != "${root}_${fiducial_freq}_r-1.0_recomb_polyapplied.fits" ]]
+            then
+                convbeam=`pyhead.py -p BMAJ ../${fiducial_freq}/${root}_${fiducial_freq}_r-1.0_recomb_polyapplied.fits | awk '{print $3*3600}'`
+                echo "Convolving $file to resolution of $convbeam arcsec."
+                imname=`basename $file | sed "s/.fits/.im/"`
+                fits_unmask.py -i $file -o temp.fits
+                fits op=xyin in=temp.fits out=$imname
+                rm temp.fits
+                puthd in=$imname/bunit value="JY/BEAM"
+                convol map=$imname options="final" fwhm=$convbeam out=temp.im
+                fits op=xyout in=temp.im out=$localname
+                rm -rf temp.im
+                echo "Writing $localname."
+            else
+                echo "$localname is already at the lowest resolution; linking instead."
+                ln -s $file
+            fi
+        fi
+   done
+# Link all of the mosaic rms images without worrying about convolution
+   for file in ../${freq}/mosaic*oid.fits
+   do
+       localname=`basename $file`
+       if [[ ! -h $localname ]]
+       then
+           ln -s $file
+       fi
+   done
+done
+
+# No weight mosaic (frequency is the same, but noise varies over the image)
+if [[ ! -e ${week}_white_noweight.fits ]]
+then
+    $aprun swarp -c ../noweight.swarp ${week}*z.fits -IMAGEOUT_NAME ${week}_white_noweight.fits -WEIGHTOUT_NAME ${week}_white_noweight.weight.fits
+    fits_trim.py ${week}_white_noweight.fits temp.fits
+    mv temp.fits ${week}_white_noweight.fits
+    fits_trim.py ${week}_white_noweight.weight.fits temp.fits
+    mv temp.fits ${week}_white_noweight.weight.fits
+# Update with zenith 170-177MHz beam
+    pyhead.py -u BMAJ $bmaj ${week}_white_noweight.fits
+    pyhead.py -u BMIN $bmin ${week}_white_noweight.fits
+    pyhead.py -u BPA 0.0 ${week}_white_noweight.fits
+fi
+
+$aprun aegean.sh ${week}_white_noweight.fits bane compress
+
+# Low noise mosaic (noise is reduced, but frequency varies over the image)
+if [[ ! -e ${week}_white_lownoise.fits ]]
+then
+    $aprun swarp -c ../weight.swarp mosaic*ed.fits -IMAGEOUT_NAME ${week}_white_lownoise.fits -WEIGHTOUT_NAME ${week}_white_lownoise.weight.fits  -PROJECTION_TYPE ZEA
+    fits_trim.py ${week}_white_lownoise.fits temp.fits
+    mv temp.fits ${week}_white_lownoise.fits
+    fits_trim.py ${week}_white_lownoise.weight.fits temp.fits
+    mv temp.fits ${week}_white_lownoise.weight.fits
+# Update with zenith 170-177MHz beam
+    pyhead.py -u BMAJ $bmaj ${week}_white_lownoise.fits
+    pyhead.py -u BMIN $bmin ${week}_white_lownoise.fits
+    pyhead.py -u BPA 0.0 ${week}_white_lownoise.fits
+fi
+
+$aprun aegean.sh ${week}_white_lownoise.fits bane compress
+
+exit 0
