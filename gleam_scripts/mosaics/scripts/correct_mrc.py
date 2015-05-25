@@ -17,7 +17,7 @@ catdir=os.environ['MWA_CODE_BASE']
 MRCvot=catdir+"/MRC.vot"
 
 #files=sorted(glob.glob("10*XX*2.0.fits")) #[::-1]
-files=sorted(glob.glob("10*XX*2.1.fits")) #[::-1]
+files=sorted(glob.glob("10*XX*2.?.fits")) #[::-1]
 # Check all matching files and VO tables are present
 
 for Xfits in files:
@@ -93,6 +93,12 @@ for Xfits in files:
             hdr_in['CRVAL2'] = dec + delDec
         # Modify to fix flux scaling
             hdu_in[0].data=hdu_in[0].data*ratio
+        # Remove stupid bonus keywords, if they have been added
+            try:
+                hdr_in.remove('DATAMIN')
+                hdr_in.remove('DATAMAX')
+            except:
+                print None
         # Write out
             fits_corr=re.sub(".fits","_corrected.fits",fitsfile)
             hdu_in.writeto(fits_corr,clobber=True)
