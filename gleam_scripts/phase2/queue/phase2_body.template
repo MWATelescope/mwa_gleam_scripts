@@ -276,6 +276,7 @@ then
         newthreshold=`echo "$rms * 3" | bc -l`
     elif [[ ${solobs} != "" ]]
     then
+        $aprun chgcentre -minw -shiftback ${obsnum}.ms
 # Use transferred solutions from another observation
 # Slightly different order: apply the good solutions before peeling
 # Apply to CORRECTED_DATA if the old dataset got peeled, DATA otherwise
