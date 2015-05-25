@@ -69,20 +69,22 @@ else:
 #put ALL the pixels into our vectorized functions and minimise our overheads
     ra,dec = w.wcs_pix2world(indexes,1).transpose()
 
+    midra=hdu_in[0].header['CRVAL1']
 # Want to find out if we need to unwrap RA, by looking at the pixel above ycrd
     minra=w.wcs_pix2world([[3*scidata.shape[0]/4,ycrd+1]],1)[0][0]
     maxra=w.wcs_pix2world([[scidata.shape[0]/4,ycrd+1]],1)[0][0]
 # WCS tends to be negative for snapshots for some reason
     if (minra < 0) or (maxra < 0):
         ra+=360.0
+# midra must match ra
+        midra+=360
 # And my unwrap function only works for +ve RAs
     if maxra < minra:
         ra=vunwrap(ra)
 # So at the end of all that, if the meridian is in the image, RA must lie between -180 and +180
 # So midra must also lie in that range
-    midra=hdu_in[0].header['CRVAL1']
-    if midra > 180.:
-        midra-=360.
+        if midra > 180.:
+            midra-=360.
 
 # Pixels to keep within RA range
     mask1d=np.ones(shape=ra.shape,dtype=np.float32)
