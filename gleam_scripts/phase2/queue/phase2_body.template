@@ -467,7 +467,7 @@ cd $datadir/$proj/
 
 if ls ${obsnum}/*MHz*fits &> /dev/null
 then
-    if [[ $docal == "True" ]]
+    if [[ $docal == "True" || -e $solobs-solutions.bin ]]
     then
         $aprun tar -I pigz -cf ${obsnum}_phase2.tar.gz ${obsnum}/${obsnum}.ms* ${obsnum}/*solutions.bin ${obsnum}/calibrate.log ${obsnum}/*.txt ${obsnum}/*.vot ${obsnum}/${obsnum}.metafits
         tar -cf ${obsnum}_images.tar ${obsnum}/${obsnum}*MHz*fits
