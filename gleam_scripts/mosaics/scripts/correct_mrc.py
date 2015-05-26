@@ -98,7 +98,7 @@ for Xfits in files:
                 hdr_in.remove('DATAMIN')
                 hdr_in.remove('DATAMAX')
             except:
-                print None
+                pass
         # Write out
             fits_corr=re.sub(".fits","_corrected.fits",fitsfile)
             hdu_in.writeto(fits_corr,clobber=True)
