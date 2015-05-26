@@ -131,7 +131,7 @@ if __name__ == '__main__':
     try:
         mimtable=sys.argv[1:][2]
     except:
-        mimtable=mwa_code_base+"/gleam_scripts/mosaics/scripts/all.mim"
+        mimtable=mwa_code_base+"/MWA_Tools/gleam_scripts/mosaics/scripts/all.mim"
     table = load(infile)
     table = filter_RADEC(table)
     table = filter_GalacticPlane(table)
