@@ -9,8 +9,8 @@ import sys
 # Galaxy
 home=os.environ['HOME']
 sys.path.insert(1,home+'/bin/')
-#mwa_code_base=os.environ['MWA_CODE_BASE']
-#sys.path.insert(1,mwa_code_base+'MWA_Tools/gleam_scripts/mosaics/scripts/')
+mwa_code_base=os.environ['MWA_CODE_BASE']
+sys.path.insert(1,mwa_code_base+'MWA_Tools/gleam_scripts/mosaics/scripts/')
 
 import numpy as np
 from AegeanTools import catalogs, flags
