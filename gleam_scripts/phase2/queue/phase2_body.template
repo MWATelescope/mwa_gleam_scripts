@@ -286,7 +286,7 @@ then
         fi
         time applysolutions $caldatacolumn -copy ${obsnum}.ms $solobs-solutions.bin
     # Re-run flagger to catch any broken channels after self-calibration
-        aoflagger -v -column CORRECTED_DATA ${obsnum}.ms
+        $aprun aoflagger -v -column CORRECTED_DATA ${obsnum}.ms
 
         if grep -q "Peel out source" peel_test.txt
         then
