@@ -126,7 +126,11 @@ def filter_region(table,regionfile):
 if __name__ == '__main__':
     #make_mim()
     #sys.exit()
-    infile,outfile,mimtable = sys.argv[-3:]
+    infile,outfile = sys.argv[-2:]
+    try:
+        mimtable=sys.argv[1:][2]
+    except:
+        mimtable=mwa_code_base+"gleam_scripts/mosaics/scripts/all.mim"
     table = load(infile)
     table = filter_RADEC(table)
     table = filter_GalacticPlane(table)
