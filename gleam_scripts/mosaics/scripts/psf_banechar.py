@@ -61,7 +61,7 @@ if os.path.exists(fitsfile):
     try:
         hdulist=fits.open(fitsfile)
         header=hdulist[0].header
-        start_freq=header['FREQ']/1e6
+        start_freq=(header['FREQ']/1e6)-(7.68/2)
     except:
         print "No frequency found in fitsheader; will estimate the frequency from the input filename."
         start_freq=int(re.search("[0-9]{3}",inputfile).group())
