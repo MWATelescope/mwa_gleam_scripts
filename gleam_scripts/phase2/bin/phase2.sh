@@ -68,9 +68,8 @@ fi
 # Chose a batch size that compromises number of jobs submitted to queue and /short space used
 batchsize=10
 
-if [[ $1 ]] && [[ $2 ]] #&& [[ $3 ]] && [[ $4 ]]
+if [[ $1 ]] && [[ $2 ]] && [[ $3 ]] && [[ $4 ]]
 then
-
     filelist=$1
     proj=$2
     chan=$3
@@ -234,7 +233,8 @@ then
         exit 1
     fi
 else
-    echo "Give me a list of files and a project ID, e.g. self_prev.sh /some/directory/files.txt G0001 ."
+    echo "Give me a list of files, a project ID, a central channel, and whether to do self/phase2/transfer of cals"
+    echo "e.g. phase2.sh /some/directory/files.txt G0001 169 1012345677 (the latter is the observation from which you're transferring cals ."
     exit 1
 fi
 
