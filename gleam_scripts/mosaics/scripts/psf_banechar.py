@@ -23,14 +23,16 @@ from optparse import OptionParser
 
 usage="Usage: %prog [options]\n"
 parser = OptionParser(usage=usage)
+parser.add_option('--input',dest="input",default=None,
+                  help="Input VO table to characterise.")
+parser.add_option('--fitsfile',dest="fitsfile",default=None,
+                  help="Corresponding fits file (default is to search for one based on filenames).")
 parser.add_option('--gridsize',dest="gridsize",default=15.0,
                   help="Specify grid size in degrees (default = 15 deg)")
 parser.add_option('--stepsize',dest="stepsize",default=1,
                   help="Specify step size in degrees (default = 1 deg)")
 parser.add_option('--minsnr',dest="minsnr",default=10.0,type="float",
                   help="Minimum S/N ratio for sources used to fit PSF (default = 10 sigma)")
-parser.add_option('--input',dest="input",default=None,
-                  help="Input VO table to characterise.")
 parser.add_option('--nomrc',action="store_false",dest="usemrc",default=True,
                   help="Don't use MRC (and VLSSr North of Dec 0) to select unresolved sources? (default = use ancillary catalogues.)")
 parser.add_option('--noisolate',action="store_false",dest="isolate",default=True,
@@ -52,10 +54,13 @@ if not os.path.exists(options.input):
     sys.exit(1)
 else:
     inputfile=options.input
-    fitsfile=inputfile.replace('_comp.vot','.fits')
-    if not os.path.exists(fitsfile):
-        tempvar=inputfile.split("_")
-        fitsfile=tempvar[0]+"_"+tempvar[1]+".fits"
+    if options.fitsfile:
+        fitsfile=options.fitsfile
+    else:
+        fitsfile=inputfile.replace('_comp.vot','.fits')
+        if not os.path.exists(fitsfile):
+            tempvar=inputfile.split("_")
+            fitsfile=tempvar[0]+"_"+tempvar[1]+".fits"
 
 if os.path.exists(fitsfile):
     print "Corresponding fits image found."
