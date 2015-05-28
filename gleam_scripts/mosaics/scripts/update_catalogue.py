@@ -100,7 +100,7 @@ data = table.array
 
 psf_table = parse_single_table(psfcat)
 psf_data = psf_table.array
-psf_ratio=np.average(a=(psf_data['int_flux']/psf_data['peak_flux']),weights=(np.power(psf_data['peak_flux']/psf_data['local_rms'],2)))
+psf_ratio=np.average(a=(psf_data['int_flux']/psf_data['peak_flux']),weights=((psf_data['peak_flux']/psf_data['local_rms'])*(data['peak_flux']/data['residual_std'])))
 #    print "Average psf_ratio = "+str(psf_ratio)
 #    psf_ratio=wgmean(a=(psf_data['int_flux']/psf_data['peak_flux']),weights=(np.power(psf_data['peak_flux']/psf_data['local_rms'],2)))
 #    print "Weighted geometric mean psf_ratio = "+str(psf_ratio)

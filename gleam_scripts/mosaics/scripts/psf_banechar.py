@@ -265,7 +265,7 @@ if options.usemrc:
     MRCvot=catdir+"/MRC.vot"
     VLSSrvot=catdir+"/VLSSr.vot"
 # GLEAM: Get rid of crazy-bright sources, really super-extended sources, and sources with high residuals after fit
-    os.system('stilts tpipe in='+sparse+' cmd=\'select ((local_rms<1.0)&&((int_flux/peak_flux)<2)&&((residual_std/peak_flux)<0.04))\' out=temp_crop.vot')
+    os.system('stilts tpipe in='+sparse+' cmd=\'select ((local_rms<1.0)&&((int_flux/peak_flux)<2)&&((residual_std/peak_flux)<0.1))\' out=temp_crop.vot')
 # MRC: get point like sources (MFLAG is blank)
     Mmatchvot=re.sub("_comp.vot","_MRC.vot",sparse)
     os.system('stilts tpipe in='+MRCvot+' cmd=\'select NULL_MFLAG\' cmd=\'addcol PA_MRC "0.0"\' out=mrc_temp.vot')
