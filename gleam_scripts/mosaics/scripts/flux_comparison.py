@@ -23,7 +23,9 @@ from optparse import OptionParser
 usage="Usage: %prog [options] <file>\n"
 parser = OptionParser(usage=usage)
 parser.add_option('--mosaic',type="string", dest="mosaic",
-                    help="The filename of the mosaic you want to read in. Exclude file extension.")
+                    help="The filename of the catalogue you want to read in. Exclude _comp.vot extension.")
+parser.add_option('--fitsfile',type="string", dest="fitsfile",
+                    help="The filename of the fits file you want to read in. Default = catalogue.fits")
 parser.add_option('--ratio_errors',action="store_true",dest="do_ratio_errors",default=True,
                     help="Calculate errors on model fits and ratio of it with image flux measurement (default = True). Keep true if already have *fluxdentable in directory.")
 parser.add_option('--int',action="store_true",dest="int",default=False,
@@ -46,7 +48,11 @@ else:
 if not check_file:
 
     # Getting freq.
-    header = fits.getheader(input_mosaic+'.fits')
+    if options.fitsfile:
+        fitsfile=options.fitsfile
+    else:
+        fitsfile=input_mosaic+'.fits'
+    header = fits.getheader(fitsfile)
     try:
         freq_obs = header['CRVAL3']/1e6
     except:
@@ -558,7 +564,7 @@ else:
 # ax1.xaxis.set_major_locator(MaxNLocator(prune='lower'))
 cb = plt.colorbar(ax.scatter(dec, ratio, marker='o',color ='k',c=SNR, cmap=plt.cm.Greys_r, norm=matplotlib.colors.LogNorm()))
 cb.set_label('error (Pred. flux density / Obs. flux density)',fontsize = 15)
-plt.savefig(input_mosaic+'_fits.png')
+plt.savefig(input_mosaic+'_'+suffix+'_flux_fits.png')
 
 # Plotting CDF
 
@@ -573,7 +579,7 @@ ax.set_ylim(0., 1.)
 ax.set_xlim(0, 1.)
 ax.legend(loc='upper right', fontsize=10) # make a legend in the best location
 ax.set_xlabel('Pred. flux density / Obs. flux density', fontsize = 15)
-plt.savefig(input_mosaic+'_cdf.png')
+plt.savefig(input_mosaic+'_'+suffix+'_cdf.png')
 
 # Saving zero fits for each freq 
 week=input_mosaic.split("_")[0]
