@@ -53,7 +53,9 @@ if not os.path.exists(options.input):
 else:
     inputfile=options.input
     fitsfile=inputfile.replace('_comp.vot','.fits')
-#    outfitstable=inputfile.replace('_comp.vot','_psf_data.fits')
+    if not os.path.exists(fitsfile):
+        tempvar=inputfile.split("_")
+        fitsfile=tempvar[0]+"_"+tempvar[1]+".fits"
 
 if os.path.exists(fitsfile):
     print "Corresponding fits image found."
@@ -283,15 +285,15 @@ if options.usemrc:
 # Concatenate the MRC and VLSSr matched tables together
     os.system('stilts tcat in='+Mmatchvot+' in='+Vmatchvot+' out='+psfvot)
 
-#    os.remove('temp_crop.vot')
-#    os.remove('mrc_temp.vot')
-#    os.remove('mrc_crop.vot')
-#    os.remove('temp_mrc_match.vot')
-#    os.remove('vlssr_temp.vot')
-#    os.remove('vlssr_crop.vot')
-#    os.remove('temp_vlssr_match.vot')
-#    os.remove(Mmatchvot)
-#    os.remove(Vmatchvot)
+    os.remove('temp_crop.vot')
+    os.remove('mrc_temp.vot')
+    os.remove('mrc_crop.vot')
+    os.remove('temp_mrc_match.vot')
+    os.remove('vlssr_temp.vot')
+    os.remove('vlssr_crop.vot')
+    os.remove('temp_vlssr_match.vot')
+    os.remove(Mmatchvot)
+    os.remove(Vmatchvot)
 
     table = parse_single_table(psfvot)
     data = table.array
@@ -411,7 +413,7 @@ if dopsfout:
             print "Error: Can't find CDELT1 or CD1_1"
         if 'CDELT2' in header:
             header['CDELT2'] = stepsize
-        elif "CD2_2" in header:
+        elif 'CD2_2' in header:
             header['CD2_2'] = stepsize
         else:
             print "Error: Can't find CDELT2 or CD2_2"
