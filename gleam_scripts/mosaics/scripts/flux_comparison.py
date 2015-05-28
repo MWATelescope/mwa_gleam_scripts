@@ -613,7 +613,7 @@ col3 = fits.Column(name='Zero_fit_err', format = 'E', array = zero_fits_err)
 cols = fits.ColDefs([col1,col2,col3])
 
 tbhdu = fits.new_table(cols)    
-tbhdu.writeto('zerofits.fits', clobber = True) 
+tbhdu.writeto(week+'_'+freq_str+'_zero.fits', clobber = True) 
 
 # plt.figure()
 # plt.hist2d(dec,ratio,bins=25)

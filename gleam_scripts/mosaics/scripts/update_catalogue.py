@@ -33,6 +33,14 @@ parser.add_option('--output',dest="output",default=None,
                   help="Output catalogue file (default = catalogue_mod.vot).")
 (options, args) = parser.parse_args()
 
+# No scipy option for weighted gmean so write my own
+
+def wgmean(a,weights):
+    total=np.sum(weights*np.log(a))
+    sum_of_weights=np.sum(weights)
+    weighted_geometric_mean=np.exp(total/sum_of_weights)
+    return weighted_geometric_mean
+
 # Parse the input options
 
 if not os.path.exists(options.catalogue):
@@ -66,7 +74,7 @@ else:
     if options.output:
         output=options.output
     else:
-        output=catfile.replace('_comp.vot','_mod.vot')
+        output=catfile.replace('_comp.vot','_posdepmod.vot')
 
 # Read the VO table and start processing
 
@@ -77,6 +85,11 @@ if options.avcat:
     psf_table = parse_single_table(avcat)
     psf_data = psf_table.array
     psf_ratio=np.average(a=(psf_data['int_flux']/psf_data['peak_flux']),weights=(np.power(psf_data['peak_flux']/psf_data['local_rms'],2)))
+#    print "Average psf_ratio = "+str(psf_ratio)
+#    psf_ratio=wgmean(a=(psf_data['int_flux']/psf_data['peak_flux']),weights=(np.power(psf_data['peak_flux']/psf_data['local_rms'],2)))
+#    print "Weighted geometric mean psf_ratio = "+str(psf_ratio)
+#    psf_ratio=scipy.stats.gmean(a=(psf_data['int_flux']/psf_data['peak_flux']))
+#    print "Unweighted geometric mean psf_ratio = "+str(psf_ratio)
     print "Simply scaling the integrated fluxes by a direction-independent factor of "+str(psf_ratio)
     data['int_flux']/=psf_ratio
     vot = Table(data)
