@@ -27,6 +27,8 @@ parser.add_option('--bimage',dest="bimage",default=None,
                   help="Input minor axis (b) image to use (default = catalogue_b.fits).")
 parser.add_option('--paimage',dest="paimage",default=None,
                   help="Input position angle (pa) image to use (default = catalogue_pa.fits).")
+parser.add_option('--printaverage',action="store_true",dest="printaverage",default=False,
+                  help="Just print the average PSF ratio (int/peak) and exit. default=False.")
 parser.add_option('--average',action="store_true",dest="average",default=False,
                   help="Use the average PSF to correct the catalogue, instead of using the position-dependent corrections. (default = False).")
 parser.add_option('--output',dest="output",default=None,
@@ -56,7 +58,6 @@ if not os.path.exists(options.catalogue):
 else:
     catfile=options.catalogue
     psfcat=catfile.replace('_comp.vot','_psf.vot')
-    print "Using PSF catalogue for average corrections: "+psfcat
     if options.psfimage:
         psfimage=options.psfimage
     else:
@@ -91,7 +92,6 @@ else:
             outfits=options.outfits
         else:
             outfits=fitsimage.replace('.fits','_mod.fits')
-        print "Modifying "+fitsimage+" to write modified header to fits image: "+outfits
 
 # Read the VO table and start processing
 
@@ -106,53 +106,56 @@ psf_ratio=np.average(a=(psf_data['int_flux']/psf_data['peak_flux']),weights=(np.
 #    print "Weighted geometric mean psf_ratio = "+str(psf_ratio)
 #    psf_ratio=scipy.stats.gmean(a=(psf_data['int_flux']/psf_data['peak_flux']))
 #    print "Unweighted geometric mean psf_ratio = "+str(psf_ratio)
-if options.scalefits:
-    print "Simply scaling the fits header beam by a direction-independent factor of "+str(psf_ratio)
-    hdu_in=fits.open(fitsimage)
-    hdu_in[0].header['BMAJ']*=psf_ratio
-    hdu_in[0].header['BMIN']*=psf_ratio
-    print "Writing to "+outfits
-    hdu_in.writeto(outfits, clobber=True)
-
-if options.average:
-    print "Simply scaling the peak fluxes in the catalogue by a direction-independent factor of "+str(psf_ratio)
-    data['peak_flux']*=psf_ratio
-    vot = Table(data)
-    # description of this votable
-    vot.description = "Corrected for position-independent PSF variation"
-    print "Writing to "+output
-    writetoVO(vot, output)
+if options.printaverage:
+    print psf_ratio
 else:
-    print "Performing direction-dependent PSF correction."
-    psf_in = fits.open(psfimage)
-    w = wcs.WCS(psf_in[0].header,naxis=2)
+    if options.scalefits:
+        print "Simply scaling the fits header beam by a direction-independent factor of "+str(psf_ratio)
+        hdu_in=fits.open(fitsimage)
+        hdu_in[0].header['BMAJ']*=psf_ratio
+        hdu_in[0].header['BMIN']*=psf_ratio
+        print "Writing to "+outfits
+        hdu_in.writeto(outfits, clobber=True)
 
-    unmara, unmadec = np.array(data['ra']).tolist(), np.array(data['dec']).tolist()
-    rapix, decpix = w.wcs_world2pix(unmara,unmadec,1)
-    raintpix, decintpix = np.array(np.round(rapix),dtype=int), np.array(np.round(decpix),dtype=int)
-    raclip, decclip = np.clip(raintpix,0,psf_in[0].data.shape[1]-1), np.clip(decintpix,0,psf_in[0].data.shape[0]-1)
-    # Yes, it's bonkers that the wcs is the other way round compared to the fits file
-    psf_ratio = psf_in[0].data[decclip,raclip]
+    if options.average:
+        print "Simply scaling the peak fluxes in the catalogue by a direction-independent factor of "+str(psf_ratio)
+        data['peak_flux']*=psf_ratio
+        vot = Table(data)
+        # description of this votable
+        vot.description = "Corrected for position-independent PSF variation"
+        print "Writing to "+output
+        writetoVO(vot, output)
+    else:
+        print "Performing direction-dependent PSF correction."
+        psf_in = fits.open(psfimage)
+        w = wcs.WCS(psf_in[0].header,naxis=2)
 
-    # Get the PSF information
-    a_in = fits.open(aimage)
-    b_in = fits.open(bimage)
-    pa_in = fits.open(paimage)
-    a = a_in[0].data[decclip,raclip]
-    b = b_in[0].data[decclip,raclip]
-    pa = pa_in[0].data[decclip,raclip]
+        unmara, unmadec = np.array(data['ra']).tolist(), np.array(data['dec']).tolist()
+        rapix, decpix = w.wcs_world2pix(unmara,unmadec,1)
+        raintpix, decintpix = np.array(np.round(rapix),dtype=int), np.array(np.round(decpix),dtype=int)
+        raclip, decclip = np.clip(raintpix,0,psf_in[0].data.shape[1]-1), np.clip(decintpix,0,psf_in[0].data.shape[0]-1)
+        # Yes, it's bonkers that the wcs is the other way round compared to the fits file
+        psf_ratio = psf_in[0].data[decclip,raclip]
 
-    # Scale the peak fluxes
-    data['peak_flux']*=psf_ratio
+        # Get the PSF information
+        a_in = fits.open(aimage)
+        b_in = fits.open(bimage)
+        pa_in = fits.open(paimage)
+        a = a_in[0].data[decclip,raclip]
+        b = b_in[0].data[decclip,raclip]
+        pa = pa_in[0].data[decclip,raclip]
 
-    vot = Table(data)
+        # Scale the peak fluxes
+        data['peak_flux']*=psf_ratio
 
-    # Add the PSF columns
-    vot.add_column(Column(data=a,name='a_psf'))
-    vot.add_column(Column(data=b,name='b_psf'))
-    vot.add_column(Column(data=pa,name='pa_psf'))
+        vot = Table(data)
 
-    # description of this votable
-    vot.description = "Corrected for position-dependent PSF variation"
-    print "Writing to "+output
-    writetoVO(vot, output)
+        # Add the PSF columns
+        vot.add_column(Column(data=a,name='a_psf'))
+        vot.add_column(Column(data=b,name='b_psf'))
+        vot.add_column(Column(data=pa,name='pa_psf'))
+
+        # description of this votable
+        vot.description = "Corrected for position-dependent PSF variation"
+        print "Writing to "+output
+        writetoVO(vot, output)
