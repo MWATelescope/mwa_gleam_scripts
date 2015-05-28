@@ -27,10 +27,14 @@ parser.add_option('--bimage',dest="bimage",default=None,
                   help="Input minor axis (b) image to use (default = catalogue_b.fits).")
 parser.add_option('--paimage',dest="paimage",default=None,
                   help="Input position angle (pa) image to use (default = catalogue_pa.fits).")
+parser.add_option('--psfcat',dest="psfcat",default=None,
+                  help="Input PSF catalogue to use (default = catalogue_psf.vot).")
 parser.add_option('--printaverage',action="store_true",dest="printaverage",default=False,
                   help="Just print the average PSF ratio (int/peak) and exit. default=False.")
 parser.add_option('--average',action="store_true",dest="average",default=False,
                   help="Use the average PSF to correct the catalogue, instead of using the position-dependent corrections. (default = False).")
+parset.add_option('--scaleint',action="store_true",dest="scaleint",default=False,
+                  help="For the direction-dependent correction, scale the integrated fluxes downward by the int/peak ratio, instead of the peak fluxes upward. (default = False).")
 parser.add_option('--output',dest="output",default=None,
                   help="Output catalogue file (default = catalogue_mod.vot, or catalogue_ddmod.vot for direction-dependent corrections).")
 parser.add_option('--scalefits',action="store_true",dest="scalefits",default=False,
@@ -57,7 +61,10 @@ if not os.path.exists(options.catalogue):
     sys.exit(1)
 else:
     catfile=options.catalogue
-    psfcat=catfile.replace('_comp.vot','_psf.vot')
+    if options.psfcat:
+        psfcat=options.psfcat
+    else:
+        psfcat=catfile.replace('_comp.vot','_psf.vot')
     if options.psfimage:
         psfimage=options.psfimage
     else:
@@ -100,7 +107,7 @@ data = table.array
 
 psf_table = parse_single_table(psfcat)
 psf_data = psf_table.array
-psf_ratio=np.average(a=(psf_data['int_flux']/psf_data['peak_flux']),weights=((psf_data['peak_flux']/psf_data['local_rms'])*(data['peak_flux']/data['residual_std'])))
+psf_ratio=np.average(a=(psf_data['int_flux']/psf_data['peak_flux']),weights=((psf_data['peak_flux']/psf_data['local_rms'])*(psf_data['peak_flux']/psf_data['residual_std'])))
 #    print "Average psf_ratio = "+str(psf_ratio)
 #    psf_ratio=wgmean(a=(psf_data['int_flux']/psf_data['peak_flux']),weights=(np.power(psf_data['peak_flux']/psf_data['local_rms'],2)))
 #    print "Weighted geometric mean psf_ratio = "+str(psf_ratio)
@@ -110,7 +117,7 @@ if options.printaverage:
     print psf_ratio
 else:
     if options.scalefits:
-        print "Simply scaling the fits header beam by a direction-independent factor of "+str(psf_ratio)
+        print "Scaling the fits header beam upward by a direction-independent factor of "+str(psf_ratio)
         hdu_in=fits.open(fitsimage)
         hdu_in[0].header['BMAJ']*=psf_ratio
         hdu_in[0].header['BMIN']*=psf_ratio
@@ -118,8 +125,12 @@ else:
         hdu_in.writeto(outfits, clobber=True)
 
     if options.average:
-        print "Simply scaling the peak fluxes in the catalogue by a direction-independent factor of "+str(psf_ratio)
-        data['peak_flux']*=psf_ratio
+        if options.scaleint:
+            print "Scaling the integrated fluxes in the catalogue downward by a direction-independent factor of "+str(psf_ratio)
+            data['int_flux']/=psf_ratio
+        else:
+            print "Scaling the peak fluxes in the catalogue upward by a direction-independent factor of "+str(psf_ratio)
+            data['peak_flux']*=psf_ratio
         vot = Table(data)
         # description of this votable
         vot.description = "Corrected for position-independent PSF variation"
@@ -146,7 +157,10 @@ else:
         pa = pa_in[0].data[decclip,raclip]
 
         # Scale the peak fluxes
-        data['peak_flux']*=psf_ratio
+        if options.scaleint:
+            data['int_flux']/=psf_ratio
+        else:
+            data['peak_flux']*=psf_ratio
 
         vot = Table(data)
 
