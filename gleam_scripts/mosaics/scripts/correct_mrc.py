@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# Script to correct the flux scale by matching peak_fluxes to scaled MRC
+# Script to correct the flux scale by matching int_fluxes to scaled MRC
 # Hopefully will remove slow RA-dependent flux scale effects in GLEAM
 # Also remove the RA, Dec shifts using MRC since it's like John's corrections but without the bugs
 
@@ -20,7 +20,8 @@ MRCvot=catdir+"/MRC.vot"
 files=sorted(glob.glob("10*XX*2.?.fits")) #[::-1]
 # Check all matching files and VO tables are present
 
-for Xfits in files:
+# Iterating in reverse means we don't accidentally skip every other entry
+for Xfits in reversed(files):
     Yfits=re.sub("XX","YY",Xfits)
     Ifits=re.sub("XX","I",Xfits)
     Ivot=re.sub(".fits","_comp.vot",Ifits)
@@ -61,7 +62,7 @@ for Xfits in files:
         os.system('stilts tpipe in='+Ivot+' cmd=\'select local_rms<1.0\' out=temp2.vot')
         os.system('stilts tmatch2 matcher=skyellipse params=30 in1=temp1.vot in2=temp2.vot out=temp.vot values1="_RAJ2000 _DEJ2000 e_RA2000 e_DE2000 PA" values2="ra dec a b pa" ofmt=votable')
     # Exclude extended sources
-        os.system('stilts tpipe in=temp.vot cmd=\'select ((int_flux/peak_flux)<2)\' cmd=\'addcol logratio "(ln(S_'+freq_str+'/peak_flux))"\' cmd=\'addcol weight "(peak_flux/local_rms)"\' cmd=\'addcol delRA "(_RAJ2000-ra)"\' cmd=\'addcol delDec "(_DEJ2000-dec)"\' omode=out ofmt=vot out=temp3.vot')
+        os.system('stilts tpipe in=temp.vot cmd=\'select ((int_flux/peak_flux)<2)\' cmd=\'addcol logratio "(ln(S_'+freq_str+'/int_flux))"\' cmd=\'addcol weight "(int_flux/local_rms)"\' cmd=\'addcol delRA "(_RAJ2000-ra)"\' cmd=\'addcol delDec "(_DEJ2000-dec)"\' omode=out ofmt=vot out=temp3.vot')
         os.system('stilts tpipe in=temp3.vot cmd=\'select abs(delRA)<1.0\' out='+matchvot)
         os.remove('temp.vot')
         os.remove('temp1.vot')
