@@ -96,10 +96,10 @@ do
                     rm $fitsimage
                 fi
             done
-            cd ../
         else
             echo "Mosaics already exist for ${date}/${chan}/subchan${subchan} ; not downloading extra images."
         fi
+        cd ../
     done
 done
 

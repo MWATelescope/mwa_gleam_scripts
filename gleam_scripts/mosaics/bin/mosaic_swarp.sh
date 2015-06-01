@@ -51,7 +51,8 @@ then
     chan=$2
     proj=$3
     targetra=$4
-    targetdec=$5
+# can only have integer decs, or the swarp script replacement will fail
+    targetdec=`echo $5 | awk '{print int($1)}'`
     xsize=$6
     ysize=$7
     version=$8
@@ -60,10 +61,14 @@ then
         version=2.1
     fi
 
-    if [[ ! -d $datadir/${proj} ]]
+    if [[ ! -d $datadir/$proj ]]
     then
         echo "You specified project ${proj}, but that directory doesn't exist."
         exit 1
+    fi
+    if [[ ! -d $datadir/$proj/$checkdate ]]
+    then
+        mkdir $datadir/$proj/$checkdate
     fi
 
     regex="[1-9][0-9][0-9][0-9][0-1][0-9][0-3][0-9]"
@@ -74,6 +79,7 @@ then
     fi
 
     dlscript="dlm_${checkdate}_${chan}"
+    cat drift.swarp.template | sed "s;TARGETRA;$targetra;g" | sed "s;TARGETDEC;$targetdec;g" | sed "s;XSIZE;$xsize;g" | sed "s;YSIZE;$ysize;g" > $datadir/$proj/$checkdate/drift.swarp
     cat dl_mosaic_${scheduler}.template | sed "s;GROUPQ;${groupq};g" | sed "s;OUTPUT;${dlscript};g" | sed "s;QUEUEDIR;${queuedir};" | sed "s;COPYQ;${copyq};g" > ${dlscript}.sh
     cat dl_mosaic_body.template | sed "s;PROJ;${proj};g" | sed "s;DATADIR;${datadir};g" | sed "s;IMAGEDIR;${imagedir};g" |  sed "s;DATE;$checkdate;g" | sed "s;CHAN;$chan;g" | sed "s;VERSION;${version};g" >> ${dlscript}.sh
     dkscript="dkm_${checkdate}_${chan}"

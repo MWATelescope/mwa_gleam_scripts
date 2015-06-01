@@ -17,6 +17,7 @@ import scipy.stats as stats
 from astropy.io import fits
 from optparse import OptionParser
 import os
+import sys
 import emcee
 # import sedplots - ask Joe for a copy
 
@@ -46,6 +47,24 @@ def redchisq(ydata,ymod,sd,deg):
     nu=ydata.size-1-deg
     return [chisq, chisq/nu]#, chisq/nu
 
+
+header = fits.getheader(input_mosaic+'.fits')
+try:
+    freq_obs = header['CRVAL3']/1e6
+except:
+    freq_obs = header['FREQ']/1e6
+if 72. < freq_obs < 103.:
+    subband = 1
+elif 103.01 < freq_obs < 134.:
+    subband = 2
+elif 139. < freq_obs < 170.:
+    subband = 3
+elif 170.01 < freq_obs < 200.:
+    subband = 4
+elif 200.01 < freq_obs < 231.:
+    subband = 5
+Dec_strip = header['CRVAL2']
+
 # Checking if file with ratios already exists. If they do, skip to straight fitting. 
 
 if not os.path.exists(input_mosaic+'_fluxdentable_decut.fits'):
@@ -62,25 +81,8 @@ if not os.path.exists(input_mosaic+'_fluxdentable_decut.fits'):
     tbdata = hdulist[1].data
     hdulist.close()
 
-    header = fits.getheader(input_mosaic+'.fits')
-    try:
-        freq_obs = header['CRVAL3']/1e6
-    except:
-        freq_obs = header['FREQ']/1e6
-    if 72. < freq_obs < 103.:
-        subband = 1
-    elif 103.01 < freq_obs < 134.:
-        subband = 2
-    elif 139. < freq_obs < 170.:
-        subband = 3
-    elif 170.01 < freq_obs < 200.:
-        subband = 4
-    elif 200.01 < freq_obs < 231.:
-        subband = 5
-    Dec_strip = header['CRVAL2']
-
-    week=input_mosaic.split("_")[1][0:6]
-    if Dec_strip == -40. or Dec_strip == -55. or Dec_strip == -72. or week != "201311":
+    week=input_mosaic.split("_")[1][0:8]
+    if Dec_strip == -40. or Dec_strip == -55. or Dec_strip == -72. or ( week != "20131107" and week != "20131111" and week != "20131125" and week != "20130822" ):
         print "Will automatically use corrections from another mosaic."
         sys.exit(0)
 
@@ -156,8 +158,8 @@ if not os.path.exists(input_mosaic+'_fluxdentable_decut.fits'):
                 S_80_err[i] = 0.10*S_80[i]
 
     freq = np.array([74., 80., 160., freq_obs, 325., 408., 843., 1400.])
-    flux = np.vstack((S_74,S_80, S_160, S_196, S_325, S_408,S_843_north,S_1400))
-    flux_err = np.vstack((S_74_err,S_80_err, S_160_err, S_196_err,S_325_err,
+    flux = np.vstack((S_74,S_80, S_160, S_196_int, S_325, S_408,S_843_north,S_1400))
+    flux_err = np.vstack((S_74_err,S_80_err, S_160_err, S_196_int_err,S_325_err,
         S_408_err,S_843_north_err,S_1400_err))
 
     print "#----------------------------------------------------------#"
@@ -192,12 +194,12 @@ if not os.path.exists(input_mosaic+'_fluxdentable_decut.fits'):
             redchisq_val[i] = redchisq(fluxfit,powlaw(freqfit,*poptpowlaw),flux_errfit,2)[0]
             # if redchisq_val[i] <= 2.5 and err_a[i] >=0 and flags_1[i] == 0 and S_196_isle_int[i]/S_196[i] < 1.4 and S_196_int[i]/S_196[i] < 1.5 and poptpowlaw[1] > 0.1 and S_196[i] > 500.: #and S_196_int[i]/S_196[i] > 1. and S_196_int[i]/S_196[i] < 1.5 # Only want to find point sources that are well fitted by a powerlaw and have three or more points (excluding MWA points).
             # if redchisq_val[i] <= 2.5 and err_a[i] >=0 and flags_1[i] == 0 and components[i] == 1 and semi_major[i]/(2*semi_minor[i]) <= 1 and poptpowlaw[1] > 0.1 and S_196[i] > 5.:
-            if redchisq_val[i] <= 2.5 and err_a[i] >=0 and flags_1[i] == 0 and components[i] == 1 and abs(poptpowlaw[1]) > 0.1 and 8*rms[i]/S_196[i] <= 1. and S_74[i] > 2.0:    #semi_major[i]/(2*semi_minor[i]) <= 1
+            if redchisq_val[i] <= 2.5 and err_a[i] >=0 and flags_1[i] == 0 and components[i] == 1 and abs(poptpowlaw[1]) > 0.1 and 8*rms[i]/S_196_int[i] <= 1. and S_74[i] > 2.0:    #semi_major[i]/(2*semi_minor[i]) <= 1
 
                 print VLSSr_Name[i]+' meets the criteria.'
 
                 MWAfreqfit_predicted[i] = powlaw(freq_obs,*poptpowlaw)
-                ratio[i] = MWAfreqfit_predicted[i] / S_196[i]
+                ratio[i] = MWAfreqfit_predicted[i] / S_196_int[i]
                 alpha[i] = poptpowlaw[1]
 
                 if options.do_ratio_errors:
@@ -284,7 +286,7 @@ if not os.path.exists(input_mosaic+'_fluxdentable_decut.fits'):
                     srcsind.append(i)
 
                     MWAfreqfit_predicted_err[i] = upper_flux_powlaw - lower_flux_powlaw
-                    ratio_err[i] = ratio[i]*np.sqrt((S_196_err[i] / S_196[i])**2 + (MWAfreqfit_predicted_err[i] / MWAfreqfit_predicted[i])**2)
+                    ratio_err[i] = ratio[i]*np.sqrt((S_196_int_err[i] / S_196_int[i])**2 + (MWAfreqfit_predicted_err[i] / MWAfreqfit_predicted[i])**2)
                     alpha[i] = specind
                     
                     # sedplots.sed(powlaw,poptpowlaw,freqplot,fluxplot,flux_errplot, freq_labels = True, savefig = False, title = VLSSr_Name[i]+r' $\alpha$ = '+str(round(alpha[i],3))+r' $ \chi_{\rm{red}}$  = '+str(round(redchisq_val[i])))#+' ObsID = '+str(aegeanfiles[j]))
@@ -418,7 +420,8 @@ hdulist = fits.open(input_mosaic+'_fluxdentable_decut.fits')
 tbdata = hdulist[1].data
 hdulist.close()
 dec = np.array(tbdata['Dec'])
-ratio = np.array(tbdata['ratio'])
+# Modified to use integrated flux densities
+ratio = np.array(tbdata['S_'+str(int(round(freq_obs)))+'_model']/tbdata['S_'+str(int(round(freq_obs)))+'_integrated_aegean'])
 ratio_err = np.array(tbdata['ratio_err'])
 
 def zero_curvefit(dec,a):
@@ -577,7 +580,7 @@ if options.make_plots:
         ax4.set_xlabel('Dec. (degrees)', fontsize = 10)
         ax5.set_xlabel('Dec. (degrees)', fontsize = 10)
         ax.set_ylabel('Ratio', fontsize = 15)
-        plt.savefig(input_mosaic+'polyfits.png')
+        plt.savefig(input_mosaic+'_polyfits_int.png')
 
     else:
 
@@ -636,7 +639,7 @@ if options.make_plots:
         ax.set_ylabel('Ratio', fontsize = 15)
         cb = plt.colorbar(ax3.scatter(dec, ratio, marker='o',color ='k',c=SNR, cmap=plt.cm.Greys))
         cb.set_label('1/log(ratio_err)',fontsize = 15)
-        plt.savefig(input_mosaic+'_polyfits.png')
+        plt.savefig(input_mosaic+'_polyfits_int.png')
 
 fit_name = ['zeroth','linear','quadratic','quadratic_zenith','cubic','quartic'] 
 

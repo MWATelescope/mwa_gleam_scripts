@@ -23,6 +23,14 @@ then
     postring="--ra=$ra --dec=$dec"
 fi
 
+# Harder to match MRC further north since it runs out at +20
+if [[ $dec == "18.6" || $dec == "+18.6" ]]
+then
+    MRCtarget=50
+else
+    MRCtarget=100
+fi
+
 if [[ ! $xsize || ! $ysize ]]
 then
     xsize=0
@@ -74,6 +82,18 @@ then
     for file in *2.?.fits
     do
         echo $file
+# Fix DATE-OBS bug
+        datestr=`pyhead.py -p DATE-OBS $file | awk '{print $3}'`
+        minutes=`echo $datestr | awk 'BEGIN {FS=":"} {print $2}'` 
+        if [[ $minutes -eq 60 ]]
+        then
+            hrs=`echo $datestr | awk 'BEGIN {FS="T"} {print $2}' | awk 'BEGIN {FS=":"} {print $1}'` 
+            ((hrs+=1)) 
+            startstr=`echo $datestr | awk 'BEGIN {FS="T"} {print $1}'`
+            endstr=`echo $datestr | awk 'BEGIN {FS=":"} {print $3}'`
+            newdatestr="${startstr}T${hrs}:00:${endstr}" 
+            pyhead.py -u DATE-OBS $newdatestr $file
+        fi 
         corfile=`echo $file | sed "s/.fits/_corrected.fits/g"`
 # If the corrected file already exists, assume that the QA worked the first time
         if [[ ! -e $corfile ]]
@@ -119,7 +139,8 @@ then
                             echo "Cropping $file to match the standard size." | tee -a checkpoint.log
                             rstart=`expr \( $xaxis - 4000 \) / 2`
                             rend=`expr $xaxis - $rstart - 1`
-                            getfits -o temp.fits $file $rstart-$rend $rstart-$rend
+                            $aprunsingle getfits -o temp.fits $file $rstart-$rend $rstart-$rend
+                            $aprunsingle unflatten.py temp.fits
                             mv $file unused/
                             mv temp.fits $file
                         fi
@@ -128,7 +149,7 @@ then
                         if [[ $docrop == "True" ]]
                         then
                             echo "Low Dec observation: blanking edges of the image." | tee -a checkpoint.log
-                            $aprun blank_SCP.py -f $file -o temp.fits
+                            $aprunsingle blank_SCP.py -f $file -o temp.fits
                             mv temp.fits $file
                         fi
                     fi
@@ -165,7 +186,7 @@ then
     done
 
 # Source-finding on the I snapshots
-# We can use cheap backgrounding since we only need peak fluxes
+# We can use cheap backgrounding since we only need bright source fluxes
 
     for file in *_I_*2.?.fits
     do
@@ -177,7 +198,8 @@ then
             echo "Cropping $file to match the standard size." | tee -a checkpoint.log
             rstart=`expr \( $xaxis - 4000 \) / 2`
             rend=`expr $xaxis - $rstart - 1`
-            getfits -o temp.fits $file $rstart-$rend $rstart-$rend
+            $aprunsingle getfits -o temp.fits $file $rstart-$rend $rstart-$rend
+            $aprunsingle unflatten.py temp.fits
             mv $file unused/
             mv temp.fits $file
         fi
@@ -196,54 +218,47 @@ then
 # NB: This script expects the directory to be full of "10*XX*2.?.fits"
 
     echo "Running MRC-based correction script." | tee -a checkpoint.log
-    $aprun correct_mrc.py | tee -a checkpoint.log
+    $aprunsingle correct_mrc.py | tee -a checkpoint.log
 
     if ls *_corrected.fits 1>> /dev/null 2>> /dev/null
     then
 # Now that we have a bunch of corrected files, run the mosaicking
 # First check whether there were enough MRC sources to keep the fits image
         echo "MRC corrections worked: checking that each snapshot cross-matched with enough sources." | tee -a checkpoint.log
+
         for file in *_corrected.fits
         do
-            if [[ $pol == "XX" ]]
+            pol=`echo $file | awk 'BEGIN {FS="_"} {print $3}'`
+            if [[ $pol == "XX" || $pol == "YY" ]]
             then
-                altfile=`echo $file | sed "s/XX/YY/g"`
-            else
-                altfile=`echo $file | sed "s/YY/XX/g"`
-            fi
-            Ivot=`echo $file | sed "s/XX/I/g" | sed "s/YY/I/g" | sed "s/_corrected.fits/_MRC.vot/"`
-            if [[ -e $Ivot ]]
-            then
-                nmatch=`grep "<TR>" $Ivot | wc -l`
-            elif [[ -e unused/$Ivot ]]
-            then
-                nmatch=`grep "<TR>" unused/$Ivot | wc -l`
-            else
-                echo "Couldn't find matching Stokes I MRC-cross-matched VO table for $file! Moving to unused." | tee -a checkpoint.log
-                mv $file unused/
-                mv $altfile unused/
-            fi
-            if [[ $nmatch -lt 100 ]]
-            then
-                echo "$file did not match enough MRC sources." | tee -a checkpoint.log
-                mv $file unused/
-                mv $altfile unused/
-            else
-# Then re-generate the IMAGERMS keywords so that swarp gets good weighting
-                echo "Matched more than 100 sources: (re-)generating IMAGERMS keyword." | tee -a checkpoint.log
-                xaxis=`pyhead.py -p NAXIS1 $file | awk '{print $3}'`
-                yaxis=`pyhead.py -p NAXIS2 $file | awk '{print $3}'`
-                xmin=`expr $xaxis / 2 - 50`
-                xmax=`expr $xaxis / 2 + 50`
-                ymin=`expr $yaxis / 2 - 50`
-                ymax=`expr $yaxis / 2 + 50`
-                getfits -o temp.fits $file $xmin-$xmax $ymin-$ymax
-                $aprun aegean_snapshot.sh temp.fits bane
-                rms=`rms_measure.py --middle --mean -f temp_rms.fits`
-                rm temp.fits temp_rms.fits temp_bkg.fits temp*vot temp*reg
-                pyhead.py -u IMAGERMS $rms $file
+                if [[ $pol == "XX" ]]
+                then
+                    altfile=`echo $file | sed "s/XX/YY/g"`
+                else
+                    altfile=`echo $file | sed "s/YY/XX/g"`
+                fi
+                Ivot=`echo $file | sed "s/XX/I/g" | sed "s/YY/I/g" | sed "s/_corrected.fits/_MRC.vot/"`
+                if [[ -e $Ivot ]]
+                then
+                    nmatch=`grep "<TR>" $Ivot | wc -l`
+                elif [[ -e unused/$Ivot ]]
+                then
+                    nmatch=`grep "<TR>" unused/$Ivot | wc -l`
+                else
+                    echo "Couldn't find matching Stokes I MRC-cross-matched VO table for $file! Moving to unused." | tee -a checkpoint.log
+                    mv $file unused/
+                    mv $altfile unused/
+                fi
+                if [[ $nmatch -lt $MRCtarget ]]
+                then
+                    echo "$file did not match enough MRC sources." | tee -a checkpoint.log
+                    mv $file unused/
+                    mv $altfile unused/
+                fi
             fi
         done
+        # Then re-generate the IMAGERMS keywords so that swarp gets good weighting
+        $aprunsingle rms_measure_batch.py --corners
         echo "IMAGERMS keywords done: running the mosaicking." | tee -a checkpoint.log
         mv *_I_* unused/
         $aprun python $MWA_CODE_BASE/bin/mosaic_driftscan.py -v --copybeam --reduce --clean --scalar=IMAGERMS --function=inversesquare --separate --proj=ZEA $postring --arguments="-IMAGE_SIZE $xsize,$ysize" *XX*_corrected.fits *YY*_corrected.fits
@@ -278,7 +293,7 @@ then
 
 # trim file to sensible size
             echo "Trimming and modifying header of $mosaicfile." | tee -a checkpoint.log
-            python $MWA_CODE_BASE/bin/fits_trim.py $mosaicfile $newname
+            $aprunsingle fits_trim.py $mosaicfile $newname
             if [[ -e $newname ]]
             then
 # add sensible keywords to the header
@@ -316,10 +331,8 @@ recomfile=`echo $mosaicfile | sed "s/[XY][XY]_r-1.0/r-1.0_recomb/"`
 if [[ ! -e $recomfile ]]
 then
     echo "Running XX:YY correction and combination script." | tee -a checkpoint.log
-# Can't aprun miriad for some reason
-    correct_XY.sh
-# Loses the FREQ keyword when you go through miriad
-    pyhead.py -u FREQ $crval3 $recomfile
+# Switching to swarp as it's more reliable
+    swarp_XY.sh
 fi
 
 # Source-finding on the recombined mosaic
@@ -343,8 +356,8 @@ then
     then
         zenithflag="--zenith"
     fi
-    $aprun decfluxdependence_derive.py --mosaic=$root $zenithflag --plot
-    $aprun fixingdecfluxdependence_apply.py --mosaic=$root
+    $aprunsingle decfluxdependence_derive.py --mosaic=$root $zenithflag --plot
+    $aprunsingle fixingdecfluxdependence_apply.py --mosaic=$root
 fi
 
 # Source-finding on the polyapplied mosaic

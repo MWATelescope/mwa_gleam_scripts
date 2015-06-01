@@ -34,22 +34,22 @@ except:
 Dec_strip = header['CRVAL2']
 
 # Week 1.1
-# 20130808 +1.6 -- Some GP at start
+# 20130808 +1.6 -- Some GP at start, ionosphere horrible later
 # 20130809 -55
 # 20130810 -27 -- Good.
 # 20130817 +18.6  --- Cygnus at start, ionosphere at the end
 # 20130818 -72
-# 20130822 -13 -- Fine.
+# 20130822 -13 -- Fine. Better than week 1.2. <------------ use this one
 # 20130825 -40
 
 # Week 1.2
-# 20131105 -13 -- Fine
+# 20131105 -13 -- Ionospheric blurring at the lowest frequencies
 # 20131106 -40
-# 20131107 +1.6 -- Fine
+# 20131107 +1.6 -- Fine <------------ use this one
 # 20131108 -55
-# 20131111 +18.6 -- Fine
+# 20131111 +18.6 -- Fine <----------- use this one
 # 20131112 -72
-# 20131125 -27 Crab is a contaminant for middle channels -- but still gives lower reduced chi2 than week 1.1
+# 20131125 -27 Crab is a contaminant for middle channels -- but still gives lower reduced chi2 than week 1.1 <-- use
 
 # Week 1.3
 # 20140303 -27 -- 1/3rd of fibre flagged on Rec 6 (don't transfer these sols)
@@ -63,17 +63,17 @@ Dec_strip = header['CRVAL2']
 
 week=input_mosaic.split("_")[1][0:6]
 
-if Dec_strip == -40. or Dec_strip == -55. or Dec_strip == -72. or week != "201311":
+if Dec_strip == -40. or Dec_strip == -55. or Dec_strip == -72. or ( week != "20131107" and week != "20131111" and week != "20131125" and week != "20130822" ):
     if Dec_strip == -40. or Dec_strip == -13.:
-        input_mosaic_polyfit = re.sub("201[0-9]{5}","20131105",input_mosaic)
-        poly_path = re.sub("201[0-9]{5}","20131105",os.getcwd())
-    if Dec_strip == -55. or Dec_strip == 1.6 or Dec_strip == 2.0:
+        input_mosaic_polyfit = re.sub("201[0-9]{5}","20130822",input_mosaic)
+        poly_path = re.sub("201[0-9]{5}","20130822",os.getcwd())
+    if Dec_strip == -55. or Dec_strip == 1.6 or Dec_strip == 2. or Dec_strip == 1.:
         input_mosaic_polyfit = re.sub("201[0-9]{5}","20131107",input_mosaic)
         poly_path = re.sub("201[0-9]{5}","20131107",os.getcwd())
-    if Dec_strip == -72. or Dec_strip == 18.6 or Dec_strip == 19.0:
+    if Dec_strip == -72. or Dec_strip == 18.6 or Dec_strip == 19. or Dec_strip == 18.:
         input_mosaic_polyfit = re.sub("201[0-9]{5}","20131111",input_mosaic)
         poly_path = re.sub("201[0-9]{5}","20131111",os.getcwd())
-    if Dec_strip == -26.7 or Dec_strip == -27.0:
+    if Dec_strip == -26.7 or Dec_strip == -27. or Dec_strip == -26.:
         input_mosaic_polyfit = re.sub("201[0-9]{5}","20131125",input_mosaic)
         poly_path = re.sub("201[0-9]{5}","20131125",os.getcwd())
     hdulist = fits.open(poly_path+'/'+input_mosaic_polyfit+'_poly_coefficients.fits')
@@ -123,16 +123,19 @@ for i in xrange(hdu_in[0].data.shape[0]):
     indexes[i*j:(i+1)*j] = idx
 #put ALL the pixles into our vectorized functions and minimised our overheads
 ra,dec = w.wcs_pix2world(indexes,1).transpose()
-if Dec_strip == -26.7 or Dec_strip == -27.0:
-# Dealing with special case of zenith
-    reshapedcorr=a[0]
+if Dec_strip == -26.7 or Dec_strip == -27.0 or Dec_strip == -26.0:
+   # Dealing with special case of zenith -- quadratic fit pinned at zenith
+    print "Applying zenith correction to Dec"+str(Dec_strip)
+    corr=(c[3]*(np.power(dec,2)+53.4*dec)+a[3])
 elif Dec_strip == -40. or Dec_strip == -55. or Dec_strip == -72.:
+    print "Applying mirror correction to Dec"+str(Dec_strip)
     # Reflecting cubic around the x-axis and shifting to new centre dec
     corr=(-d[4]*np.power((dec-(2*dec_zenith)),3)+c[4]*np.power((dec-(2*dec_zenith)),2)-b[4]*((dec-(2*dec_zenith)))+a[4])
-    reshapedcorr=corr.reshape(hdu_in[0].data.shape[0],hdu_in[0].data.shape[1])
 else:
+    print "Applying normal correction to Dec"+str(Dec_strip)
     corr=(d[4]*np.power(dec,3)+c[4]*np.power(dec,2)+b[4]*(dec)+a[4])
-    reshapedcorr=corr.reshape(hdu_in[0].data.shape[0],hdu_in[0].data.shape[1])
+
+reshapedcorr=corr.reshape(hdu_in[0].data.shape[0],hdu_in[0].data.shape[1])
 hdu_in[0].data=np.array(reshapedcorr*hdu_in[0].data,dtype=np.float32)
 hdu_in.writeto(input_mosaic+'_polyapplied.fits',clobber=True)
 hdu_in.close(input_mosaic+'_polyapplied.fits')
