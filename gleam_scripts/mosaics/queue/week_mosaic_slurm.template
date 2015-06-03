@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --account=GROUPQ
 #SBATCH --partition=STANDARDQ
-#SBATCH --time=03:00:00
+#SBATCH --time=05:00:00
 #SBATCH --nodes=1
 #SBATCH --mem=HOSTMEMgb
 #SBATCH --output=QUEUEDIR/OUTPUT.o%A_%a
