@@ -69,7 +69,7 @@ if [[ ! -d $datadir/$proj/$week ]]
 then
     mkdir $datadir/$proj/$week
 fi
-if [[ ! -e $datadir/$proj/$week/mosaic.swarp ]]
+if [[ ! -e $datadir/$proj/$week/weight.swarp ]]
 then
     cat weight.swarp.template | sed "s/TARGETRA/$ra/" > $datadir/$proj/$week/weight.swarp
 fi
