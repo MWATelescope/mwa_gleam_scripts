@@ -34,7 +34,7 @@ PROJECTION_ERR         0.01           # Maximum projection error (in output
 CENTER_TYPE            MANUAL             # MANUAL, ALL or MOST
 CENTER         TARGETRA:00:00.0, -27:00:00.0 # Coordinates of the image center
 PIXELSCALE_TYPE        MEDIAN          # MANUAL,FIT,MIN,MAX or MEDIAN
-IMAGE_SIZE             20000, 18000               # Image size (0 = AUTOMATIC)
+IMAGE_SIZE             24000, 20000               # Image size (0 = AUTOMATIC)
  
 #-------------------------------- Resampling ----------------------------------
  
