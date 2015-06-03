@@ -8,4 +8,5 @@
 #SBATCH --error=QUEUEDIR/OUTPUT.e%j
 
 aprun="aprun -n 1 -d NCPUS "
+aprunsingle="aprun -n 1 -d 1 "
 

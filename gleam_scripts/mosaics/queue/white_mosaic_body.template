@@ -18,7 +18,7 @@ freqs=""
 
 for file in $list
 do
-    startfreq=`basename $file |  awk 'BEGIN {FS="-"} {print $1}'`
+    startfreq=`basename $file | awk 'BEGIN {FS="-"} {print int($1)}'`
     if [[ $startfreq -gt 169 ]]
     then
         freqs="$freqs "$file
@@ -106,9 +106,9 @@ done
 if [[ ! -e ${week}_white_noweight.fits ]]
 then
     $aprun swarp -c ../noweight.swarp ${week}*z.fits -IMAGEOUT_NAME ${week}_white_noweight.fits -WEIGHTOUT_NAME ${week}_white_noweight.weight.fits
-    fits_trim.py ${week}_white_noweight.fits temp.fits
+    $aprunsingle fits_trim.py ${week}_white_noweight.fits temp.fits
     mv temp.fits ${week}_white_noweight.fits
-    fits_trim.py ${week}_white_noweight.weight.fits temp.fits
+    $aprunsingle fits_trim.py ${week}_white_noweight.weight.fits temp.fits
     mv temp.fits ${week}_white_noweight.weight.fits
 # Update with zenith 170-177MHz beam
     pyhead.py -u BMAJ $bmaj ${week}_white_noweight.fits
@@ -117,14 +117,16 @@ then
 fi
 
 $aprun aegean.sh ${week}_white_noweight.fits bane compress
+$aprun newaegean.sh ${week}_white_noweight.fits bane compress
+$aprunsingle QC_filter.py ${week}_white_noweight_resid_comp.vot ${week}_white_noweight_resid_excl_comp.vot
 
 # Low noise mosaic (noise is reduced, but frequency varies over the image)
 if [[ ! -e ${week}_white_lownoise.fits ]]
 then
     $aprun swarp -c ../weight.swarp mosaic*ed.fits -IMAGEOUT_NAME ${week}_white_lownoise.fits -WEIGHTOUT_NAME ${week}_white_lownoise.weight.fits  -PROJECTION_TYPE ZEA
-    fits_trim.py ${week}_white_lownoise.fits temp.fits
+    $aprunsingle fits_trim.py ${week}_white_lownoise.fits temp.fits
     mv temp.fits ${week}_white_lownoise.fits
-    fits_trim.py ${week}_white_lownoise.weight.fits temp.fits
+    $aprunsingle fits_trim.py ${week}_white_lownoise.weight.fits temp.fits
     mv temp.fits ${week}_white_lownoise.weight.fits
 # Update with zenith 170-177MHz beam
     pyhead.py -u BMAJ $bmaj ${week}_white_lownoise.fits
@@ -133,5 +135,8 @@ then
 fi
 
 $aprun aegean.sh ${week}_white_lownoise.fits bane compress
+$aprun newaegean.sh ${week}_white_lownoise.fits bane compress
+$aprunsingle QC_filter.py ${week}_white_lownoise_resid_comp.vot ${week}_white_lownoise_resid_excl_comp.vot
+$aprunsingle psf_banechar.py --input=${week}_white_lownoise_resid_excl_comp.vot --fitsfile=${week}_white_lownoise.fits
 
 exit 0

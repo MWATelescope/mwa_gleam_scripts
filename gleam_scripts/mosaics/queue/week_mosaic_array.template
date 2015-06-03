@@ -1,4 +1,3 @@
-#!/bin/bash
 datadir=DATADIR
 proj=PROJ
 week=WEEK
@@ -81,16 +80,30 @@ then
        if [[ ! -e $newfile ]]
        then
            echo "Modifying the weights at the edges of $file, to produce $newfile."
-           $aprun sigmoid_weight.py --mosaic=$file
+           $aprunsingle sigmoid_weight.py --mosaic=$file
        else
            echo "$newfile already exists"
        fi
     done
+
+# Rescale RMS maps in preparation for swarping
+    for file in *_polyapplied_rms_sigmoid.fits
+    do
+        $aprunsingle rescale_rms.py --mosaic=$file
+    done
+
     $aprun swarp -c ../weight.swarp mosaic*_polyapplied.fits -IMAGEOUT_NAME ${week}_${freq}.fits -WEIGHTOUT_NAME ${week}_${freq}.weight.fits -PROJECTION_TYPE ZEA
+
+# De-rescale RMS maps
+    for file in *_polyapplied_rms_sigmoid.fits
+    do
+        $aprunsingle rescale_rms.py --mosaic=$file --upscale
+    done
+
 # Trim off the dead zones
-    fits_trim.py ${week}_${freq}.fits temp.fits
+    $aprunsingle fits_trim.py ${week}_${freq}.fits temp.fits
     mv temp.fits ${week}_${freq}.fits
-    fits_trim.py ${week}_${freq}.weight.fits temp.fits
+    $aprunsingle fits_trim.py ${week}_${freq}.weight.fits temp.fits
     mv temp.fits ${week}_${freq}.weight.fits
 # Use the zenith psf as the header beam
     pyhead.py -u BMAJ $bmaj ${week}_${freq}.fits
@@ -100,3 +113,17 @@ else
     echo "${week}_${freq}.fits already exists, so I didn't bother to re-make it. Please delete and re-run if you want a new version."
 fi
 $aprun aegean.sh ${week}_${freq}.fits bane compress
+$aprun newaegean.sh ${week}_${freq}.fits bane compress
+# Filter only the bits of sky I care about
+QC_filter.py ${week}_${freq}_resid_comp.vot ${week}_${freq}_resid_excl_comp.vot
+# See what the peak and integrated fluxes look like
+#$aprunsingle flux_comparison.py --mosaic=${week}_${freq}_resid_excl --fitsfile=${week}_${freq}.fits
+#$aprunsingle flux_comparison.py --int --mosaic=${week}_${freq}_resid_excl --fitsfile=${week}_${freq}.fits
+# Characterise the PSF
+$aprunsingle psf_banechar.py --input=${week}_${freq}_resid_excl_comp.vot
+# Update the catalogues by scaling the peak fluxes
+#update_catalogue.py --catalogue=${week}_${freq}_resid_excl_comp.vot --scaleint --output=${week}_${freq}_resid_excl_ddmod_int_comp.vot
+update_catalogue.py --catalogue=${week}_${freq}_resid_excl_comp.vot --output=${week}_${freq}_resid_excl_ddmod_comp.vot
+# Now check the peak and integrated fluxes against the catalogue expectations
+$aprunsingle flux_comparison.py --peak --mosaic=${week}_${freq}_resid_excl_ddmod --fitsfile=${week}_${freq}.fits --printaverage
+$aprunsingle flux_comparison.py --mosaic=${week}_${freq}_resid_excl_ddmod --fitsfile=${week}_${freq}.fits --printaverage
