@@ -28,8 +28,10 @@ parser.add_option('--fitsfile',type="string", dest="fitsfile",
                     help="The filename of the fits file you want to read in. Default = catalogue.fits")
 parser.add_option('--ratio_errors',action="store_true",dest="do_ratio_errors",default=True,
                     help="Calculate errors on model fits and ratio of it with image flux measurement (default = True). Keep true if already have *fluxdentable in directory.")
-parser.add_option('--int',action="store_true",dest="int",default=False,
-                    help="Use integrated flux rather than peak flux (default = False)")
+parser.add_option('--peak',action="store_false",dest="int",default=True,
+                    help="Use peak flux rather than int flux (default = False)")
+parser.add_option('--printaverage',action="store_true",dest="printaverage",default=False,
+                    help="Print the average flux ratio correction (default = False)")
 (options, args) = parser.parse_args()
 
 input_mosaic = options.mosaic
@@ -322,7 +324,7 @@ if not check_file:
     
     tbhdu = fits.new_table(cols)
     tbhdu.writeto(input_mosaic+'_fluxdentable_'+suffix+'.fits', clobber = True) 
-    print 'Wrote to '+input_mosaic+'_fluxdentable+'+suffix+'.fits'
+    print 'Wrote to '+input_mosaic+'_fluxdentable_'+suffix+'.fits'
 else:
     print input_mosaic+'_fluxdentable* exists. Will not recalculate errors but read in existing table.'
 
@@ -585,20 +587,22 @@ plt.savefig(input_mosaic+'_'+suffix+'_cdf.png')
 week=input_mosaic.split("_")[0]
 freq_list = np.array(['072-080MHz','080-088MHz','088-095MHz','095-103MHz','103-111MHz','111-118MHz','118-126MHz','126-134MHz','139-147MHz','147-154MHz','154-162MHz','162-170MHz','170-177MHz','177-185MHz','185-193MHz','193-200MHz','200-208MHz','208-216MHz','216-223MHz','223-231'])
 
-if not os.path.exists(week+'_zero.fits'):
-    print 'Making '+week+'_zero.fits'
+zerofits=week+'_'+freq_str+'_'+suffix+'_zero.fits'
+
+if not os.path.exists(zerofits):
+    print 'Making '+zerofits
     zero_fits = np.zeros(len(freq_list))
     zero_fits_err = np.zeros(len(freq_list))
     freqs = np.array([76,84,92,99,107,115,123,130,143,150,158,166,174,181,189,197,204,212,219,227])
 else:
-    print 'Reading in '+week+'_zero.fits'
-    hdulist = fits.open(week+'_zero.fits')
+    print 'Reading in '+zerofits
+    hdulist = fits.open(zerofits)
     tbdata = hdulist[1].data
     hdulist.close()
     zero_fits = np.array(tbdata['Zero_fit'])
     zero_fits_err = np.array(tbdata['Zero_fit_err'])
 
-print 'Saving zero fits of this frequency to '+week+'_zero.fits'
+print 'Saving zero fits of this frequency to '+zerofits
 
 freq_str = input_mosaic.split("_")[1]
 
@@ -611,6 +615,9 @@ else:
     zero_fits[freq_ind] = poptzero[0]
     zero_fits_err[freq_ind] = np.sqrt(pcovzero[0])
 
+if options.printaverage:
+    print zero_fits[freq_ind]
+
 print 'End '+input_mosaic+': '+str(datetime.datetime.now())
 
 col1 = fits.Column(name='Frequency', format = 'E', array = freqs)
@@ -619,7 +626,7 @@ col3 = fits.Column(name='Zero_fit_err', format = 'E', array = zero_fits_err)
 cols = fits.ColDefs([col1,col2,col3])
 
 tbhdu = fits.new_table(cols)    
-tbhdu.writeto(week+'_'+freq_str+'_zero.fits', clobber = True) 
+tbhdu.writeto(zerofits, clobber = True) 
 
 # plt.figure()
 # plt.hist2d(dec,ratio,bins=25)
