@@ -33,8 +33,8 @@ parser.add_option('--printaverage',action="store_true",dest="printaverage",defau
                   help="Just print the average PSF ratio (int/peak) and exit. default=False.")
 parser.add_option('--average',action="store_true",dest="average",default=False,
                   help="Use the average PSF to correct the catalogue, instead of using the position-dependent corrections. (default = False).")
-parset.add_option('--scaleint',action="store_true",dest="scaleint",default=False,
-                  help="For the direction-dependent correction, scale the integrated fluxes downward by the int/peak ratio, instead of the peak fluxes upward. (default = False).")
+parser.add_option('--scaleint',action="store_true",dest="scaleint",default=False,
+                  help="For the catalogue correction, scale the integrated fluxes downward by the int/peak ratio, instead of the peak fluxes upward. (default = False).")
 parser.add_option('--output',dest="output",default=None,
                   help="Output catalogue file (default = catalogue_mod.vot, or catalogue_ddmod.vot for direction-dependent corrections).")
 parser.add_option('--scalefits',action="store_true",dest="scalefits",default=False,

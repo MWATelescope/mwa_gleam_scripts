@@ -144,20 +144,19 @@ then
                             mv $file unused/
                             mv temp.fits $file
                         fi
-            # Congratulations, made it through all the QA!
-        # If the pointing is Dec -72, flag out the SCP
-                        if [[ $docrop == "True" ]]
-                        then
-                            echo "Low Dec observation: blanking edges of the image." | tee -a checkpoint.log
-                            $aprunsingle blank_SCP.py -f $file -o temp.fits
-                            mv temp.fits $file
-                        fi
                     fi
                 fi
             fi
         fi
     done
 
+    # Congratulations, made it through all the QA!
+    # If the pointing is Dec -72, flag out the SCP
+    if [[ $docrop == "True" ]]
+    then
+        echo "Low Dec observation: blanking edges of the images." | tee -a checkpoint.log
+        $aprunsingle blank_SCP_batch.py
+    fi
 # Final QA step to check that all XXs have YYs and vice versa, and grab the useful Is out of the unused/ directory
 
     for xfile in *XX*2.?.fits

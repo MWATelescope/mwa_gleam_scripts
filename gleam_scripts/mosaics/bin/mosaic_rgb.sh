@@ -42,7 +42,6 @@ queuedir=/home/$user/queue
 # We're getting so specific here that I doubt this is going to change!
 proj=G0008
 
-
 cd $queuedir
 
 week=$1
@@ -65,18 +64,11 @@ else
     exit 1
 fi
 
-if [[ ! -d $datadir/$proj/$week ]]
-then
-    mkdir $datadir/$proj/$week
-fi
-if [[ ! -e $datadir/$proj/$week/weight.swarp ]]
-then
-    cat weight.swarp.template | sed "s/TARGETRA/$ra/" > $datadir/$proj/$week/weight.swarp
-fi
+swarpscript=rgb_${week}.sh
+cat rgb_mosaic_${scheduler}.template | sed "s;GROUPQ;${groupq};g" | sed "s;STANDARDQ;${standardq};g" | sed "s;HOSTMEM;${hostmem};g" | sed "s;NCPUS;$ncpus;g" |  sed "s;OUTPUT;${swarpscript};g" | sed "s;QUEUEDIR;${queuedir};" > $swarpscript
+cat rgb_mosaic_body.template  | sed "s;PROJ;${proj};g" | sed "s;DATADIR;${datadir};g" | sed "s;WEEK;${week};g" >> $swarpscript
+cat noweight.swarp.template | sed "s/TARGETRA/$ra/" > $datadir/$proj/$week/noweight.swarp
 
-swarpscript=swarp_${week}.sh
-cat week_mosaic_${scheduler}.template | sed "s;GROUPQ;${groupq};g" | sed "s;STANDARDQ;${standardq};g" | sed "s;HOSTMEM;${hostmem};g" | sed "s;NCPUS;$ncpus;g" |  sed "s;OUTPUT;${swarpscript};g" | sed "s;QUEUEDIR;${queuedir};" > $swarpscript
-cat week_mosaic_array.template  | sed "1,40s;PROJ;${proj};g" | sed "s;DATADIR;${datadir};g" | sed "s;WEEK;${week};g" >> $swarpscript
 $qsub $swarpscript
 
 exit 0

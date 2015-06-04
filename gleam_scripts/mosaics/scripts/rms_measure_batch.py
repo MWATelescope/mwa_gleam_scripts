@@ -7,7 +7,7 @@ try:
 except ImportError:
     import pyfits
 from optparse import OptionParser
-from numpy import std, average
+from numpy import nanstd, nanmean 
 
 usage="Usage: %prog [options] <file>\n"
 parser = OptionParser(usage=usage)
@@ -58,8 +58,8 @@ for filename in files:
             else:
                 scidata=hdulist[0].data[half-side:half+side,half-side:half+side]
         if options.mean:
-            imagerms=average(scidata)
+            imagerms=nanmean(scidata)
         else:
-            imagerms=std(scidata)
+            imagerms=nanstd(scidata)
     hdulist[0].header['IMAGERMS'] = imagerms
     hdulist.writeto(filename, clobber=True)

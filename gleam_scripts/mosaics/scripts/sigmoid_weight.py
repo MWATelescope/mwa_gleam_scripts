@@ -79,11 +79,11 @@ if Dec_strip == -40. or Dec_strip == -55. or Dec_strip == -72. :
     print "Dec strip "+str(Dec_strip)+": using mirrored indices for "+str(dec_centre)+": "+str(Dec_lim1)+" to "+str(Dec_lim2)
 # Zenith Dec -35 hard cut is incorrect for these purposes; better to use Dec-13 but shifted by 14 deg
 elif Dec_strip == -26.7 or Dec_strip == -27.0:
-    dec_centre = -13.
+    dec_centre = -13
     cut_ind = n.where((centre_dec == dec_centre) & (freq_band == subband))
     Dec_lim1 = Dec_lim1[cut_ind]+(dec_zenith-dec_centre)
     Dec_lim2 = Dec_lim2[cut_ind]+(dec_zenith-dec_centre)
-    print "Dec strip "+str(Dec_strip)+": using shifted indices for "+str(dec_centre)+": "+str(Dec_lim1)+" to "+str(Dec_lim2)
+    print "Dec strip "+str(Dec_strip)+": using deliberately shifted indices for "+str(dec_centre)+": "+str(Dec_lim1)+" to "+str(Dec_lim2)
 else:
     dec_centre = Dec_strip
     cut_ind = n.where((centre_dec == dec_centre) & (freq_band == subband))
