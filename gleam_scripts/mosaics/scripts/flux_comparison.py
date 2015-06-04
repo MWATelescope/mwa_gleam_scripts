@@ -585,7 +585,9 @@ plt.savefig(input_mosaic+'_'+suffix+'_cdf.png')
 
 # Saving zero fits for each freq 
 week=input_mosaic.split("_")[0]
-freq_list = np.array(['072-080MHz','080-088MHz','088-095MHz','095-103MHz','103-111MHz','111-118MHz','118-126MHz','126-134MHz','139-147MHz','147-154MHz','154-162MHz','162-170MHz','170-177MHz','177-185MHz','185-193MHz','193-200MHz','200-208MHz','208-216MHz','216-223MHz','223-231'])
+freq_list = np.array(['072-080MHz','080-088MHz','088-095MHz','095-103MHz','103-111MHz','111-118MHz','118-126MHz','126-134MHz','139-147MHz','147-154MHz','154-162MHz','162-170MHz','170-177MHz','177-185MHz','185-193MHz','193-200MHz','200-208MHz','208-216MHz','216-223MHz','223-231MHz'])
+
+freq_str = input_mosaic.split("_")[1]
 
 zerofits=week+'_'+freq_str+'_'+suffix+'_zero.fits'
 
@@ -603,8 +605,6 @@ else:
     zero_fits_err = np.array(tbdata['Zero_fit_err'])
 
 print 'Saving zero fits of this frequency to '+zerofits
-
-freq_str = input_mosaic.split("_")[1]
 
 freq_ind = np.where(freq_str == freq_list)
 
