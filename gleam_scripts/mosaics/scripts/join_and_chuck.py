@@ -14,7 +14,7 @@ from astropy.io.votable import writeto as writetoVO
 import re
 
 prefix="Week"
-suffix="_white_noweight_comp.vot"
+suffix="_white_lownoise_comp.vot"
 
 table1=prefix+"1"+suffix
 table2=prefix+"2"+suffix
@@ -52,9 +52,9 @@ for amatch,rmatch in zip(ands,revands):
         vot = Table(data_x)
         writetoVO(vot, 'temp.vot')
     # Run through tpipe and keep the right columns (i.e. none of the _2 columns)
-        os.system('stilts tpipe in=temp.vot cmd=\'keepcols "island source background local_rms ra_str dec_str ra err_ra dec err_dec peak_flux err_peak_flux int_flux err_int_flux a err_a b err_b pa err_pa flags residual_mean residual_std uuid"\' out='+output)
+#        os.system('stilts tpipe in=temp.vot cmd=\'keepcols "island source background local_rms ra_str dec_str ra err_ra dec err_dec peak_flux err_peak_flux int_flux err_int_flux a err_a b err_b pa err_pa flags residual_mean residual_std uuid"\' out='+output)
 # For the older version of Aegean (no uuid)
-        #os.system('stilts tpipe in=temp.vot cmd=\'keepcols "island source background local_rms ra_str dec_str ra err_ra dec err_dec peak_flux err_peak_flux int_flux err_int_flux a err_a b err_b pa err_pa flags residual_mean residual_std"\' out='+output)
+        os.system('stilts tpipe in=temp.vot cmd=\'keepcols "island source background local_rms ra_str dec_str ra err_ra dec err_dec peak_flux err_peak_flux int_flux err_int_flux a err_a b err_b pa err_pa flags residual_mean residual_std"\' out='+output)
 
 # Not using XOR means we don't have to rename the columns later
 # Crossmatch 1 with 2, 2 with 3, 3 with 4, 4 with 1, saving only things which DON'T overlap
@@ -70,5 +70,17 @@ if not os.path.exists('x2_1.vot'):
     os.system('stilts tmatch2 matcher=skyellipse params=30 in1='+table3+' in2='+table4+' out=x4_3.vot values1="ra dec a b pa" values2="ra dec a b pa" ofmt=votable find=all fixcols=none join=2not1')
     os.system('stilts tmatch2 matcher=skyellipse params=30 in1='+table4+' in2='+table1+' out=x1_4.vot values1="ra dec a b pa" values2="ra dec a b pa" ofmt=votable find=all fixcols=none join=2not1')
 
+# Now we want to get just the 1s, just the 2s, just the 3s, just the 4s
+# Using PA for now, but should change this to UUID when new version becomes available
+if not os.path.exists('x1.vot'):
+    os.system('stilts tmatch2 matcher=exact values1=pa values2=pa in1=x1_2.vot in2=x1_4.vot out=temp.vot ofmt=votable find=all fixcols=none join=1and2')
+    os.system('stilts tpipe in=temp.vot cmd=\'keepcols "island source background local_rms ra_str dec_str ra err_ra dec err_dec peak_flux err_peak_flux int_flux err_int_flux a err_a b err_b pa err_pa flags residual_mean residual_std"\' out=x1.vot')
+    os.system('stilts tmatch2 matcher=exact values1=pa values2=pa in1=x2_3.vot in2=x2_1.vot out=temp.vot ofmt=votable find=all fixcols=none join=1and2')
+    os.system('stilts tpipe in=temp.vot cmd=\'keepcols "island source background local_rms ra_str dec_str ra err_ra dec err_dec peak_flux err_peak_flux int_flux err_int_flux a err_a b err_b pa err_pa flags residual_mean residual_std"\' out=x2.vot')
+    os.system('stilts tmatch2 matcher=exact values1=pa values2=pa in1=x3_4.vot in2=x3_2.vot out=temp.vot ofmt=votable find=all fixcols=none join=1and2')
+    os.system('stilts tpipe in=temp.vot cmd=\'keepcols "island source background local_rms ra_str dec_str ra err_ra dec err_dec peak_flux err_peak_flux int_flux err_int_flux a err_a b err_b pa err_pa flags residual_mean residual_std"\' out=x3.vot')
+    os.system('stilts tmatch2 matcher=exact values1=pa values2=pa in1=x4_1.vot in2=x4_3.vot out=temp.vot ofmt=votable find=all fixcols=none join=1and2')
+    os.system('stilts tpipe in=temp.vot cmd=\'keepcols "island source background local_rms ra_str dec_str ra err_ra dec err_dec peak_flux err_peak_flux int_flux err_int_flux a err_a b err_b pa err_pa flags residual_mean residual_std"\' out=x4.vot')
+
 # Concatenate all of the tables together
-os.system('stilts tcat in=x1_2.vot in=x2_3.vot in=x3_4.vot in=x4_1.vot in=x2_1.vot in=x3_2.vot in=x4_3.vot in=x1_4.vot in=a1_2_best.vot in=a2_3_best.vot in=a3_4_best.vot in=a4_1_best.vot out=complete.vot')
+os.system('stilts tcat in=x1.vot in=x2.vot in=x3.vot in=x4.vot in=a1_2_best.vot in=a2_3_best.vot in=a3_4_best.vot in=a4_1_best.vot out=complete.vot')
