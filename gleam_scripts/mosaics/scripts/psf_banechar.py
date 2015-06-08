@@ -68,6 +68,7 @@ if os.path.exists(fitsfile):
     try:
         hdulist=fits.open(fitsfile)
         header=hdulist[0].header
+        central_RA=header['CRVAL1']
         start_freq=(header['FREQ']/1e6)-(7.68/2)
     except:
         print "No frequency found in fitsheader; will estimate the frequency from the input filename."
@@ -422,12 +423,14 @@ if dopsfout:
             header['CD2_2'] = stepsize
         else:
             print "Error: Can't find CDELT2 or CD2_2"
-    # These need to be zero in order for a plate caree (CAR) projection to resemble a Cartesian grid
-        header['CRVAL1']=0.0
+    # CRVAL2 needs to be zero in order for a plate caree (CAR) projection to resemble a Cartesian grid
         header['CRVAL2']=0.0
-    # The pixel values where RA and Dec are 0
-        header['CRPIX1']=-min(x[mask])/stepsize
+    # The pixel values where Dec is 0
         header['CRPIX2']=-min(y[mask])/stepsize
+    # CRVAL1 should be in the middle of the image
+        header['CRVAL1']=central_RA
+        header['CRPIX1']=central_RA-min(x[mask])/stepsize
+
         header['CTYPE1']='RA---CAR'
         header['CTYPE2']='DEC--CAR'
         hdulist[0].data = agrid[i].transpose()
@@ -449,13 +452,13 @@ if dopsfout:
         header['CD2_2'] = stepsize
     else:
         print "Error: Can't find CDELT2 or CD2_2"
-# These need to be zero in order for a plate caree (CAR) projection to resemble a Cartesian grid
-    header['CRVAL1']=0.0
+# CRVAL2 needs to be zero in order for a plate caree (CAR) projection to resemble a Cartesian grid
     header['CRVAL2']=0.0
-    header['CRVAL3']=0
-# The pixel values where RA and Dec are 0
-    header['CRPIX1']=-min(x[mask])/stepsize
+# The pixel values where Dec is 0
     header['CRPIX2']=-min(y[mask])/stepsize
+# CRVAL1 should be in the middle of the image
+    header['CRVAL1']=central_RA
+    header['CRPIX1']=central_RA-min(x[mask])/stepsize
     header['CRPIX3']=0
     header['CTYPE1']='RA---CAR'
     header['CTYPE2']='DEC--CAR'
