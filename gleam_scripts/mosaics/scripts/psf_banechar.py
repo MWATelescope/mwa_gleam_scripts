@@ -433,3 +433,35 @@ if dopsfout:
         hdulist[0].data = agrid[i].transpose()
         hdulist[0].header = header
         hdulist.writeto(outfitsfile, clobber=True)
+
+# param_names are [a,b,pa,...]
+    print 'Making multi dimensional image'
+    outfile = inputfile.replace('_comp.vot','_triple.fits')
+    if 'CDELT1' in header:
+        header['CDELT1'] = stepsize
+    elif 'CD1_1' in header:
+        header['CD1_1'] = stepsize
+    else:
+        print "Error: Can't find CDELT1 or CD1_1"
+    if 'CDELT2' in header:
+        header['CDELT2'] = stepsize
+    elif 'CD2_2' in header:
+        header['CD2_2'] = stepsize
+    else:
+        print "Error: Can't find CDELT2 or CD2_2"
+# These need to be zero in order for a plate caree (CAR) projection to resemble a Cartesian grid
+    header['CRVAL1']=0.0
+    header['CRVAL2']=0.0
+    header['CRVAL3']=0
+# The pixel values where RA and Dec are 0
+    header['CRPIX1']=-min(x[mask])/stepsize
+    header['CRPIX2']=-min(y[mask])/stepsize
+    header['CRPIX3']=0
+    header['CTYPE1']='RA---CAR'
+    header['CTYPE2']='DEC--CAR'
+    header['CTYPE3']=('Beam',"0=a,1=b,2=pa (degrees)")
+    newdata = np.array([ agrid[0].transpose()/3600 , agrid[1].transpose()/3600, agrid[2].transpose()])
+    #newdata[np.where(np.bitwise_not(np.isfinite(newdata)))]=0
+    hdulist[0].data = newdata
+    hdulist[0].header = header
+    hdulist.writeto(outfile, clobber=True)
