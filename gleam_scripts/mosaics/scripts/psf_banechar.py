@@ -140,7 +140,7 @@ param_names=["a","b","pa","int_peak","nsrc"]
 
 # For unwrapping RA values which bridge the meridian
 def unwrap(x):
-    if x>250:
+    if x>180:
         return x-360
     else:
         return x
@@ -309,6 +309,7 @@ else:
 
 x=data['ra']
 
+# NB: this will break if your catalogue stretches all the way from RA0 to RA12 or RA12 to RA0
 if min(x)<1. and max(x)>359.:
     data['ra']=vunwrap(data['ra'])
 
