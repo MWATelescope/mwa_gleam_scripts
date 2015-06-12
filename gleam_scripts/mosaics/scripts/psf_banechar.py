@@ -69,6 +69,9 @@ if os.path.exists(fitsfile):
         hdulist=fits.open(fitsfile)
         header=hdulist[0].header
         central_RA=header['CRVAL1']
+        if central_RA>300:
+           print "Recentring RA as the WCS will fail otherwise due to WCS bugginess..."
+           central_RA=0
         start_freq=(header['FREQ']/1e6)-(7.68/2)
     except:
         print "No frequency found in fitsheader; will estimate the frequency from the input filename."
