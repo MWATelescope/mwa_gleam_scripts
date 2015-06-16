@@ -57,16 +57,16 @@ fi
 cd ${color}
 
 # Get list of frequencies and zenith psf from the header of the final mosaic, which itself should be using the zenith PSF
-bmaj=`pyhead.py -p BMAJ ${fiducial_freq}/${week}_${fiducial_freq}.fits | awk '{print $3}'`
-bmin=`pyhead.py -p BMIN ${fiducial_freq}/${week}_${fiducial_freq}.fits | awk '{print $3}'`
+bmaj=`pyhead.py -p BMAJ ../${fiducial_freq}/${week}_${fiducial_freq}.fits | awk '{print $3}'`
+bmin=`pyhead.py -p BMIN ../${fiducial_freq}/${week}_${fiducial_freq}.fits | awk '{print $3}'`
 echo "Final resolution will be $bmaj x $bmin deg."
 
 for freq in $freqs
 do
-    for file in ../${freq}/${week}_${freq}.fits
+    for file in ../${freq}/${week}_${freq}_rescaled.fits
     do
 # Load and convolve-down all of the Week images, setting up for the no-weight run
-        localname=`basename $file`
+        localname=`basename $file | sed "s/_rescaled//g"`
         if [[ ! -e $localname ]]
         then
             if [[ $localname != "${week}_${fiducial_freq}.fits" ]]
@@ -81,10 +81,11 @@ do
                 convol map=$imname options="final" fwhm=$convbeam out=temp.im
                 fits op=xyout in=temp.im out=$localname
                 rm -rf temp.im
-                echo "Writing $localname."
+                echo "Writing $localname, copying mask from $file."
+                copy_mask.py --mask=$file --mosaic=$localname
             else
                 echo "$localname is already at the lowest resolution; linking instead."
-                ln -s $file
+                ln -s $file $localname
             fi
         fi
     done
@@ -120,7 +121,7 @@ do
    for file in ../${freq}/mosaic*oid.fits
    do
        localname=`basename $file`
-       if [[ ! -h $localname ]]
+       if [[ ! -e $localname ]]
        then
            cp $file $localname
        fi
@@ -143,7 +144,14 @@ fi
 
 $aprun aegean.sh ${week}_${color}_noweight.fits bane compress
 $aprun newaegean.sh ${week}_${color}_noweight.fits bane compress
-$aprunsingle QC_filter.py ${week}_${color}_noweight_resid_comp.vot ${week}_${color}_noweight_resid_excl_comp.vot
+if [[ ! -e ${week}_${color}_noweight_resid_excl_comp.vot ]]
+then
+    $aprunsingle QC_filter.py --input=${week}_${color}_noweight_resid_comp.vot --output=${week}_${color}_noweight_resid_excl_comp.vot
+fi
+if [[ ! -e ${week}_${color}_noweight_resid_excl_triple.fits ]]
+then
+    $aprunsingle psf_banechar.py --input=${week}_${color}_noweight_resid_excl_comp.vot --fitsfile=${week}_${color}_noweight.fits
+fi
 
 # Low noise mosaic (noise is reduced, but frequency varies over the image)
 if [[ ! -e ${week}_${color}_lownoise.fits ]]
@@ -151,9 +159,9 @@ then
 # Rescale RMS maps in preparation for swarping
     for file in *_polyapplied_rms_sigmoid.fits
     do
-        $aprunsingle rescale_rms.py --mosaic=$file
+        $aprunsingle pyhead.py -u BSCALE  0.000001
     done
-    $aprun swarp -c ../weight.swarp mosaic*ed.fits -IMAGEOUT_NAME ${week}_${color}_lownoise.fits -WEIGHTOUT_NAME ${week}_${color}_lownoise.weight.fits  -PROJECTION_TYPE ZEA
+    $aprun swarp -c ../weight.swarp mosaic*ed.fits -IMAGEOUT_NAME ${week}_${color}_lownoise.fits -WEIGHTOUT_NAME ${week}_${color}_lownoise.weight.fits
     $aprunsingle fits_trim.py ${week}_${color}_lownoise.fits temp.fits
     mv temp.fits ${week}_${color}_lownoise.fits
     $aprunsingle fits_trim.py ${week}_${color}_lownoise.weight.fits temp.fits
@@ -165,13 +173,19 @@ then
 # De-rescale RMS maps
     for file in *_polyapplied_rms_sigmoid.fits
     do
-        $aprunsingle rescale_rms.py --mosaic=$file --upscale
+        $aprunsingle pyhead.py -u BSCALE 1.0 $file
     done
 fi
 
 $aprun aegean.sh ${week}_${color}_lownoise.fits bane compress
 $aprun newaegean.sh ${week}_${color}_lownoise.fits bane compress
-$aprunsingle QC_filter.py ${week}_${color}_lownoise_resid_comp.vot ${week}_${color}_lownoise_resid_excl_comp.vot
-$aprunsingle psf_banechar.py --input=${week}_${color}_lownoise_resid_excl_comp.vot --fitsfile=${week}_${color}_lownoise.fits
+if [[ ! -e ${week}_${color}_lownoise_resid_excl_comp.vot ]]
+then
+    $aprunsingle QC_filter.py --input=${week}_${color}_lownoise_resid_comp.vot --output=${week}_${color}_lownoise_resid_excl_comp.vot
+fi
+if [[ ! -e ${week}_${color}_lownoise_resid_excl_triple.fits ]]
+then
+    $aprunsingle psf_banechar.py --input=${week}_${color}_lownoise_resid_excl_comp.vot --fitsfile=${week}_${color}_lownoise.fits
+fi
 
 exit 0
