@@ -1,4 +1,4 @@
-#! /usr/bin/env python
+#!/usr/bin/env python
 
 __author__ = "PaulHancock"
 
@@ -23,6 +23,44 @@ try:
     import cPickle as pickle
 except ImportError:
     import pickle
+
+from optparse import OptionParser
+
+usage="Usage: %prog [options]\n"
+parser = OptionParser(usage=usage)
+parser.add_option('--input',dest="input",default=None,
+                  help="Input VO table to filter.")
+parser.add_option('--output',dest="output",default=None,
+                  help="Output VO table -- default is input_filter.vot")
+parser.add_option('--mimtable',dest="mimtable",default=None,
+                  help="MIMAS table to read in (default is MWA_Tools/gleam_scripts/mosaics/scripts/all.mim)
+parser.add_option('--minRA',dest="minRA",default=0.0,type="float",
+                  help="Minimum RA to allow through, in degrees (default = 0)")
+parser.add_option('--maxRA',dest="maxRA",default=360.0,type="float",
+                  help="Maximum RA to allow through, in degrees (default = 360)")
+parser.add_option('--minDec',dest="minDec",default=-90.0,type="float",
+                  help="Minimum Dec to allow through, in degrees (default = -90)")
+parser.add_option('--maxDec',dest="maxDec",default=35.0,type="float",
+                  help="Maximum Dec to allow through, in degrees (default = 35)")
+(options, args) = parser.parse_args()
+
+# Parse the input options
+
+if not os.path.exists(options.input):
+    print "Error! Must specify an input file."
+    sys.exit(1)
+else:
+    infile=options.input
+
+if options.output:
+    outfile=options.output
+else:
+    outfile=infile.replace(".vot","_filtered.vot")
+
+if options.mimtable:
+    mimtable=options.mimtable
+else:
+    mimtable=mwa_code_base+"/MWA_Tools/gleam_scripts/mosaics/scripts/all.mim"
 
 def load(filename):
     print "load",filename
@@ -123,18 +161,12 @@ def filter_region(table,regionfile):
     good = np.bitwise_not(bad)
     return table[good]
 
+# Run the filters we've defined
 
-if __name__ == '__main__':
-    #make_mim()
-    #sys.exit()
-    infile,outfile = sys.argv[-2:]
-    try:
-        mimtable=sys.argv[1:][2]
-    except:
-        mimtable=mwa_code_base+"/MWA_Tools/gleam_scripts/mosaics/scripts/all.mim"
-    table = load(infile)
-    table = filter_RADEC(table)
-    table = filter_GalacticPlane(table)
-    table = filter_intpeak(table)
-    table = filter_region(table,mimtable)
-    save(table,outfile)
+table = load(infile)
+table = filter_RADEC(table)
+table = filter_GalacticPlane(table)
+table = filter_intpeak(table)
+table = filter_region(table,mimtable)
+save(table,outfile)
+
