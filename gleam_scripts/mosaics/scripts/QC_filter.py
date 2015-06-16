@@ -33,7 +33,7 @@ parser.add_option('--input',dest="input",default=None,
 parser.add_option('--output',dest="output",default=None,
                   help="Output VO table -- default is input_filter.vot")
 parser.add_option('--mimtable',dest="mimtable",default=None,
-                  help="MIMAS table to read in (default is MWA_Tools/gleam_scripts/mosaics/scripts/all.mim")
+                  help="MIMAS table to read in (default is MWA_Tools/gleam_scripts/mosaics/scripts/all.mim)")
 parser.add_option('--minRA',dest="minRA",default=0.0,type="float",
                   help="Minimum RA to allow through, in degrees (default = 0)")
 parser.add_option('--maxRA',dest="maxRA",default=360.0,type="float",
@@ -55,12 +55,14 @@ else:
 if options.output:
     outfile=options.output
 else:
-    outfile=infile.replace(".vot","_filtered.vot")
+    outfile=infile.replace(".vot","_filter.vot")
 
 if options.mimtable:
     mimtable=options.mimtable
 else:
     mimtable=mwa_code_base+"/MWA_Tools/gleam_scripts/mosaics/scripts/all.mim"
+
+ramin, ramax, decmin, decmax = options.minRA, options.maxRA, options.minDec, options.maxDec
 
 def load(filename):
     print "load",filename
