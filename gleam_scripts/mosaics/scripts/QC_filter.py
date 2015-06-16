@@ -33,7 +33,7 @@ parser.add_option('--input',dest="input",default=None,
 parser.add_option('--output',dest="output",default=None,
                   help="Output VO table -- default is input_filter.vot")
 parser.add_option('--mimtable',dest="mimtable",default=None,
-                  help="MIMAS table to read in (default is MWA_Tools/gleam_scripts/mosaics/scripts/all.mim)
+                  help="MIMAS table to read in (default is MWA_Tools/gleam_scripts/mosaics/scripts/all.mim")
 parser.add_option('--minRA',dest="minRA",default=0.0,type="float",
                   help="Minimum RA to allow through, in degrees (default = 0)")
 parser.add_option('--maxRA',dest="maxRA",default=360.0,type="float",
