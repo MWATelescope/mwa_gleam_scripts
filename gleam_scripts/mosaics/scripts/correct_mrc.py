@@ -2,7 +2,8 @@
 
 # Script to correct the flux scale by matching int_fluxes to scaled MRC
 # Hopefully will remove slow RA-dependent flux scale effects in GLEAM
-# Also remove the RA, Dec shifts using MRC since it's like John's corrections but without the bugs
+# Also remove the RA, Dec shifts using MRC
+# And plot nice vectors, if desired
 
 import os
 import sys
@@ -12,16 +13,74 @@ import numpy
 from astropy.io import fits
 from astropy.io.votable import parse_single_table
 import re
+import matplotlib as mpl
+mpl.use('Agg') # So does not use display
+import matplotlib.pylab as plt
+
+from optparse import OptionParser
+
+usage="Usage: %prog [options]\n"
+parser = OptionParser(usage=usage)
+parser.add_option('--plot',action="store_true",dest="make_plots",default=False,
+                  help="Make vector plots? (off by default)")
+parser.add_option('--dec',dest="dec",default=None,type="float",
+                  help="Declination of the observations to set plotting ranges. (default is to try to get from the date)")
+parser.add_option('--date',dest="date",default=None,type="string",
+                  help="Date of observations in YYYYMMDD format? (default is try to read from directory name) Not used if --dec is specified.")
+(options, args) = parser.parse_args()
+
+def unwrap(x):
+    if x>250:
+        return x-360
+    else:
+        return x
+vunwrap=numpy.vectorize(unwrap)
 
 catdir=os.environ['MWA_CODE_BASE']
 MRCvot=catdir+"/MRC.vot"
 
-#files=sorted(glob.glob("10*XX*2.0.fits")) #[::-1]
-files=sorted(glob.glob("10*XX*2.?.fits")) #[::-1]
-# Check all matching files and VO tables are present
+if not os.path.exists(MRCvot):
+    print "Can't find MRC.vot in $MWA_CODE_BASE! Either it's not there or the variable wasn't set properly. Make sure you set it to the directory in which MWA_Tools resides."
+    sys.exit(1)
 
-# Iterating in reverse means we don't accidentally skip every other entry
-for Xfits in reversed(files):
+if options.dec:
+    plotdec=options.dec
+else:
+    if options.date:
+        date=options.date
+    else:
+    # Expecting to be in a directory named with the date in format YYYYMMDD
+        date=re.search("201[0-9]{5}",os.getcwd()).group()
+        if date=="20130817" or date=="20131111" or date=="20140306" or date=="20140615" :
+            plotdec=18.6
+        elif date=="20130808" or date=="20131107" or date=="20140306" or date=="20140611":
+            plotdec=1.6
+        elif date=="20130822" or date=="20131105" or date=="20140304" or date=="20140613" or date=="20140616":
+            plotdec=-13
+        elif date=="20130810" or date=="20131125" or date=="20140303" or date=="20140609":
+            plotdec=-27
+        elif date=="20130825" or date=="20131106" or date=="20140316" or date=="20140610":
+            plotdec=-40
+        elif date=="20130809" or date=="20131108" or date=="20140317" or date=="20140612" or date=="20140618":
+            plotdec=-55
+        elif date=="20130818" or date=="20131112" or date=="20140309" or date=="20140614":
+            plotdec=-72
+        else:
+            print "Defaulting to zenith in the absence of a known plotdeclination."
+            plotdec=-27
+
+# Expects to act on a directory full of Phase 2 XX, YY, I snapshots and their source-finding results.
+# Would probably work on Phase 1 but hasn't been tested.
+files=sorted(glob.glob("10*XX*2.?.fits")) #[::-1]
+
+if options.make_plots:
+    # Assume that the first file is at the right frequency!
+    freq=fits.getheader(files[0])['CRVAL3']
+
+# Check all matching files and VO tables are present
+ras=[]
+docorr=[]
+for Xfits in files:
     Yfits=re.sub("XX","YY",Xfits)
     Ifits=re.sub("XX","I",Xfits)
     Ivot=re.sub(".fits","_comp.vot",Ifits)
@@ -39,11 +98,29 @@ for Xfits in reversed(files):
     Ifits_corr=re.sub(".fits","_corrected.fits",Ifits)
     if os.path.exists(Xfits_corr) and os.path.exists(Yfits_corr) and os.path.exists(Ifits_corr):
        print Xfits+" already corrected: not bothing to calculate."
-       files.remove(Xfits)
-   
+#       files.remove(Xfits)
+       docorr.append(False)
+    else:
+       docorr.append(True)
+    if options.make_plots:
+    # Get min and max RA, to see whether we need to unwrap, and set the plot limits
+    # Surprised to find that WSClean uses negative RAs, which messes up the unwrap check
+        crval1=fits.getheader(Ifits)['CRVAL1']
+        if crval1 < 0.0:
+            crval1+=360.0
+        ras.append(crval1)
+
+files_to_check=zip(files,docorr)
+
+if options.make_plots:
+# Padding around central RA and Dec -- roughly the field-of-view
+    margin=4000000000./freq
+    if max(ras)+margin-min(ras)-margin>300:
+        unwrap=True
+        ras=vunwrap(ras)
 ratio=1.0
 
-for Xfits in files:
+for Xfits,corr in files_to_check:
 
     ra=fits.getheader(Xfits)['CRVAL1']
     dec=fits.getheader(Xfits)['CRVAL2']
@@ -54,6 +131,7 @@ for Xfits in files:
 # inputs
     Yfits=re.sub("XX","YY",Xfits)
     Ifits=re.sub("XX","I",Xfits)
+    Iroot=re.sub(".fits","",Ifits)
     Ivot=re.sub(".fits","_comp.vot",Ifits)
     matchvot=re.sub(".fits","_MRC.vot",Ifits)
 
@@ -70,41 +148,76 @@ for Xfits in files:
         os.remove('temp3.vot')
 
     t = parse_single_table(matchvot)
+    if corr:
 # Check the matched table actually has entries
-    if t.array.shape[0]>0:
-# weight is currently S/N
-        ratio=numpy.exp(numpy.average(a=t.array['logratio'],weights=(t.array['weight']))) #*(distfunc)))
-        stdev=numpy.exp(numpy.std(a=t.array['logratio']))
-        print "Ratio of "+str(ratio)+" between "+Ifits+" and MRC."
-        print "stdev= "+str(stdev)
+        if t.array.shape[0]>0:
+    # weight is currently S/N
+            ratio=numpy.exp(numpy.average(a=t.array['logratio'],weights=(t.array['weight']))) #*(distfunc)))
+            stdev=numpy.exp(numpy.std(a=t.array['logratio']))
+            print "Ratio of "+str(ratio)+" between "+Ifits+" and MRC."
+            print "stdev= "+str(stdev)
 
-    # Calculate ionospheric offsets
-        delRA=numpy.average(a=t.array['delRA'],weights=(t.array['weight'])) #*(distfunc)))
-        delDec=numpy.average(a=t.array['delDec'],weights=(t.array['weight'])) #*(distfunc)))
-    #    delRAstdev=numpy.std(a=t.array['delRA'])
-    #    delDecstdev=numpy.std(a=t.array['delDec'])
+        # Calculate ionospheric offsets
+            delRA=numpy.average(a=t.array['delRA'],weights=(t.array['weight'])) #*(distfunc)))
+            delDec=numpy.average(a=t.array['delDec'],weights=(t.array['weight'])) #*(distfunc)))
+        #    delRAstdev=numpy.std(a=t.array['delRA'])
+        #    delDecstdev=numpy.std(a=t.array['delDec'])
 
-    # Write new fits files
+        # Write new fits files
 
-        for fitsfile in Ifits,Xfits,Yfits:
-            hdu_in = fits.open(fitsfile)
-        # Modify to fix ionosphere
-            hdr_in = hdu_in[0].header
-            hdr_in['CRVAL1'] = ra + delRA
-            hdr_in['CRVAL2'] = dec + delDec
-        # Modify to fix flux scaling
-            hdu_in[0].data=hdu_in[0].data*ratio
-        # Remove stupid bonus keywords, if they have been added
-            try:
-                hdr_in.remove('DATAMIN')
-                hdr_in.remove('DATAMAX')
-            except:
-                pass
-        # Write out
-            fits_corr=re.sub(".fits","_corrected.fits",fitsfile)
-            hdu_in.writeto(fits_corr,clobber=True)
-    else:
-        print Ifits+" had no valid matches with MRC. Moving files to unused/ ."
-        obsid=Ifits.split("_")[0]
-        for file in glob.glob(obsid+"*"):
-            shutil.move(file,"./unused/")
+            for fitsfile in Ifits,Xfits,Yfits:
+                hdu_in = fits.open(fitsfile)
+            # Modify to fix ionosphere
+                hdr_in = hdu_in[0].header
+                hdr_in['CRVAL1'] = ra + delRA
+                hdr_in['CRVAL2'] = dec + delDec
+            # Modify to fix flux scaling
+                hdu_in[0].data=hdu_in[0].data*ratio
+            # Remove stupid bonus keywords, if they have been added
+                try:
+                    hdr_in.remove('DATAMIN')
+                    hdr_in.remove('DATAMAX')
+                except:
+                    pass
+            # Write out
+                fits_corr=re.sub(".fits","_corrected.fits",fitsfile)
+                hdu_in.writeto(fits_corr,clobber=True)
+        else:
+            print Ifits+" had no valid matches with MRC. Moving files to unused/ ."
+            obsid=Ifits.split("_")[0]
+            for file in glob.glob(obsid+"*"):
+                shutil.move(file,"./unused/")
+
+    if options.make_plots:
+        outputpng=Iroot+"_vect.png"
+    # Plot vectors
+        if unwrap:
+            X=vunwrap(t.array['_RAJ2000'])
+            U=vunwrap(t.array['ra'])
+        else:
+            X=t.array['_RAJ2000']
+            U=t.array['ra']
+        Y=t.array['_DEJ2000']
+        V=t.array['dec']
+        fig=plt.figure(figsize=(20, 10))
+        fig.suptitle(Iroot)
+        ax = plt.gca()
+        M = numpy.arctan((V-Y)/(U-X))
+        ax.quiver(X,Y,60*(U-X),60*(V-Y),M,angles='xy',scale_units='xy',scale=1)
+        ax.set_xlim([min(ras)-margin,max(ras)+margin])
+        umargin=plotdec+margin
+        #if umargin > 90.0:
+        #    umargin=90.0
+        #umargin=plotdec+margin*numpy.cos(numpy.deg2rad(umargin))
+        if umargin > 90.0:
+            umargin=90.0
+        lmargin=plotdec-margin
+        #if lmargin < -90.0:
+        #    lmargin=-90.0
+        #lmargin=plotdec-margin*numpy.cos(numpy.deg2rad(lmargin))
+        if lmargin < -90.0:
+            lmargin=-90.0
+        ax.set_ylim([lmargin,umargin])
+        ax.set_ylabel('Declination (deg)')
+        ax.set_xlabel('RA (deg)')
+        plt.savefig(outputpng)
