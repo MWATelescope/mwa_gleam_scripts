@@ -74,14 +74,19 @@ def save(table,filename):
     writetoVO(table,filename)
     #catalogs.save_catalog(filename,catalogs.table_to_source_list(table))
 
-
 def filter_RADEC(table,ramin,ramax,decmin,decmax):
     print "RADEC filter"
     good = []
-    for i,row in enumerate(table):
-        if ramin<=row['ra']<=ramax:
-            if decmin<=row['dec']<decmax:
-                good.append(i)
+    if ramin>ramax:
+        for i,row in enumerate(table):
+            if 0.0<=row['ra']<=ramin or ramax<=row['ra']<=360.0:
+                if decmin<=row['dec']<decmax:
+                    good.append(i)
+    else:
+        for i,row in enumerate(table):
+            if ramin<=row['ra']<=ramax:
+                if decmin<=row['dec']<decmax:
+                    good.append(i)
     return table[good]
 
 
