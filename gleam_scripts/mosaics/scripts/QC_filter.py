@@ -75,10 +75,8 @@ def save(table,filename):
     #catalogs.save_catalog(filename,catalogs.table_to_source_list(table))
 
 
-def filter_RADEC(table):
+def filter_RADEC(table,ramin,ramax,decmin,decmax):
     print "RADEC filter"
-    ramin,ramax = 0,120
-    decmin,decmax = -90,30
     good = []
     for i,row in enumerate(table):
         if ramin<=row['ra']<=ramax:
@@ -166,7 +164,7 @@ def filter_region(table,regionfile):
 # Run the filters we've defined
 
 table = load(infile)
-table = filter_RADEC(table)
+table = filter_RADEC(table,ramin,ramax,decmin,decmax)
 table = filter_GalacticPlane(table)
 table = filter_intpeak(table)
 table = filter_region(table,mimtable)
