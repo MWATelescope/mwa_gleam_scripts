@@ -9,8 +9,6 @@
 
 import datetime
 import numpy as np
-import scipy.optimize as opt
-import scipy.stats as stats
 from astropy.io import fits
 from optparse import OptionParser
 import os
@@ -26,8 +24,8 @@ usage="Usage: %prog [options] <file>\n"
 parser = OptionParser(usage=usage)
 parser.add_option('--mosaic',type="string", dest="mosaic",
                     help="The filename of the mosaic you want to read in.")
-parser.add_option('--plot',action="store_true",dest="make_plots",default=True,
-                    help="Make fit plots? (default = True)")
+parser.add_option('--plot',action="store_true",dest="make_plots",default=False,
+                    help="Make fit plots? (default = False)")
 parser.add_option('--zenith',action="store_true",dest="zenith",default=False,
                     help="Calculate correction for the special case of zenith.")
 (options, args) = parser.parse_args()
@@ -118,7 +116,7 @@ indices=np.intersect1d(np.where(tbdata['components']==1),indices)
 indices=np.intersect1d(np.where(tbdata['S_vlss']>2.),indices)
 # Sources should be more than 8 sigma in GLEAM
 indices=np.intersect1d(np.where((tbdata['int_flux_1']/tbdata['local_rms_1'])>8),indices)
-# We should avoid sources outside the RA and Dec ranges we're not interested in (currently manually set, need to read from a file)
+# We should avoid sources outside the RA and Dec ranges we're not interested in
 indices=np.intersect1d(np.where(tbdata['DEJ2000_vlss']<Dec_max),indices)
 indices=np.intersect1d(np.where(tbdata['DEJ2000_vlss']>Dec_min),indices)
 if RA_min > RA_max:
@@ -174,7 +172,11 @@ x=np.concatenate((decs,decs2),axis=1)
 y=np.concatenate((ratio,ratio2),axis=1)
 w=np.concatenate((w,w2),axis=1)
 
-polycoeffs=np.polyfit(x,y,3,w=w)
+if (Dec_strip == -26 or Dec_strip == -26.7 or Dec_strip == -27.0):
+# Need to constrain this to being centred around zenith...
+    polycoeffs=np.polyfit(x,y,2,w=w)
+else:
+    polycoeffs=np.polyfit(x,y,3,w=w)
 
 if options.make_plots:
     outpng=input_root+"_"+"polyfit_int.png"
@@ -188,6 +190,7 @@ if options.make_plots:
     fitplot=pyplot.figure(figsize=figsize)
     ax = fitplot.add_subplot(111)
     ax.set_xlim(min(x),max(x))
+    ax.set_ylim((0.5,1.5))
     ax.set_xlabel("Dec / degrees")
     ax.set_ylabel("S_predicted / S_GLEAM")
     ax.set_title(title,fontsize=10)
