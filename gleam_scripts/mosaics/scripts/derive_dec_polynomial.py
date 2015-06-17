@@ -75,7 +75,7 @@ Dec_strip = header['CRVAL2']
 
 cutdir=os.environ['MWA_CODE_BASE']
 
-centre_dec, freq_band, RA_min, RA_max, Dec_min, Dec_max = np.loadtxt(cutdir+'/ra_dec_limits_polyderivation.dat',skiprows=2,unpack=True) 
+centre_dec, freq_band, RA_min, RA_max, Dec_min, Dec_max = np.loadtxt(cutdir+'/MWA_Tools/gleam_scripts/mosaics/ra_dec_limits_polyderivation.dat',skiprows=2,unpack=True) 
 
 dec_freq_comb = [centre_dec, freq_band]
 cut_ind = np.where((centre_dec == Dec_strip) & (freq_band == subband))
@@ -93,7 +93,7 @@ if not os.path.exists(marco_xmatch):
     print 'Crossmatching mosaic with literature using stilts.'
 
     os.system('stilts tmatch2 in1='+input_root+'_comp.vot in2='+input_root+'_isle.vot join=1and2 find=best matcher=exact values1="island" values2="island" out='+input_root+'_tot.vot')
-    os.system('stilts tmatch2 matcher=skyellipse in1=$MWA_CODE_BASE/marco_all_VLSSsrcs.fits in2='+input_root+'_tot.vot out=marco_all_VLSSsrcs+'+input_root+'.fits values1="RAJ2000 DEJ2000 MajAxis MinAxis PA" values2="ra_1 dec_1 a b pa_1" params=20')
+    os.system('stilts tmatch2 matcher=skyellipse in1=$MWA_CODE_BASE/MWA_Tools/catalogues/marco_all_VLSSsrcs.fits in2='+input_root+'_tot.vot out=marco_all_VLSSsrcs+'+input_root+'.fits values1="RAJ2000 DEJ2000 MajAxis MinAxis PA" values2="ra_1 dec_1 a b pa_1" params=20')
 
 hdulist = fits.open(marco_xmatch)
 hdulist.verify('fix')
