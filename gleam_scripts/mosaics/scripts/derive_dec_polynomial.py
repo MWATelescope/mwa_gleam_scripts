@@ -7,7 +7,6 @@
 # Note that this should be run from directory structure that is above saving directories.
 # NHW 17/06/2015
 
-import datetime
 import numpy as np
 from astropy.io import fits
 from optparse import OptionParser
@@ -41,8 +40,10 @@ input_mosaic = options.mosaic
 
 dec_zenith=-26.7
 
+#def quad_curvefit_zenith(dec, c, a): # defining quadratic which turns over at the zenith
+#    return c*(np.power(dec,2) + dec_zenith*2*dec) + a
 def quad_curvefit_zenith(dec, c, a): # defining quadratic which turns over at the zenith
-    return c*(np.power(dec,2) + dec_zenith*2*dec) + a
+    return c*np.power((dec-dec_zenith),2) + a
 
 def powlaw(freq, a, alpha): # defining powlaw as S = a*nu^alpha.
     return a*(freq**alpha)
