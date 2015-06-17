@@ -5,13 +5,13 @@
 # measured flux density from Aegean. All sources have a VLSSr counterpart.
 # It will then calculate the best fitting polynomial.
 # Note that this should be run from directory structure that is above saving directories.
-# J. R. Callingham 26/2/2015
+# NHW 17/06/2015
 
 import datetime
 import numpy as np
 from astropy.io import fits
 from optparse import OptionParser
-import scipy.optimize as opt
+from scipy.optimize import curve_fit
 import os
 import sys
 
@@ -27,32 +27,25 @@ parser.add_option('--mosaic',type="string", dest="mosaic",
                     help="The filename of the mosaic you want to read in.")
 parser.add_option('--plot',action="store_true",dest="make_plots",default=False,
                     help="Make fit plots? (default = False)")
+parser.add_option('--write',action="store_true",dest="write_coefficients",default=False,
+                    help="Write coefficients to file? (default = False)")
 (options, args) = parser.parse_args()
 
 if options.make_plots:
     import matplotlib as mpl 
     mpl.use('Agg') # So does not use display
     import matplotlib.pyplot as pyplot
-
-    sbplt_pad_left  = 0.125  # the left side of the subplots of the figure
-    sbplt_pad_right = 0.9    # the right side of the subplots of the figure
-    sbplt_pad_bottom = 0.1   # the bottom of the subplots of the figure
-    sbplt_pad_top = 0.9      # the top of the subplots of the figure
-    sbplt_pad_wspace = 0.2   # the amount of width reserved for blank space between subplots
-    sbplt_pad_hspace = 0.5   # the amount of height reserved for white space between subplots
-
     figsize=(5,5)
 
 input_mosaic = options.mosaic
 
+dec_zenith=-26.7
+
+def quad_curvefit_zenith(dec, c, a): # defining quadratic which turns over at the zenith
+    return c*(np.power(dec,2) + dec_zenith*2*dec) + a
+
 def powlaw(freq, a, alpha): # defining powlaw as S = a*nu^alpha.
     return a*(freq**alpha)
-
-def cubic_curvefit(dec, a, b, c, d): # defining cubic
-    return d*np.power(dec,3) + c*np.power(dec,2) + b*dec + a
-
-def quad_curvefit_zenith(dec, a, c): # defining constrained quadratic
-    return c*(np.power(dec,2) + 53.4*dec) + a
 
 input_root=input_mosaic.replace(".fits","")
 
@@ -87,7 +80,7 @@ RA_max = RA_max[cut_ind]
 Dec_min = Dec_min[cut_ind]
 Dec_max = Dec_max[cut_ind]
 
-# Checking if file with ratios already exists. If it does, skip to straight fitting. 
+# Checking if the crossmatch already exists. If it does, skip to the polynomial fitting.
 marco_xmatch="marco_all_VLSSsrcs+"+input_root+".fits"
 
 if not os.path.exists(marco_xmatch):
@@ -139,7 +132,6 @@ freq_array = np.log(np.array([74., 408., 1400.]))
 catalogue_fluxes = np.transpose(np.log(np.vstack((tbdata['S_vlss'][indices_mrc],tbdata['S_mrc'][indices_mrc],tbdata['S'][indices_mrc]))))
 catalogue_flux_errs = np.transpose(np.vstack((tbdata['e_S_vlss'][indices_mrc],tbdata['e_S_mrc'][indices_mrc],tbdata['e_S'][indices_mrc]))/(np.vstack((tbdata['S_vlss'][indices_mrc],tbdata['S_mrc'][indices_mrc],tbdata['S'][indices_mrc]))))
 weights = 1/(catalogue_flux_errs**2)
-#    fit=np.empty((weights.shape[0],3))
 pred_fluxes=np.empty(catalogue_fluxes.shape[0])
 residuals=np.empty(catalogue_fluxes.shape[0])
 # Currently the vectorized version doesn't care about weights, so we'll have to do this with a loop
@@ -150,12 +142,10 @@ for i in range(0,catalogue_fluxes.shape[0]):
 #        fit[i]=[P[0],P[1],residuals[0]]
     pred_fluxes[i]=powlaw(freq_obs,np.exp(P[1]),P[0])
     residuals[i]=res[0]
-ratio=np.log(pred_fluxes/tbdata['int_flux_1'][indices_mrc])
-decs=tbdata['DEJ2000_vlss'][indices_mrc]
+ratio_mrc=np.log(pred_fluxes/tbdata['int_flux_1'][indices_mrc])
+decs_mrc=tbdata['DEJ2000_vlss'][indices_mrc]
 # Base the weighting entirely off the GLEAM S/N as I do for the XX:YY fits
-w=tbdata['int_flux_1'][indices_mrc]/tbdata['local_rms_1'][indices_mrc]
-
-#plot_weights=(1/residuals)*1e4
+w_mrc=tbdata['int_flux_1'][indices_mrc]/tbdata['local_rms_1'][indices_mrc]
 
 # Sources which lie above Dec+20 only get two data points fitted
 freq_array = np.log(np.array([74., 1400.]))
@@ -168,22 +158,36 @@ for i in range(0,catalogue_fluxes.shape[0]):
     P=np.polyfit(freq_array,catalogue_fluxes[i],1)
     pred_fluxes[i]=powlaw(freq_obs,np.exp(P[1]),P[0])
 
-ratio2=np.log(pred_fluxes/tbdata['int_flux_1'][indices_highdec])
-decs2=tbdata['DEJ2000_vlss'][indices_highdec]
-w2=tbdata['int_flux_1'][indices_highdec]/tbdata['local_rms_1'][indices_highdec]
-#plot_weights2=np.ones(catalogue_fluxes.shape[0])
+ratio_highdec=np.log(pred_fluxes/tbdata['int_flux_1'][indices_highdec])
+decs_highdec=tbdata['DEJ2000_vlss'][indices_highdec]
+w_highdec=tbdata['int_flux_1'][indices_highdec]/tbdata['local_rms_1'][indices_highdec]
 
-x=np.concatenate((decs,decs2),axis=1)
-y=np.concatenate((ratio,ratio2),axis=1)
-w=np.concatenate((w,w2),axis=1)
+# scipy curve_fit ONLY understands numpy float32s and will fail silently with normal arrays
+x=np.array(np.concatenate((decs_mrc,decs_highdec),axis=1),dtype="float32")
+y=np.array(np.concatenate((ratio_mrc,ratio_highdec),axis=1),dtype="float32")
+w=np.array(np.concatenate((w_mrc,w_highdec),axis=1),dtype="float32")
 
-if (Dec_strip == -26 or Dec_strip == -26.7 or Dec_strip == -27.0):
-    p_guess_quad_zenith = [ 1.5, -1]
-    poptquad_zenith, pcovquad_zenith = opt.curve_fit(quad_curvefit_zenith, x, y, p0 = p_guess_quad_zenith, sigma = 1/np.sqrt(w), maxfev = 10000)
-    polycoeffs=[poptquad_zenith[0], poptquad_zenith[1]]
-
+if (Dec_strip == -26.0 or Dec_strip == -26.7 or Dec_strip == -27.0):
+    p_guess_quad_zenith = [0.005,-0.1]
+    pzen, pcovquad_zenith = curve_fit(quad_curvefit_zenith, x, y, p0 = p_guess_quad_zenith, sigma = 1/np.sqrt(w),absolute_sigma=False)
+# Somewhat convoluted, but necessary to convert the constrained quadratic into a cubic function of Dec, rather than (Dec-zenith)
+    polycoeffs=[0.0,pzen[0],-2.0*pzen[0]*dec_zenith,pzen[1]+pzen[0]*dec_zenith**2]
 else:
     polycoeffs=np.polyfit(x,y,3,w=w)
+
+if options.write_coefficients:
+    outcoeff=input_root+'_simple_coefficients.fits'
+    print "#----------------------------------------------------------#"
+    print 'Saving correction to '+outcoeff
+
+    fit_name = ['cubic']
+    col1 = fits.Column(name='a', format = 'E', array = [polycoeffs[3]])
+    col2 = fits.Column(name='b', format = 'E', array = [polycoeffs[2]])
+    col3 = fits.Column(name='c', format = 'E', array = [polycoeffs[1]])
+    col4 = fits.Column(name='d', format = 'E', array = [polycoeffs[0]])
+    cols = fits.ColDefs([col1, col2, col3, col4])
+    tbhdu = fits.new_table(cols)
+    tbhdu.writeto(outcoeff, clobber = True)
 
 if options.make_plots:
     outpng=input_root+"_"+"polyfit_int.png"
@@ -197,7 +201,7 @@ if options.make_plots:
     fitplot=pyplot.figure(figsize=figsize)
     ax = fitplot.add_subplot(111)
     ax.set_xlim(min(x),max(x))
-    ax.set_ylim((0.5,1.5))
+    ax.set_ylim((0.5,1.3))
     ax.set_xlabel("Dec / degrees")
     ax.set_ylabel("S_predicted / S_GLEAM")
     ax.set_title(title,fontsize=10)
