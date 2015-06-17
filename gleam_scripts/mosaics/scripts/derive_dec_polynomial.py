@@ -123,9 +123,9 @@ indices=np.intersect1d(np.where(tbdata['DEJ2000_vlss']<Dec_max),indices)
 indices=np.intersect1d(np.where(tbdata['DEJ2000_vlss']>Dec_min),indices)
 if RA_min > RA_max:
 # i.e. we're crossing RA 0
-   before_meridian=np.intersect1d(np.where(tbdata['RAJ2000_vlss']>RA_min),np.where(np.where(tbdata['RAJ2000_vlss']<360.0)))
-   after_meridian=np.intersect1d(np.where(tbdata['RAJ2000_vlss']>0.0),np.where(np.where(tbdata['RAJ2000_vlss']<RA_max)))
-   indices=np.intersect1d(np.concatenate(before_meridian,after_meridian),indices)
+   before_meridian=np.intersect1d(np.where(tbdata['RAJ2000_vlss']>RA_min),np.where(tbdata['RAJ2000_vlss']<360.0))
+   after_meridian=np.intersect1d(np.where(tbdata['RAJ2000_vlss']>0.0),np.where(tbdata['RAJ2000_vlss']<RA_max))
+   indices=np.intersect1d(np.concatenate((before_meridian,after_meridian)),indices)
 else:
    indices=np.intersect1d(np.where(tbdata['DEJ2000_vlss']<RA_max),indices)
    indices=np.intersect1d(np.where(tbdata['DEJ2000_vlss']>RA_min),indices)
