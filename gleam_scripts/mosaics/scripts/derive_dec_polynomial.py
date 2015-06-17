@@ -11,6 +11,7 @@ import datetime
 import numpy as np
 from astropy.io import fits
 from optparse import OptionParser
+import scipy.optimize as opt
 import os
 import sys
 
@@ -26,8 +27,6 @@ parser.add_option('--mosaic',type="string", dest="mosaic",
                     help="The filename of the mosaic you want to read in.")
 parser.add_option('--plot',action="store_true",dest="make_plots",default=False,
                     help="Make fit plots? (default = False)")
-parser.add_option('--zenith',action="store_true",dest="zenith",default=False,
-                    help="Calculate correction for the special case of zenith.")
 (options, args) = parser.parse_args()
 
 if options.make_plots:
@@ -48,6 +47,12 @@ input_mosaic = options.mosaic
 
 def powlaw(freq, a, alpha): # defining powlaw as S = a*nu^alpha.
     return a*(freq**alpha)
+
+def cubic_curvefit(dec, a, b, c, d): # defining cubic
+    return d*np.power(dec,3) + c*np.power(dec,2) + b*dec + a
+
+def quad_curvefit_zenith(dec, a, c): # defining constrained quadratic
+    return c*(np.power(dec,2) + 53.4*dec) + a
 
 input_root=input_mosaic.replace(".fits","")
 
@@ -125,8 +130,8 @@ if RA_min > RA_max:
    after_meridian=np.intersect1d(np.where(tbdata['RAJ2000_vlss']>0.0),np.where(tbdata['RAJ2000_vlss']<RA_max))
    indices=np.intersect1d(np.concatenate((before_meridian,after_meridian)),indices)
 else:
-   indices=np.intersect1d(np.where(tbdata['DEJ2000_vlss']<RA_max),indices)
-   indices=np.intersect1d(np.where(tbdata['DEJ2000_vlss']>RA_min),indices)
+   indices=np.intersect1d(np.where(tbdata['RAJ2000_vlss']<RA_max),indices)
+   indices=np.intersect1d(np.where(tbdata['RAJ2000_vlss']>RA_min),indices)
 
 # All sources which have an MRC match get three data points fitted
 indices_mrc=np.intersect1d(np.where(np.bitwise_not(np.isnan(tbdata['S_mrc']))),indices)
@@ -173,8 +178,10 @@ y=np.concatenate((ratio,ratio2),axis=1)
 w=np.concatenate((w,w2),axis=1)
 
 if (Dec_strip == -26 or Dec_strip == -26.7 or Dec_strip == -27.0):
-# Need to constrain this to being centred around zenith...
-    polycoeffs=np.polyfit(x,y,2,w=w)
+    p_guess_quad_zenith = [ 1.5, -1]
+    poptquad_zenith, pcovquad_zenith = opt.curve_fit(quad_curvefit_zenith, x, y, p0 = p_guess_quad_zenith, sigma = 1/np.sqrt(w), maxfev = 10000)
+    polycoeffs=[poptquad_zenith[0], poptquad_zenith[1]]
+
 else:
     polycoeffs=np.polyfit(x,y,3,w=w)
 
