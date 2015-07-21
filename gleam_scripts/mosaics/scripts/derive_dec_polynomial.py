@@ -252,7 +252,7 @@ if options.write_coefficients:
     tbhdu.writeto(outcoeff, clobber = True)
 
 if options.make_plots:
-    outpng=input_root+"_"+"polyfit_int_otherfit_vlssr_2.png"
+    outpng=input_root+"_"+"polyfit_int.png"
     title=input_root.split('_')[1]+' Dec '+str(Dec_strip)+' '+input_root.split('_')[2]
     # Re-sort by S/N so that high S/N points are plotted over the top of low S/N points
     x=[X for (W,X) in sorted(zip(w,x))]
