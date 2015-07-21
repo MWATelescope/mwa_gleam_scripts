@@ -5,14 +5,17 @@
 # measured flux density from Aegean. All sources have a VLSSr counterpart.
 # It will then calculate the best fitting polynomial.
 # Note that this should be run from directory structure that is above saving directories.
-# NHW 17/06/2015
+# NHW and JRC 17/06/2015
 
 import numpy as np
-from astropy.io import fits
-from optparse import OptionParser
-from scipy.optimize import curve_fit
+import matplotlib.pylab as plt
+import astropy.units as u
 import os
 import sys
+from astropy.io import fits
+from astropy.coordinates import SkyCoord
+from optparse import OptionParser
+from scipy.optimize import curve_fit
 
 print "#----------------------------------------------------------#"
 print '''Fixing declination dependent flux scale in GLEAM mosaic. Ensure you have votables from Aegean. 
@@ -34,7 +37,7 @@ if options.make_plots:
     import matplotlib as mpl 
     mpl.use('Agg') # So does not use display
     import matplotlib.pyplot as pyplot
-    figsize=(5,5)
+    figsize=(15,5)
 
 input_mosaic = options.mosaic
 
@@ -47,6 +50,11 @@ def quad_curvefit_zenith(dec, c, a): # defining quadratic which turns over at th
 
 def powlaw(freq, a, alpha): # defining powlaw as S = a*nu^alpha.
     return a*(freq**alpha)
+
+def redchisq(ydata,ymod,sd,deg):
+    chisq=np.sum(((ydata-ymod)/sd)**2)
+    nu=ydata.size-1-deg
+    return [chisq]
 
 input_root=input_mosaic.replace(".fits","")
 
@@ -91,6 +99,7 @@ if not os.path.exists(marco_xmatch):
 
     os.system('stilts tmatch2 in1='+input_root+'_comp.vot in2='+input_root+'_isle.vot join=1and2 find=best matcher=exact values1="island" values2="island" out='+input_root+'_tot.vot')
     os.system('stilts tmatch2 matcher=skyellipse in1=$MWA_CODE_BASE/MWA_Tools/catalogues/marco_all_VLSSsrcs.fits in2='+input_root+'_tot.vot out=marco_all_VLSSsrcs+'+input_root+'.fits values1="RAJ2000 DEJ2000 MajAxis MinAxis PA" values2="ra_1 dec_1 a b pa_1" params=20')
+    # os.system('stilts tmatch2 matcher=skyellipse in1=/Users/jcal/scripts/python/MWA_Tools/catalogues/marco_all_VLSSsrcs.fits in2='+input_root+'_tot.vot out=marco_all_VLSSsrcs+'+input_root+'.fits values1="RAJ2000 DEJ2000 MajAxis MinAxis PA" values2="ra_1 dec_1 a b pa_1" params=20')
 
 hdulist = fits.open(marco_xmatch)
 hdulist.verify('fix')
@@ -105,6 +114,19 @@ if Dec_strip == -40. or Dec_strip == -55. or Dec_strip == -72. or ( week != "201
 print "#----------------------------------------------------------#"
 print 'Analysing '+input_mosaic
 
+def filter_GalacticPlane(table):
+    """
+    Filter out sources that have |b|<10\deg, consistent with the SUMSS/MGPS-2 division
+    """
+    print "Filtering Galactic plane"
+    bmax = 10
+    good = []
+    b = abs(SkyCoord(table['RAJ2000']*u.deg, table['DEJ2000']*u.deg,frame="icrs").galactic.b.degree)
+    good = np.where(b>=bmax)
+    return  table[good]
+
+tbdata = filter_GalacticPlane(tbdata)
+
 # Aegean flags should be OK
 indices=np.concatenate((np.where(tbdata['flags_1'] & 101)[0],np.where(tbdata['flags_1'] == 0)[0]))
 # We want them to be isolated
@@ -118,50 +140,89 @@ indices=np.intersect1d(np.where((tbdata['int_flux_1']/tbdata['local_rms_1'])>8),
 # We should avoid sources outside the RA and Dec ranges we're not interested in
 indices=np.intersect1d(np.where(tbdata['DEJ2000_vlss']<Dec_max),indices)
 indices=np.intersect1d(np.where(tbdata['DEJ2000_vlss']>Dec_min),indices)
-if RA_min > RA_max:
-# i.e. we're crossing RA 0
-   before_meridian=np.intersect1d(np.where(tbdata['RAJ2000_vlss']>RA_min),np.where(tbdata['RAJ2000_vlss']<360.0))
-   after_meridian=np.intersect1d(np.where(tbdata['RAJ2000_vlss']>0.0),np.where(tbdata['RAJ2000_vlss']<RA_max))
-   indices=np.intersect1d(np.concatenate((before_meridian,after_meridian)),indices)
-else:
-   indices=np.intersect1d(np.where(tbdata['RAJ2000_vlss']<RA_max),indices)
-   indices=np.intersect1d(np.where(tbdata['RAJ2000_vlss']>RA_min),indices)
+
+# if RA_min > RA_max:
+# # i.e. we're crossing RA 0
+#    before_meridian=np.intersect1d(np.where(tbdata['RAJ2000_vlss']>RA_min),np.where(tbdata['RAJ2000_vlss']<360.0))
+#    after_meridian=np.intersect1d(np.where(tbdata['RAJ2000_vlss']>0.0),np.where(tbdata['RAJ2000_vlss']<RA_max))
+#    indices=np.intersect1d(np.concatenate((before_meridian,after_meridian)),indices)
+# else:
+#    indices=np.intersect1d(np.where(tbdata['RAJ2000_vlss']<RA_max),indices)
+#    indices=np.intersect1d(np.where(tbdata['RAJ2000_vlss']>RA_min),indices)
 
 # All sources which have an MRC match get three data points fitted
 indices_mrc=np.intersect1d(np.where(np.bitwise_not(np.isnan(tbdata['S_mrc']))),indices)
 freq_array = np.log(np.array([74., 408., 1400.]))
 catalogue_fluxes = np.transpose(np.log(np.vstack((tbdata['S_vlss'][indices_mrc],tbdata['S_mrc'][indices_mrc],tbdata['S'][indices_mrc]))))
-catalogue_flux_errs = np.transpose(np.vstack((tbdata['e_S_vlss'][indices_mrc],tbdata['e_S_mrc'][indices_mrc],tbdata['e_S'][indices_mrc]))/(np.vstack((tbdata['S_vlss'][indices_mrc],tbdata['S_mrc'][indices_mrc],tbdata['S'][indices_mrc]))))
+# catalogue_flux_errs = np.transpose(np.vstack((tbdata['e_S_vlss'][indices_mrc],tbdata['e_S_mrc'][indices_mrc],tbdata['e_S'][indices_mrc]))/(np.vstack((tbdata['S_vlss'][indices_mrc],tbdata['S_mrc'][indices_mrc],tbdata['S'][indices_mrc]))))
+catalogue_flux_errs = np.transpose(np.vstack((np.sqrt((tbdata['e_S_vlss'][indices_mrc])**2 + (np.exp(tbdata['e_S_vlss'][indices_mrc])*0.1)**2),tbdata['e_S_mrc'][indices_mrc],tbdata['e_S'][indices_mrc]))/(np.vstack((tbdata['S_vlss'][indices_mrc],tbdata['S_mrc'][indices_mrc],tbdata['S'][indices_mrc])))) # fixing problem with VLSSr uncertainties here too.
+# catalogue_flux_errs = np.transpose(np.vstack((tbdata['e_S_vlss'][indices_mrc],tbdata['e_S_mrc'][indices_mrc],tbdata['e_S'][indices_mrc])))
+# catalogue_flux_errs[:,0] = np.sqrt((catalogue_flux_errs[:,0])**2 + (np.exp(catalogue_fluxes[:,0])*0.1)**2) # fixing problem with VLSSr uncertainties
+
 weights = 1/(catalogue_flux_errs**2)
 pred_fluxes=np.empty(catalogue_fluxes.shape[0])
 residuals=np.empty(catalogue_fluxes.shape[0])
+redchisq_val=np.empty(catalogue_fluxes.shape[0])
+specind = np.empty(catalogue_fluxes.shape[0])
+Name = tbdata['ID'][indices_mrc]
+p0pow = [-0.7,1]
 # Currently the vectorized version doesn't care about weights, so we'll have to do this with a loop
 #    fit=np.polynomial.polynomial.polyfit(freq_array,catalogue_fluxes,1)
 
 for i in range(0,catalogue_fluxes.shape[0]):
     P,res,rank,singular_values,rcond=np.polyfit(freq_array,catalogue_fluxes[i],1,w=weights[i],full=True)
-#        fit[i]=[P[0],P[1],residuals[0]]
+    poptpowlaw, pcovpowlaw = curve_fit(powlaw, np.exp(freq_array), np.exp(catalogue_fluxes[i]), p0 = p0pow, sigma = catalogue_flux_errs[i], maxfev = 10000)
+    # pred_fluxes[i]=powlaw(freq_obs,*poptpowlaw)
     pred_fluxes[i]=powlaw(freq_obs,np.exp(P[1]),P[0])
+    specind[i] = P[0]#poptpowlaw[1]
+    fit_spec = np.poly1d(P)
+    redchisq_val[i] = redchisq(catalogue_fluxes[i],fit_spec(freq_array),catalogue_flux_errs[i],2)[0]
+    # redchisq_val[i] = redchisq(np.exp(catalogue_fluxes[i]),powlaw(np.exp(freq_array),*poptpowlaw),catalogue_flux_errs[i],2)[0]
     residuals[i]=res[0]
+
 ratio_mrc=np.log(pred_fluxes/tbdata['int_flux_1'][indices_mrc])
 decs_mrc=tbdata['DEJ2000_vlss'][indices_mrc]
 # Base the weighting entirely off the GLEAM S/N as I do for the XX:YY fits
 w_mrc=tbdata['int_flux_1'][indices_mrc]/tbdata['local_rms_1'][indices_mrc]
 
+# Ensuring the source is well fit by a powerlaw and not flat.
+indices_redchisq = np.where((redchisq_val < 15.) & (abs(specind) > 0.5))
+ratio_mrc = ratio_mrc[indices_redchisq]
+decs_mrc = decs_mrc[indices_redchisq]
+w_mrc = w_mrc[indices_redchisq]
+
 # Sources which lie above Dec+20 only get two data points fitted
 freq_array = np.log(np.array([74., 1400.]))
 indices_highdec=np.intersect1d(np.where(tbdata['DEJ2000_vlss']>18),indices)
 catalogue_fluxes = np.transpose(np.log(np.vstack((tbdata['S_vlss'][indices_highdec],tbdata['S'][indices_highdec]))))
-catalogue_flux_errs = np.transpose(np.vstack((tbdata['e_S_vlss'][indices_highdec],tbdata['e_S'][indices_highdec]))/(np.vstack((tbdata['S_vlss'][indices_highdec],tbdata['S'][indices_highdec]))))
+# catalogue_flux_errs = np.transpose(np.vstack((tbdata['e_S_vlss'][indices_highdec],tbdata['e_S'][indices_highdec]))/(np.vstack((tbdata['S_vlss'][indices_highdec],tbdata['S'][indices_highdec]))))
+catalogue_flux_errs = np.transpose(np.vstack((np.sqrt((tbdata['e_S_vlss'][indices_highdec])**2 + (np.exp(tbdata['e_S_vlss'][indices_highdec])*0.1)**2),tbdata['e_S_mrc'][indices_highdec],tbdata['e_S'][indices_highdec]))/(np.vstack((tbdata['S_vlss'][indices_highdec],tbdata['S_mrc'][indices_highdec],tbdata['S'][indices_highdec]))))
+# catalogue_flux_errs = np.transpose(np.vstack((tbdata['e_S_vlss'][indices_highdec],tbdata['e_S'][indices_highdec])))
+
 pred_fluxes=np.empty(catalogue_fluxes.shape[0])
+redchisq_val=np.empty(catalogue_fluxes.shape[0])
+specind = np.empty(catalogue_fluxes.shape[0])
+Name = tbdata['ID'][indices_highdec]
 
 for i in range(0,catalogue_fluxes.shape[0]):
     P=np.polyfit(freq_array,catalogue_fluxes[i],1)
+    poptpowlaw, pcovpowlaw = curve_fit(powlaw, np.exp(freq_array), np.exp(catalogue_fluxes[i]), p0 = p0pow, sigma = catalogue_flux_errs[i], maxfev = 10000)
     pred_fluxes[i]=powlaw(freq_obs,np.exp(P[1]),P[0])
+    # pred_fluxes[i]=powlaw(freq_obs,*poptpowlaw)
+    specind[i] = P[0]#poptpowlaw[1]
+    fit_spec = np.poly1d(P)
+    redchisq_val[i] = redchisq(catalogue_fluxes[i],fit_spec(freq_array),catalogue_flux_errs[i],2)[0]
+    # redchisq_val[i] = redchisq(np.exp(catalogue_fluxes[i]),powlaw(np.exp(freq_array),*poptpowlaw),catalogue_flux_errs[i],2)[0]
 
 ratio_highdec=np.log(pred_fluxes/tbdata['int_flux_1'][indices_highdec])
 decs_highdec=tbdata['DEJ2000_vlss'][indices_highdec]
 w_highdec=tbdata['int_flux_1'][indices_highdec]/tbdata['local_rms_1'][indices_highdec]
+
+# Ensuring the source is well fit by a powelaw and not flat.
+indices_redchisq_highdec = np.where((redchisq_val < 10.) & (abs(specind) > 0.5))
+ratio_highdec = ratio_highdec[indices_redchisq_highdec]
+decs_highdec = decs_highdec[indices_redchisq_highdec]
+w_highdec = w_highdec[indices_redchisq_highdec]
 
 # scipy curve_fit ONLY understands numpy float32s and will fail silently with normal arrays
 x=np.array(np.concatenate((decs_mrc,decs_highdec),axis=1),dtype="float32")
@@ -191,9 +252,9 @@ if options.write_coefficients:
     tbhdu.writeto(outcoeff, clobber = True)
 
 if options.make_plots:
-    outpng=input_root+"_"+"polyfit_int.png"
+    outpng=input_root+"_"+"polyfit_int_otherfit_vlssr_2.png"
     title=input_root.split('_')[1]+' Dec '+str(Dec_strip)+' '+input_root.split('_')[2]
-# Re-sort by S/N so that high S/N points are plotted over the top of low S/N points
+    # Re-sort by S/N so that high S/N points are plotted over the top of low S/N points
     x=[X for (W,X) in sorted(zip(w,x))]
     y=[Y for (W,Y) in sorted(zip(w,y))]
     w=sorted(w)
@@ -202,10 +263,14 @@ if options.make_plots:
     fitplot=pyplot.figure(figsize=figsize)
     ax = fitplot.add_subplot(111)
     ax.set_xlim(min(x),max(x))
-    ax.set_ylim((0.5,1.3))
+    # ax.set_ylim((0.5,1.3))
+    ax.set_ylim(0.2,1.6)
     ax.set_xlabel("Dec / degrees")
     ax.set_ylabel("S_predicted / S_GLEAM")
     ax.set_title(title,fontsize=10)
-    ax.scatter(x,np.exp(y),marker='+',c=SNR,cmap=pyplot.cm.Greys)
-    ax.plot(np.arange(min(x),max(x),0.01),np.exp(fitmodel(np.arange(min(x),max(x),0.01))),'.',ms=1)
-    fitplot.savefig(outpng,pad_inches=0.0,bbox_inches='tight')
+    ax.scatter(x,np.exp(y),marker='o',c=SNR,cmap=pyplot.cm.Greys)
+    cb = plt.colorbar(ax.scatter(x, np.exp(y), marker='o',color ='k',c=SNR, cmap=plt.cm.Greys))
+    cb.set_label('SNR',fontsize = 15)
+    ax.plot(np.arange(min(x),max(x),0.01),np.exp(fitmodel(np.arange(min(x),max(x),0.01))),'darkred',linewidth = 3)
+    fitplot.savefig(outpng,pad_inches=0.0,bbox_inches='tight',clobber=True)
+
