@@ -193,10 +193,10 @@ w_mrc = w_mrc[indices_redchisq]
 
 # Sources which lie above Dec+20 only get two data points fitted
 freq_array = np.log(np.array([74., 1400.]))
-indices_highdec=np.intersect1d(np.where(tbdata['DEJ2000_vlss']>18),indices)
+indices_highdec=np.intersect1d(np.where(tbdata['DEJ2000_vlss']>18.5),indices)
 catalogue_fluxes = np.transpose(np.log(np.vstack((tbdata['S_vlss'][indices_highdec],tbdata['S'][indices_highdec]))))
 # catalogue_flux_errs = np.transpose(np.vstack((tbdata['e_S_vlss'][indices_highdec],tbdata['e_S'][indices_highdec]))/(np.vstack((tbdata['S_vlss'][indices_highdec],tbdata['S'][indices_highdec]))))
-catalogue_flux_errs = np.transpose(np.vstack((np.sqrt((tbdata['e_S_vlss'][indices_highdec])**2 + (np.exp(tbdata['e_S_vlss'][indices_highdec])*0.1)**2),tbdata['e_S_mrc'][indices_highdec],tbdata['e_S'][indices_highdec]))/(np.vstack((tbdata['S_vlss'][indices_highdec],tbdata['S_mrc'][indices_highdec],tbdata['S'][indices_highdec]))))
+catalogue_flux_errs = np.transpose(np.vstack((np.sqrt((tbdata['e_S_vlss'][indices_highdec])**2 + (np.exp(tbdata['e_S_vlss'][indices_highdec])*0.1)**2),tbdata['e_S'][indices_highdec]))/(np.vstack((tbdata['S_vlss'][indices_highdec],tbdata['S'][indices_highdec]))))
 # catalogue_flux_errs = np.transpose(np.vstack((tbdata['e_S_vlss'][indices_highdec],tbdata['e_S'][indices_highdec])))
 
 pred_fluxes=np.empty(catalogue_fluxes.shape[0])
