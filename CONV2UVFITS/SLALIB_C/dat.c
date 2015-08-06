@@ -59,6 +59,9 @@ double slaDat ( double utc )
 /* the preamble comments appropriately.      */
 /* - - - - - - - - - - - - - - - - - - - - - */
 
+/* 2015 July 1 */
+   if ( utc >= 57204.0 ) return 36.0;
+
 /* 2012 July 1 */
    if ( utc >= 56109.0 ) return 35.0;
 
