@@ -5,19 +5,17 @@ __author__ = "PaulHancock"
 import os
 import sys
 # GammaCrucis
-#sys.path.insert(1,'/home/hancock/alpha/Aegean') 
+sys.path.insert(1,'/home/hancock/alpha/Aegean') 
 # Galaxy
-home=os.environ['HOME']
-sys.path.insert(1,home+'/bin/')
+sys.path.insert(1,os.environ['HOME']+'/bin/')
 mwa_code_base=os.environ['MWA_CODE_BASE']
 sys.path.insert(1,mwa_code_base+'/MWA_Tools/gleam_scripts/mosaics/scripts/')
-sys.path.insert(1,mwa_code_base+'/new_version_Aegean/bin')
+sys.path.insert(1,mwa_code_base+'/Aegean/')
 
 import numpy as np
 from AegeanTools import catalogs, flags
 from AegeanTools.regions import Region
 from astropy.coordinates import SkyCoord, Angle
-from astropy.io.votable import writeto as writetoVO
 import astropy.units as u
 try:
     import cPickle as pickle
@@ -34,14 +32,8 @@ parser.add_option('--output',dest="output",default=None,
                   help="Output VO table -- default is input_filter.vot")
 parser.add_option('--mimtable',dest="mimtable",default=None,
                   help="MIMAS table to read in (default is MWA_Tools/gleam_scripts/mosaics/scripts/all.mim)")
-parser.add_option('--minRA',dest="minRA",default=0.0,type="float",
-                  help="Minimum RA to allow through, in degrees (default = 0)")
-parser.add_option('--maxRA',dest="maxRA",default=360.0,type="float",
-                  help="Maximum RA to allow through, in degrees (default = 360)")
-parser.add_option('--minDec',dest="minDec",default=-90.0,type="float",
-                  help="Minimum Dec to allow through, in degrees (default = -90)")
-parser.add_option('--maxDec',dest="maxDec",default=35.0,type="float",
-                  help="Maximum Dec to allow through, in degrees (default = 35)")
+parser.add_option('--week', dest="week", default=1, type='int',
+                  help="Week number for custom filtering options")
 (options, args) = parser.parse_args()
 
 # Parse the input options
@@ -62,31 +54,39 @@ if options.mimtable:
 else:
     mimtable=mwa_code_base+"/MWA_Tools/gleam_scripts/mosaics/scripts/all.mim"
 
-ramin, ramax, decmin, decmax = options.minRA, options.maxRA, options.minDec, options.maxDec
+week = options.week
+
 
 def load(filename):
-    print "load",filename
+    print "load", filename
     table = catalogs.load_table(filename)
     return table
 
 def save(table,filename):
-    print "save",filename
-    writetoVO(table,filename)
-    #catalogs.save_catalog(filename,catalogs.table_to_source_list(table))
+    print "save", filename
+    #writetoVO(table,filename)
+    catalogs.write_table(table, filename)
 
-def filter_RADEC(table,ramin,ramax,decmin,decmax):
+def filter_RADEC(table, week):
+    # hard coded ra/dec filter based on week.
     print "RADEC filter"
-    good = []
-    if ramin>ramax:
-        for i,row in enumerate(table):
-            if 0.0<=row['ra']<=ramin or ramax<=row['ra']<=360.0:
-                if decmin<=row['dec']<decmax:
-                    good.append(i)
+    if week==1:
+        good = np.where((table['dec']<0) & ((table['ra']<=4*15 ) | (table['ra']>=20*15)))
+        print good
     else:
-        for i,row in enumerate(table):
-            if ramin<=row['ra']<=ramax:
-                if decmin<=row['dec']<decmax:
-                    good.append(i)
+        if week==2:
+            ramin=0*15
+            ramax=8*15
+        elif week==3:
+            ramin = 6*15
+            ramax = 15*15
+        elif week==4:
+            ramin=14*15
+            ramax=21*15
+        else:
+            print "bad week"
+            sys.exit()
+        good = np.where( (table['dec']<30) & (table['ra']>=ramin) & (table['ra']<=ramax))
     return table[good]
 
 
@@ -96,7 +96,6 @@ def filter_GalacticPlane(table):
     """
     print "filtering Galactic plane"
     bmax = 10
-    good = []
     b = abs(SkyCoord(table['ra']*u.deg, table['dec']*u.deg,frame="icrs").galactic.b.degree)
     good = np.where(b>=bmax)
     return  table[good]
@@ -115,6 +114,14 @@ def filter_residual(table):
 
     return table
 
+
+def filter_rms(table):
+    """
+    Discard sources that have a local rms >0.5 since they are in dodgy ares of the sky
+    """
+    print "filtering local_rms"
+    good = np.where(table['local_rms']<0.5)
+    return table[good]
 
 def filter_intpeak(table):
     """
@@ -169,7 +176,7 @@ def filter_region(table,regionfile):
 # Run the filters we've defined
 
 table = load(infile)
-table = filter_RADEC(table,ramin,ramax,decmin,decmax)
+table = filter_RADEC(table,week)
 table = filter_GalacticPlane(table)
 table = filter_intpeak(table)
 table = filter_region(table,mimtable)

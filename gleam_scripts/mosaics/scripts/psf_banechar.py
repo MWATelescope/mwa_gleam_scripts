@@ -45,6 +45,8 @@ parser.add_option('--initsize',dest="initsize",default=None,
                   help="Specify initial histogram bin size in degrees (default = don't specify, and no initial gridding will be performed (probably the better option))")
 parser.add_option('--output',dest="output",default=None,
                   help="Output png file -- default is input_psf.png")
+parser.add_option('--week',dest='week',default=None,
+                  help='week number, for some fine tuning')
 (options, args) = parser.parse_args()
 
 # Parse the input options
@@ -61,6 +63,10 @@ else:
         if not os.path.exists(fitsfile):
             tempvar=inputfile.split("_")
             fitsfile=tempvar[0]+"_"+tempvar[1]+".fits"
+
+week = options.week
+if 'Week4' in fitsfile:
+    week = 4 
 
 if os.path.exists(fitsfile):
     print "Corresponding fits image found."
@@ -313,8 +319,9 @@ else:
 x=data['ra']
 
 # NB: this will break if your catalogue stretches all the way from RA0 to RA12 or RA12 to RA0
-if min(x)<1. and max(x)>359.:
-    data['ra']=vunwrap(data['ra'])
+if week != 4:
+    if min(x)<1. and max(x)>359.:
+        data['ra']=vunwrap(data['ra'])
 
 x=data['ra']
 y=data['dec']
