@@ -12,27 +12,71 @@ Dependency: pip install -U astropy
 
 For any isssues, please email: chen.wu@icrar.org
 """
-import base64, urlparse
+import base64, urlparse, os
 from urllib2 import urlopen, Request
 
 from wsgi_intercept import (
     urllib_intercept, add_wsgi_intercept, remove_wsgi_intercept
 )
 
+# which VO service to use
 vo_name_dict={"cutout":"gleam_postage", "snapshot":"gleam"}
 
-def run_cutout_example(access_url):
+def run_cutout_example(access_url, regrid=False, download_dir=None):
     """
     PyVO examples are here
     """
+    if (download_dir and (not os.path.exists(download_dir))):
+        print "Invalid download dir: {0}".format(download_dir)
+        return
     from pyvo.dal import sia
     svc = sia.SIAService(access_url) #start Simple Image Access service
-    pos = (22, -40) # position
-    size = 2.0 # angular size
-    images = svc.search(pos, size)
+    ra = 22 #313.07
+    dec = -40 #-36.675
+    pos = (ra, dec) # position
+    size = 1.0 # angular size
+    if (regrid):
+        images = svc.search(pos, size, grid_opt="regrid")
+    else:
+        images = svc.search(pos, size)
+
     for img in images:
-        # for each mached image, print its frequency and access url
-        print img.get('freq'), img.acref
+        # for each mached image, download or print its frequency and access url
+        freq = img.get('freq')
+        url = img.acref
+        if (download_dir):
+            download_file(url, ra, dec, freq, download_dir)
+        else:
+            print freq, url
+
+def download_file(url, ra, dec, freq, download_dir):
+    """
+
+    """
+    u = urlopen(url, timeout=200)
+    if (u.headers['content-type'] == 'image/fits'):
+        # we know for sure this is a fits image file
+        filename = "{0}_{1}_{2}.fits".format(ra, dec, freq)
+    else:
+        filename = "error_{0}_{1}_{2}.html".format(ra, dec, freq)
+
+    # get file size
+    file_size = int(u.headers['content-length'])
+
+    current = 0
+    file_size_dl = 0
+    block_sz = u.fp.bufsize
+    fulnm = download_dir + "/" + filename
+    with open(fulnm, 'wb') as f:
+        print "Downloading {0}".format(fulnm)
+        while True:
+            buff = u.read(block_sz)
+            if not buff:
+                break
+
+            f.write(buff)
+            current = len(buff)
+            file_size_dl += current
 
 class GleamVoProxy():
     """
@@ -87,7 +131,7 @@ if __name__ == "__main__":
     gvp.start()
 
     # your VO code goes here
-    run_cutout_example(gvp.access_url)
+    run_cutout_example(gvp.access_url, download_dir='/tmp/gleamvo')
 
     # stop the gleam proxy
     gvp.stop()
