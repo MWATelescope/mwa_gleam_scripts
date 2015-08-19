@@ -60,11 +60,6 @@ def download_file(url, ra, dec, freq, download_dir):
     else:
         filename = "error_{0}_{1}_{2}.html".format(ra, dec, freq)
 
-    # get file size
-    file_size = int(u.headers['content-length'])
-
-    current = 0
-    file_size_dl = 0
     block_sz = u.fp.bufsize
     fulnm = download_dir + "/" + filename
     with open(fulnm, 'wb') as f:
@@ -75,8 +70,6 @@ def download_file(url, ra, dec, freq, download_dir):
                 break
 
             f.write(buff)
-            current = len(buff)
-            file_size_dl += current
 
 class GleamVoProxy():
     """
