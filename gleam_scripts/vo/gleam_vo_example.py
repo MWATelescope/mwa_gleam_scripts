@@ -78,12 +78,13 @@ class GleamVoProxy():
     Since pyvo (http://pyvo.readthedocs.org/en/latest/pyvo/) does not support
     authorisation, we intercept each VO request and add credentials on the fly
     """
-    def __init__(self, type='cutout'):
+    def __init__(self, type='cutout', p_host='localhost', p_port=80):
         self._vo_host = 'mwa-web.icrar.org'
-        self._p_host = 'localhost'
+        self._p_host = p_host
+        self._p_port = p_port
         self._vo_path = '/{0}/q/siap.xml?'.format(vo_name_dict[type])
         self._vo_url = "http://{0}{1}".format(self._vo_host, self._vo_path)
-        self._access_url = "http://{0}{1}".format(self._p_host, self._vo_path)
+        self._access_url = "http://{0}:{2}{1}".format(self._p_host, self._vo_path, self._p_port)
         self._token = base64.encodestring('%s:%s' % ('Z2xlYW1lcg==\n'.decode('base64'), 'Qm93VGll\n'.decode('base64'))).replace('\n', '')
 
     @property
@@ -110,7 +111,7 @@ class GleamVoProxy():
 
     def start(self):
         urllib_intercept.install_opener()
-        add_wsgi_intercept(self._p_host, 80, self._make_callback)
+        add_wsgi_intercept(self._p_host, self._p_port, self._make_callback)
 
     def stop(self):
         remove_wsgi_intercept()
@@ -121,6 +122,7 @@ if __name__ == "__main__":
     """
     # start the gleam proxy
     gvp = GleamVoProxy()
+    #gvp = GleamVoProxy(p_port=7799)
     gvp.start()
 
     # your VO code goes here
