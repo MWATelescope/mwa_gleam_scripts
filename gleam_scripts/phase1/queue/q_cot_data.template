@@ -1,0 +1,16 @@
+#!/bin/bash
+
+# Cotter the data
+
+#PBS -W group_list=GROUPQ
+#PBS -q STANDARDQ
+#PBS -l walltime=01:00:00
+#PBS -l select=1:ncpus=12:mem=HOSTMEM
+
+module load python/2.6.9 numpy/1.6.2 scipy/0.11.0 openmpi
+cd DATADIR/PROJ/OBSNUM/
+make_metafits.py -g OBSNUM 1>> DATADIR/PROJ/OBSNUM/output.log 2>>DATADIR/PROJ/OBSNUM/error.log
+if [[ -e OBSNUM_flags.zip ]] ; then unzip OBSNUM_flags.zip ; flagfiles="-flagfiles OBSNUM_%%.mwaf" ; fi
+# First year of observing was at 1s/40kHz ; second at 2s/10kHz.
+cotter $flagfiles -timeres 4 -freqres 40 *gpubox*.fits -edgewidth 80 -m OBSNUM.metafits -o OBSNUM.ms 1>> DATADIR/PROJ/OBSNUM/output.log 2>>DATADIR/PROJ/OBSNUM/error.log
+if [[ -d OBSNUM.ms ]] ; then rm *gpubox*fits *.zip *.mwaf ; fi

@@ -1,0 +1,13 @@
+#!/bin/bash
+
+# Send calibration solutions elsewhere
+
+#PBS -W group_list=GROUPQ
+#PBS -q copyq
+#PBS -m e
+#PBS -l walltime=00:05:00,mem=1gb
+
+cd DATADIR/PROJ/OBSNUM
+rsync -tva OBSNUM_phases.png tash@glados.ivec.org:/home/tash/data/Dropbox/Phase_solutions/PROJ/
+rsync -tva OBSNUM_phases.png nhw@enterprise.sese.asu.edu:/data1/nhw/PROJ/Fornax/
+

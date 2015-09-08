@@ -1,0 +1,1 @@
+obsdownload.py -o OBSNUM 1>> DATADIR/PROJ/output.log 2>>DATADIR/PROJ/error.log

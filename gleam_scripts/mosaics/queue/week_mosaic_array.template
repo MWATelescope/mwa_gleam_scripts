@@ -1,0 +1,149 @@
+datadir=DATADIR
+proj=PROJ
+week=WEEK
+
+# Convert SLURM id to PBS id
+if [[ ! $PBS_ARRAY_INDEX ]]
+then
+    PBS_ARRAY_INDEX=$SLURM_ARRAY_TASK_ID
+fi
+
+if [[ $week == "Week1" ]]
+then
+    dateprefix=201308
+    zenith=20130810
+elif [[ $week == "Week2" ]]
+then
+    dateprefix=201311
+    zenith=20131125
+elif [[ $week == "Week3" ]]
+then
+    dateprefix=201403
+    zenith=20140303
+elif [[ $week == "Week4" ]]
+then
+    dateprefix=201406
+    zenith=20140609
+else
+    echo "Week not given correctly: specify like 'WeekN', where N=1-4"
+    exit 1
+fi
+
+cd $datadir/$proj/
+
+if [[ ! -d $week ]]
+then
+    mkdir $week
+fi
+
+cd $week
+
+# Get list of frequencies and zenith psf from the header of the zenith mosaic
+testdir=`ls -d $datadir/$proj/$zenith`
+file=`ls $testdir/*/subchan?/*polyapplied.fits | head -${PBS_ARRAY_INDEX} | tail -1`
+freq=`basename $file | awk 'BEGIN {FS="_"} {print $3}'`
+bmaj=`pyhead.py -p BMAJ $file | awk '{print $3}'`
+bmin=`pyhead.py -p BMIN $file | awk '{print $3}'`
+
+if [[ ! -d $freq ]]
+then
+    mkdir $freq
+fi
+
+cd $freq
+
+if [[ ! -e ${week}_${freq}.fits ]]
+then
+    for file in $datadir/$proj/${dateprefix}??/*/subchan?/*$freq*_polyapplied.fits
+    do
+       localfile=`basename $file`
+       rms=`echo $file | sed "s;.fits;_rms.fits;"`
+       localrms=`basename $rms`
+       if [[ -h $localfile ]]
+       then
+           rm $localfile
+       fi
+       if [[ -h $localrms ]]
+       then
+           rm $localrms
+       fi
+       ln -s $file
+       echo "ln -s $file"
+    # Link RMS
+       ln -s $rms
+       echo "ln -s $rms"
+    done
+
+    for file in *_polyapplied_rms.fits
+    do
+       newfile=`echo $file | sed "s/_rms.fits/_rms_sigmoid.fits/"`
+       if [[ ! -e $newfile ]]
+       then
+           echo "Modifying the weights at the edges of $file, to produce $newfile."
+           $aprunsingle sigmoid_weight.py --mosaic=$file
+       else
+           echo "$newfile already exists"
+       fi
+    done
+
+# Rescale RMS maps in preparation for swarping
+    for file in *_polyapplied_rms_sigmoid.fits
+    do
+        $aprunsingle pyhead.py -u BSCALE 0.000001
+    done
+
+    $aprun swarp -c ../weight.swarp mosaic*_polyapplied.fits -IMAGEOUT_NAME ${week}_${freq}.fits -WEIGHTOUT_NAME ${week}_${freq}.weight.fits
+
+# De-rescale RMS maps
+    for file in *_polyapplied_rms_sigmoid.fits
+    do
+        $aprunsingle pyhead.py -u BSCALE 1.0 $file
+    done
+
+# Trim off the dead zones
+    $aprunsingle fits_trim.py ${week}_${freq}.fits temp.fits
+    mv temp.fits ${week}_${freq}.fits
+    $aprunsingle fits_trim.py ${week}_${freq}.weight.fits temp.fits
+    mv temp.fits ${week}_${freq}.weight.fits
+# Use the zenith psf as the header beam
+    pyhead.py -u BMAJ $bmaj ${week}_${freq}.fits
+    pyhead.py -u BMIN $bmin ${week}_${freq}.fits
+    pyhead.py -u BPA 0.0 ${week}_${freq}.fits
+else
+    echo "${week}_${freq}.fits already exists, so I didn't bother to re-make it. Please delete and re-run if you want a new version."
+fi
+$aprun aegean.sh ${week}_${freq}.fits bane compress
+$aprun newaegean.sh ${week}_${freq}.fits bane compress
+# Filter only the bits of sky I care about
+if [[ ! -e ${week}_${freq}_resid_excl_comp.vot ]]
+then
+    QC_filter.py --input=${week}_${freq}_resid_comp.vot --output=${week}_${freq}_resid_excl_comp.vot
+fi
+# See what the peak and integrated fluxes look like
+#$aprunsingle flux_comparison.py --mosaic=${week}_${freq}_resid_excl --fitsfile=${week}_${freq}.fits
+#$aprunsingle flux_comparison.py --int --mosaic=${week}_${freq}_resid_excl --fitsfile=${week}_${freq}.fits
+# Characterise the PSF
+if [[ ! -e ${week}_${freq}_resid_excl_triple.fits ]]
+then
+    $aprunsingle psf_banechar.py --input=${week}_${freq}_resid_excl_comp.vot
+fi
+# Update the catalogues by scaling the peak fluxes
+#update_catalogue.py --catalogue=${week}_${freq}_resid_excl_comp.vot --scaleint --output=${week}_${freq}_resid_excl_ddmod_int_comp.vot
+if [[ ! -e ${week}_${freq}_resid_excl_ddmod_comp.vot ]]
+then
+    update_catalogue.py --catalogue=${week}_${freq}_resid_excl_comp.vot --output=${week}_${freq}_resid_excl_ddmod_comp.vot
+# Now check the peak and integrated fluxes against the catalogue expectations
+fi
+if [[ ! -e ${week}_${freq}_peak_zero.fits ]]
+then
+    $aprunsingle flux_comparison.py --peak --mosaic=${week}_${freq}_resid_excl_ddmod --fitsfile=${week}_${freq}.fits --printaverage
+fi
+if [[ ! -e ${week}_${freq}_int_zero.fits ]]
+then
+    $aprunsingle flux_comparison.py --mosaic=${week}_${freq}_resid_excl_ddmod --fitsfile=${week}_${freq}.fits --printaverage
+fi
+# Unsafe -- Joe's corrections are not always reliable
+#if [[ ! -e ${week}_${freq}_rescaled.fits ]]
+#then
+#    $aprunsingle rescale_zerofits.py --mosaic=${week}_${freq}.fits --zerofits=${week}_${freq}_int_zero.fits
+#fi

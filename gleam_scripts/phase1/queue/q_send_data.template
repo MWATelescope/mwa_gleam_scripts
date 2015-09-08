@@ -1,0 +1,11 @@
+#!/bin/bash
+
+# Send calibration solutions elsewhere
+
+#PBS -W group_list=GROUPQ
+#PBS -q copyq
+#PBS -m e
+#PBS -l walltime=00:05:00,mem=1gb
+
+cd DATADIR/PROJ/OBSNUM
+rsync -tva OBSNUM.cal nhw@mwadas5.ivec.org:/data02/nhw/PROJ/Fornax/
