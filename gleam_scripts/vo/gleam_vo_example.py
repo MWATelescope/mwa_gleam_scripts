@@ -36,7 +36,8 @@ def run_cutout_example(access_url, regrid=False, download_dir=None):
     pos = (ra, dec) # position
     size = 1.0 # angular size
     if (regrid):
-        images = svc.search(pos, size, grid_opt="regrid")
+	# 'ZEA', 'ZEA_regrid', 'SIN'
+        images = svc.search(pos, size, proj_opt="SIN")
     else:
         images = svc.search(pos, size)
 
@@ -126,7 +127,7 @@ if __name__ == "__main__":
     gvp.start()
 
     # your VO code goes here
-    run_cutout_example(gvp.access_url, download_dir='/tmp/gleamvo')
+    run_cutout_example(gvp.access_url, regrid=True, download_dir='/tmp/gleamvo')
 
     # stop the gleam proxy
     gvp.stop()
