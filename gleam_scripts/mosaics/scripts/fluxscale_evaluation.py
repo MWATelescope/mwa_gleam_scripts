@@ -7,7 +7,7 @@ import os
 import matplotlib
 matplotlib.use('Agg')
 import numpy as np
-import matplotlib.pylab as plt
+import matplotlib.pyplot as plt
 import astropy.units as u
 from scipy.optimize import curve_fit
 from astropy.io import fits
@@ -32,7 +32,7 @@ parser.add_option('--printaverage',action="store_true",dest="printaverage",defau
                     help="Print the average flux ratio correction (default = False)")
 (options, args) = parser.parse_args()
 
-input_mosaic = options.mosaic
+input_mosaic = options.mosaic # e.g Week2_072-080MHz
 
 print "#----------------------------------------------------------#"
 print 'Analysing '+input_mosaic
@@ -85,18 +85,19 @@ elif 200.01 < freq_obs < 231.:
     subband = 5
 Dec_strip = header['CRVAL2']
 
-cutdir=os.environ['MWA_CODE_BASE']
+# Uncomment if you want to make an RA or Dec cut. 
+# cutdir=os.environ['MWA_CODE_BASE']
 
-centre_dec, freq_band, RA_min, RA_max, Dec_min, Dec_max = np.loadtxt(cutdir+'/MWA_Tools/gleam_scripts/mosaics/ra_dec_limits_polyderivation.dat',skiprows=2,unpack=True) 
+# centre_dec, freq_band, RA_min, RA_max, Dec_min, Dec_max = np.loadtxt(cutdir+'/MWA_Tools/gleam_scripts/mosaics/ra_dec_limits_polyderivation.dat',skiprows=2,unpack=True) 
 
-# centre_dec, freq_band, RA_min, RA_max, Dec_min, Dec_max = np.loadtxt('/Users/jcal/scripts/python/MWA_Tools/gleam_scripts/mosaics/ra_dec_limits_polyderivation.dat',skiprows=2,unpack=True) 
+# # centre_dec, freq_band, RA_min, RA_max, Dec_min, Dec_max = np.loadtxt('/Users/jcal/scripts/python/MWA_Tools/gleam_scripts/mosaics/ra_dec_limits_polyderivation.dat',skiprows=2,unpack=True) 
 
-dec_freq_comb = [centre_dec, freq_band]
-cut_ind = np.where((centre_dec == Dec_strip) & (freq_band == subband))
-RA_min = RA_min[cut_ind]
-RA_max = RA_max[cut_ind]
-Dec_min = Dec_min[cut_ind]
-Dec_max = Dec_max[cut_ind]
+# dec_freq_comb = [centre_dec, freq_band]
+# cut_ind = np.where((centre_dec == Dec_strip) & (freq_band == subband))
+# RA_min = RA_min[cut_ind]
+# RA_max = RA_max[cut_ind]
+# Dec_min = Dec_min[cut_ind]
+# Dec_max = Dec_max[cut_ind]
 
 hdulist = fits.open('marco_all_VLSSsrcs+'+input_mosaic+'.fits')
 hdulist.verify('fix')
