@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <getopt.h>
 #include <assert.h>
+#include <complex.h>
 #include "uvfits.h"
 
 /* globals */
@@ -78,16 +79,23 @@ int main(int argc, char *argv[]) {
     readUVFITSCloseIter(iter);
     if (res < 0) exit(res);
 
-    if (debug) fprintf(fpd,"There are %d baselines\n",data_new->n_baselines[0]);
+    fprintf(fpd,"N pols: %d, Pol type: %d\n",data_new->n_pol,data_new->pol_type);
 
     /* print a few vis values */
     for (i=0; i<10; i++) {
+        float complex *visdata,temp;
         int f,p;
+        visdata = (float complex *)data_new->visdata[0];
         fprintf(stdout,"u,v,w: %g,%g,%g. Baseline: %.6f.\n",data_new->u[0][i],data_new->v[0][i],data_new->w[0][i],data_new->baseline[0][i]);
         for (f=0; f<data_new->n_freq; f++) {
             fprintf(stdout,"Freq %g ",data_new->cent_freq +data_new->freq_delta*(f-data_new->n_freq/2));
             for(p=0; p<data_new->n_pol; p++) {
-                fprintf(stdout,"%g ",data_new->visdata[0][p+data_new->n_pol*f]);
+                temp=visdata[p+data_new->n_pol*f];
+                fprintf(stdout,"%g,%g ",crealf(temp),cimagf(temp));
+            }
+            fprintf(stdout,". Weights: ");
+            for(p=0; p<data_new->n_pol; p++) {
+                fprintf(stdout,"%g ",data_new->weightdata[0][p+data_new->n_pol*f]);
             }
             fprintf(stdout,"\n");
         }
