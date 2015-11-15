@@ -26,43 +26,28 @@ parser.add_option('--mosaic',type="string", dest="mosaic",
                     help="The filename of the catalogue you want to read in. Exclude _comp.vot extension.")
 parser.add_option('--fitsfile',type="string", dest="fitsfile",
                     help="The filename of the fits file you want to read in. Default = catalogue.fits")
-parser.add_option('--peak',action="store_false",dest="int",default=True,
+parser.add_option('--peak',action="store_false",dest="int",default=False,
                     help="Use peak flux rather than int flux (default = False)")
 parser.add_option('--printaverage',action="store_true",dest="printaverage",default=False,
                     help="Print the average flux ratio correction (default = False)")
 (options, args) = parser.parse_args()
 
-input_mosaic = options.mosaic # e.g Week2_072-080MHz
-
-print "#----------------------------------------------------------#"
-print 'Analysing '+input_mosaic
+input_mosaic = options.mosaic
 
 print 'Before '+input_mosaic+': '+str(datetime.datetime.now())
 
-if options.int:
-    suffix = 'int'
-else:
-    suffix = 'peak'
-
-def powlaw(freq, a, alpha): # defining powlaw as S = a*nu^alpha.
-    return a*(freq**alpha)
-
-def redchisq(ydata,ymod,sd,deg):
-    chisq=np.sum(((ydata-ymod)/sd)**2)
-    nu=ydata.size-1-deg
-    return [chisq]
-
 # Checking if fluxdentable exists
 
-check_file = os.path.exists('marco_all_VLSSsrcs+'+input_mosaic+'.fits')
+if options.int:
+    suffix="int"
+    check_file = os.path.exists(input_mosaic+'_fluxdentable_'+suffix+'.fits')
+else:
+    suffix="peak"
+    check_file = os.path.exists(input_mosaic+'_fluxdentable_'+suffix+'.fits')
 
-if not check_file:
+# if not check_file:
 
-    os.system('stilts tmatch2 in1='+input_mosaic+'_comp.vot in2='+input_mosaic+'_isle.vot join=1and2 find=best matcher=exact values1="island" values2="island" out='+input_mosaic+'_tot.vot')
-    os.system('stilts tmatch2 matcher=skyellipse in1=$MWA_CODE_BASE/marco_all_VLSSsrcs.fits in2='+input_mosaic+'_comp.vot out=marco_all_VLSSsrcs+'+input_mosaic+'.fits values1="RAJ2000 DEJ2000 MajAxis MinAxis PA" values2="ra dec a b pa" params=20')
-    # os.system('stilts tmatch2 matcher=skyellipse in1=/Users/jcal/scripts/python/MWA_Tools/catalogues/marco_all_VLSSsrcs.fits in2='+input_mosaic+'_tot.vot out=marco_all_VLSSsrcs+'+input_mosaic+'.fits values1="RAJ2000 DEJ2000 MajAxis MinAxis PA" values2="ra_1 dec_1 a b pa_1" params=20')
-    
-# Getting freq.
+    # Getting freq.
 if options.fitsfile:
     fitsfile=options.fitsfile
 else:
@@ -73,31 +58,16 @@ try:
 except:
     freq_obs = header['FREQ']/1e6
 
-if 72. < freq_obs < 103.:
-    subband = 1
-elif 103.01 < freq_obs < 134.:
-    subband = 2
-elif 139. < freq_obs < 170.:
-    subband = 3
-elif 170.01 < freq_obs < 200.:
-    subband = 4
-elif 200.01 < freq_obs < 231.:
-    subband = 5
-Dec_strip = header['CRVAL2']
+def redchisq(ydata,ymod,sd,deg):
+    chisq=np.sum(((ydata-ymod)/sd)**2)
+    nu=ydata.size-1-deg
+    return [chisq, chisq/nu]#, chisq/nu
 
-# Uncomment if you want to make an RA or Dec cut. 
-# cutdir=os.environ['MWA_CODE_BASE']
+def powlaw(freq, a, alpha): # defining powlaw as S = a*nu^alpha.
+    return a*(freq**alpha)
 
-# centre_dec, freq_band, RA_min, RA_max, Dec_min, Dec_max = np.loadtxt(cutdir+'/MWA_Tools/gleam_scripts/mosaics/ra_dec_limits_polyderivation.dat',skiprows=2,unpack=True) 
-
-# # centre_dec, freq_band, RA_min, RA_max, Dec_min, Dec_max = np.loadtxt('/Users/jcal/scripts/python/MWA_Tools/gleam_scripts/mosaics/ra_dec_limits_polyderivation.dat',skiprows=2,unpack=True) 
-
-# dec_freq_comb = [centre_dec, freq_band]
-# cut_ind = np.where((centre_dec == Dec_strip) & (freq_band == subband))
-# RA_min = RA_min[cut_ind]
-# RA_max = RA_max[cut_ind]
-# Dec_min = Dec_min[cut_ind]
-# Dec_max = Dec_max[cut_ind]
+os.system('stilts tmatch2 matcher=skyellipse in1=$MWA_CODE_BASE/marco_all_VLSSsrcs.fits in2='+input_mosaic+'_comp.vot out=marco_all_VLSSsrcs+'+input_mosaic+'.fits values1="RAJ2000 DEJ2000 MajAxis MinAxis PA" values2="ra dec a b pa" params=20')
+# os.system('stilts tmatch2 matcher=skyellipse in1=/Users/jcal/scripts/python/MWA_Tools/catalogues/marco_all_VLSSsrcs.fits in2='+input_mosaic+'_comp.vot out=marco_all_VLSSsrcs+'+input_mosaic+'.fits values1="RAJ2000 DEJ2000 MajAxis MinAxis PA" values2="ra dec a b pa" params=20')
 
 hdulist = fits.open('marco_all_VLSSsrcs+'+input_mosaic+'.fits')
 hdulist.verify('fix')
@@ -108,6 +78,7 @@ def filter_GalacticPlane(table):
     """
     Filter out sources that have |b|<10\deg, consistent with the SUMSS/MGPS-2 division
     """
+
     print "Filtering Galactic plane"
     bmax = 10
     good = []
@@ -117,18 +88,18 @@ def filter_GalacticPlane(table):
 
 tbdata = filter_GalacticPlane(tbdata)
 
-indices=np.concatenate((np.where(tbdata['flags_1'] & 101)[0],np.where(tbdata['flags_1'] == 0)[0]))
+indices=np.concatenate((np.where(tbdata['flags'] & 101)[0],np.where(tbdata['flags'] == 0)[0]))
 # We want them to be isolated
 indices=np.intersect1d(np.where(tbdata['isolated']==True),indices)
 # Should only have a single component in the fit
-indices=np.intersect1d(np.where(tbdata['components']==1),indices)
+# indices=np.intersect1d(np.where(tbdata['components']==1),indices)
 # Flux in VLSS should be more than 2Jy
 indices=np.intersect1d(np.where(tbdata['S_vlss']>2.),indices)
-if options.int:
+if suffix == 'int':
     # Sources should be more than 8 sigma in GLEAM
-    indices=np.intersect1d(np.where((tbdata['int_flux_1']/tbdata['local_rms_1'])>8),indices)
+    indices=np.intersect1d(np.where((tbdata['int_flux']/tbdata['local_rms'])>8),indices)
 else:
-    indices=np.intersect1d(np.where((tbdata['peak_flux_1']/tbdata['local_rms_1'])>8),indices)
+    indices=np.intersect1d(np.where((tbdata['peak_flux']/tbdata['local_rms'])>8),indices)
 
 # All sources which have an MRC match get three data points fitted
 indices_mrc=np.intersect1d(np.where(np.bitwise_not(np.isnan(tbdata['S_mrc']))),indices)
@@ -160,16 +131,15 @@ for i in range(0,catalogue_fluxes.shape[0]):
     # redchisq_val[i] = redchisq(np.exp(catalogue_fluxes[i]),powlaw(np.exp(freq_array),*poptpowlaw),catalogue_flux_errs[i],2)[0]
     residuals[i]=res[0]
 
-if options.int:
-    ratio_mrc=np.log(pred_fluxes/tbdata['int_flux_1'][indices_mrc])
+if suffix == 'int':
+    ratio_mrc=np.log(pred_fluxes/tbdata['int_flux'][indices_mrc])
     # Base the weighting entirely off the GLEAM S/N as I do for the XX:YY fits
-    w_mrc=tbdata['int_flux_1'][indices_mrc]/tbdata['local_rms_1'][indices_mrc]
+    w_mrc=tbdata['int_flux'][indices_mrc]/tbdata['local_rms'][indices_mrc]
 else:
-    ratio_mrc=np.log(pred_fluxes/tbdata['peak_flux_1'][indices_mrc])
+    ratio_mrc=np.log(pred_fluxes/tbdata['peak_flux'][indices_mrc])
     # Base the weighting entirely off the GLEAM S/N as I do for the XX:YY fits
-    w_mrc=tbdata['peak_flux_1'][indices_mrc]/tbdata['local_rms_1'][indices_mrc]
+    w_mrc=tbdata['peak_flux'][indices_mrc]/tbdata['local_rms'][indices_mrc]
 decs_mrc=tbdata['DEJ2000_vlss'][indices_mrc]
-
 
 # Ensuring the source is well fit by a powerlaw and not flat.
 indices_redchisq = np.where((redchisq_val < 15.) & (abs(specind) > 0.5))
@@ -199,14 +169,14 @@ for i in range(0,catalogue_fluxes.shape[0]):
     redchisq_val[i] = redchisq(catalogue_fluxes[i],fit_spec(freq_array),catalogue_flux_errs[i],2)[0]
     # redchisq_val[i] = redchisq(np.exp(catalogue_fluxes[i]),powlaw(np.exp(freq_array),*poptpowlaw),catalogue_flux_errs[i],2)[0]
 
-if options.int:
-    ratio_highdec=np.log(pred_fluxes/tbdata['int_flux_1'][indices_highdec])
+if suffix == 'int':
+    ratio_highdec=np.log(pred_fluxes/tbdata['int_flux'][indices_highdec])
     # Base the weighting entirely off the GLEAM S/N as I do for the XX:YY fits
-    w_highdec=tbdata['int_flux_1'][indices_highdec]/tbdata['local_rms_1'][indices_highdec]
+    w_highdec=tbdata['int_flux'][indices_highdec]/tbdata['local_rms'][indices_highdec]
 else:
-    ratio_highdec=np.log(pred_fluxes/tbdata['peak_flux_1'][indices_highdec])
+    ratio_highdec=np.log(pred_fluxes/tbdata['peak_flux'][indices_highdec])
     # Base the weighting entirely off the GLEAM S/N as I do for the XX:YY fits
-    w_highdec=tbdata['peak_flux_1'][indices_highdec]/tbdata['local_rms_1'][indices_highdec]
+    w_highdec=tbdata['peak_flux'][indices_highdec]/tbdata['local_rms'][indices_highdec]
 
 decs_highdec=tbdata['DEJ2000_vlss'][indices_highdec]
 
@@ -291,10 +261,14 @@ n_dec18, bins_dec18 = np.histogram(ratio_dec18, bins = 20,weights = ratio_err_de
 n_dec18, bins_dec18 = hist_norm_height(n_dec18,bins_dec18,n_dec18.max())
 n_less_dec18, bins_less_dec18 = np.histogram(ratio_less_dec18, bins = 20,weights = ratio_err_less_dec18)
 n_less_dec18, bins_less_dec18 = hist_norm_height(n_less_dec18,bins_less_dec18,n_less_dec18.max())
+g_dec18 = fit_g(g_init, bins_dec18, n_dec18)
+g_less_dec18 = fit_g(g_init, bins_less_dec18, n_less_dec18)
 ax1.step(n, bins, color = 'k',linewidth = 2, label="All Dec.")
-ax1.plot(g(np.linspace(y_lim_plot[0],y_lim_plot[1],100)),np.linspace(y_lim_plot[0],y_lim_plot[1],100), 'r-', lw=2, label='Gaussian')
-ax1.step(n_dec18, bins_dec18, color = 'k', linestyle = 'dashed', label="Dec. > 18")
-ax1.step(n_less_dec18, bins_less_dec18, color = 'k',linestyle = 'dotted', label="Dec. < 18")
+ax1.plot(g(np.linspace(y_lim_plot[0],y_lim_plot[1],100)),np.linspace(y_lim_plot[0],y_lim_plot[1],100), 'r-', lw=2, label='All')
+ax1.plot(g_dec18(np.linspace(y_lim_plot[0],y_lim_plot[1],100)),np.linspace(y_lim_plot[0],y_lim_plot[1],100), 'b-', lw=2, label='Dec. > 18.5')
+ax1.plot(g_less_dec18(np.linspace(y_lim_plot[0],y_lim_plot[1],100)),np.linspace(y_lim_plot[0],y_lim_plot[1],100), 'g-', lw=2, label='Dec. < 18.5')
+ax1.step(n_dec18, bins_dec18, color = 'k', linestyle = 'dashed', label="Dec. > 18.5")
+ax1.step(n_less_dec18, bins_less_dec18, color = 'k',linestyle = 'dotted', label="Dec. < 18.5")
 ax1.legend(loc='upper right', fontsize=10) # make a legend in the best location
 ax1.yaxis.set_ticklabels([])   # remove the major ticks
 ax1.set_ylim(y_lim_plot)
@@ -302,13 +276,13 @@ start_x, end_x = ax1.get_xlim()
 start_y, end_y = ax1.get_ylim()
 ax1.xaxis.set_ticks([0.5, 1.0])
 n_range = np.arange(start_x, end_x,0.01)
-ax.set_title(input_mosaic)
+ax.set_title(input_mosaic+' Freq = '+str(freq_obs))
 ax1.set_title(r'$\mu$ = '+str(round(g.mean[0],4))+r' $\sigma$ = '+str(round(g.stddev[0],4)), fontsize = 10)
 ax1.plot(n_range,np.ones(len(n_range))*zero_curvefit(n_range, *np.exp(poptzero)), 'saddlebrown', linewidth = 3)
 # ax1.xaxis.set_major_locator(MaxNLocator(prune='lower'))
 cb = plt.colorbar(ax.scatter(x, np.exp(y), marker='o',color ='k',c=SNR, cmap=plt.cm.Greys))
 cb.set_label('log(SNR)',fontsize = 15)
-plt.savefig(input_mosaic+'_'+suffix+'_flux_fits.png')
+plt.savefig(input_mosaic+'_'+suffix+'_'+str(freq_obs)+'MHz_flux_fits.png')
 
 # Plotting CDF
 
@@ -318,16 +292,15 @@ ax = plt.subplot(gs[0])
 ax.hist(abs(np.exp(y)-1),bins = 20,normed=1,  cumulative = True, histtype = 'step', color = 'k',linewidth = 2,label="All Dec.") # weights = ratio_err,
 # ax.hist(abs(ratio_dec18), bins = 20,normed=1,cumulative = True, linestyle = 'dashed', histtype = 'step', color = 'k', label="Dec. > 18") #  weights = ratio_err_dec18, 
 # ax.hist(abs(ratio_less_dec18), bins = 20,normed=1,  cumulative = True, linestyle = 'dotted', histtype = 'step', color = 'k', label="Dec. < 18") # weights = ratio_err_less_dec18,
-ax.set_title(input_mosaic)
+ax.set_title(input_mosaic+' Freq = '+str(freq_obs))
 ax.set_ylim(0., 1.)
 ax.set_xlim(0, 1.)
 ax.legend(loc='upper right', fontsize=10) # make a legend in the best location
 ax.set_xlabel('Pred. flux density / Obs. flux density', fontsize = 15)
-plt.savefig(input_mosaic+'_'+suffix+'_cdf.png')
+plt.savefig(input_mosaic+'_'+suffix+'_'+str(freq_obs)+'MHz_cdf.png')
 
 # Saving zero fits for each freq 
 freq_list = np.array(['072-080MHz','080-088MHz','088-095MHz','095-103MHz','103-111MHz','111-118MHz','118-126MHz','126-134MHz','139-147MHz','147-154MHz','154-162MHz','162-170MHz','170-177MHz','177-185MHz','185-193MHz','193-200MHz','200-208MHz','208-216MHz','216-223MHz','223-231MHz'])
-freqs = np.array([76,84,92,99,107,115,123,130,143,150,158,166,174,181,189,197,204,212,219,227])
 
 freq_str = input_mosaic.split("_")[1]
 
@@ -337,6 +310,7 @@ if not os.path.exists(zerofits):
     print 'Making '+zerofits
     zero_fits = np.zeros(len(freq_list))
     zero_fits_err = np.zeros(len(freq_list))
+    freqs = np.array([76,84,92,99,107,115,123,130,143,150,158,166,174,181,189,197,204,212,219,227])
 else:
     print 'Reading in '+zerofits
     hdulist = fits.open(zerofits)
@@ -348,6 +322,7 @@ else:
 print 'Saving zero fits of this frequency to '+zerofits
 
 freq_ind = np.where(freq_str == freq_list)
+
 
 zero_fits[freq_ind] = poptzero[0]
 zero_fits_err[freq_ind] = np.sqrt(pcovzero[0])
