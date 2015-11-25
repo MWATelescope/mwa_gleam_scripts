@@ -15,7 +15,7 @@ daytable_id='1EsSh3vXtsPScjZdN2rW5WXL38PWG_g7dFAKQf34'
 obstable_id='1poo8vJn8FHcwuZ0OlF-IGpOY5krFvOH-dSZIyPc'
 host='eor-db.mit.edu'
 fail_log='/nfs/blank/h4215/aaronew/MWA_Tools/eorlive/fail_cmd.log'
-hostcurtin='ngas01.ivec.org'
+hostcurtin='mwa-metadata01.pawsey.org.au'
 dbname='mwa'
 user='mwa'
 password='BowTie'
@@ -227,7 +227,7 @@ class FusionConnector():
             exit()
 
     def get_n_data(self,obsid):
-        loccmd = 'python /csr/mwa/python/mwa_git/mwatools_setup/bin/obslocate.py -s eor-db.mit.edu -r ngas01.ivec.org -o '+str(obsid)
+        loccmd = 'python /csr/mwa/python/mwa_git/mwatools_setup/bin/obslocate.py -s eor-db.mit.edu -r mwa-metadata01.pawsey.org.au -o '+str(obsid)
         p=subprocess.Popen([loccmd,],stdout=subprocess.PIPE,stderr=subprocess.PIPE,shell=True)
         outstr = p.communicate()
         print outstr

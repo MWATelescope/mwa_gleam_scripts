@@ -1,6 +1,6 @@
 <?php
 header("Content-type: text/xml");
-$host="ngas01.ivec.org";
+$host="mwa-metadata01.pawsey.org.au";
 $host="eor-db.mit.edu";
 $dbname="mwa";
 $user="mwa";
