@@ -24,6 +24,9 @@ except ImportError:
 
 from optparse import OptionParser
 
+import logging
+logging.getLogger('Aegean')
+
 usage="Usage: %prog [options]\n"
 parser = OptionParser(usage=usage)
 parser.add_option('--input',dest="input",default=None,
@@ -37,8 +40,8 @@ parser.add_option('--week', dest="week", default=1, type='int',
 (options, args) = parser.parse_args()
 
 # Parse the input options
-
-if not os.path.exists(options.input):
+print options.input
+if options.input is None or not os.path.exists(options.input):
     print "Error! Must specify an input file."
     sys.exit(1)
 else:
@@ -64,8 +67,10 @@ def load(filename):
 
 def save(table,filename):
     print "save", filename
-    #writetoVO(table,filename)
-    catalogs.write_table(table, filename)
+    if os.path.exists(filename):
+        os.remove(filename)
+    table.write(filename, format='votable')
+
 
 def filter_RADEC(table, week):
     # hard coded ra/dec filter based on week.
@@ -180,5 +185,5 @@ table = filter_RADEC(table,week)
 table = filter_GalacticPlane(table)
 table = filter_intpeak(table)
 table = filter_region(table,mimtable)
-save(table,outfile)
+save(table, outfile)
 
