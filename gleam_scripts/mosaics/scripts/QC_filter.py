@@ -35,7 +35,7 @@ parser.add_option('--output',dest="output",default=None,
                   help="Output VO table -- default is input_filter.vot")
 parser.add_option('--mimtable',dest="mimtable",default=None,
                   help="MIMAS table to read in (default is MWA_Tools/gleam_scripts/mosaics/scripts/all.mim)")
-parser.add_option('--week', dest="week", default=1, type='int',
+parser.add_option('--week', dest="week", default=None, type='int',
                   help="Week number for custom filtering options")
 (options, args) = parser.parse_args()
 
@@ -57,7 +57,11 @@ if options.mimtable:
 else:
     mimtable=mwa_code_base+"/MWA_Tools/gleam_scripts/mosaics/scripts/all.mim"
 
-week = options.week
+if options.week is not None:
+    week = options.week
+else:
+    print "ERR: Please supply week number via --week"
+    sys.exit(1)
 
 
 def load(filename):
