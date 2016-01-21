@@ -24,6 +24,9 @@ except ImportError:
 
 from optparse import OptionParser
 
+import logging
+logging.getLogger('Aegean')
+
 usage="Usage: %prog [options]\n"
 parser = OptionParser(usage=usage)
 parser.add_option('--input',dest="input",default=None,
@@ -32,13 +35,13 @@ parser.add_option('--output',dest="output",default=None,
                   help="Output VO table -- default is input_filter.vot")
 parser.add_option('--mimtable',dest="mimtable",default=None,
                   help="MIMAS table to read in (default is MWA_Tools/gleam_scripts/mosaics/scripts/all.mim)")
-parser.add_option('--week', dest="week", default=1, type='int',
+parser.add_option('--week', dest="week", default=None, type='int',
                   help="Week number for custom filtering options")
 (options, args) = parser.parse_args()
 
 # Parse the input options
-
-if not os.path.exists(options.input):
+print options.input
+if options.input is None or not os.path.exists(options.input):
     print "Error! Must specify an input file."
     sys.exit(1)
 else:
@@ -54,7 +57,11 @@ if options.mimtable:
 else:
     mimtable=mwa_code_base+"/MWA_Tools/gleam_scripts/mosaics/scripts/all.mim"
 
-week = options.week
+if options.week is not None:
+    week = options.week
+else:
+    print "ERR: Please supply week number via --week"
+    sys.exit(1)
 
 
 def load(filename):
@@ -64,8 +71,10 @@ def load(filename):
 
 def save(table,filename):
     print "save", filename
-    #writetoVO(table,filename)
-    catalogs.write_table(table, filename)
+    if os.path.exists(filename):
+        os.remove(filename)
+    table.write(filename, format='votable')
+
 
 def filter_RADEC(table, week):
     # hard coded ra/dec filter based on week.
@@ -180,5 +189,5 @@ table = filter_RADEC(table,week)
 table = filter_GalacticPlane(table)
 table = filter_intpeak(table)
 table = filter_region(table,mimtable)
-save(table,outfile)
+save(table, outfile)
 
