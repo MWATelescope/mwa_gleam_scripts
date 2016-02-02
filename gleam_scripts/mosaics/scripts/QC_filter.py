@@ -8,9 +8,10 @@ import sys
 sys.path.insert(1,'/home/hancock/alpha/Aegean') 
 # Galaxy
 sys.path.insert(1,os.environ['HOME']+'/bin/')
-mwa_code_base=os.environ['MWA_CODE_BASE']
-sys.path.insert(1,mwa_code_base+'/MWA_Tools/gleam_scripts/mosaics/scripts/')
-sys.path.insert(1,mwa_code_base+'/Aegean/')
+if 'MWA_CODE_BASE' in os.environ:
+    mwa_code_base=os.environ['MWA_CODE_BASE']
+    sys.path.insert(1,mwa_code_base+'/MWA_Tools/gleam_scripts/mosaics/scripts/')
+    sys.path.insert(1,mwa_code_base+'/Aegean/')
 
 import numpy as np
 from AegeanTools import catalogs, flags
@@ -162,7 +163,6 @@ if __name__=="__main__":
         sys.exit(0)
 
     # Parse the input options
-    print options.input
     if options.input is None or not os.path.exists(options.input):
         print "Error! Must specify an input file."
         sys.exit(1)
@@ -179,15 +179,13 @@ if __name__=="__main__":
     else:
         mimtable=mwa_code_base+"/MWA_Tools/gleam_scripts/mosaics/scripts/all.mim"
 
-    if options.week is not None:
-        week = options.week
-    else:
-        print "ERR: Please supply week number via --week"
-        sys.exit(1)
-
     # Run the filters we've defined
     table = load(infile)
-    table = filter_RADEC(table,week)
+
+    if options.week is None:
+        print "No week supplied, applying week-specific ra/dec cuts"
+    else:
+        table = filter_RADEC(table,options.week)
     table = filter_GalacticPlane(table)
     table = filter_intpeak(table)
     table = filter_region(table,mimtable)
