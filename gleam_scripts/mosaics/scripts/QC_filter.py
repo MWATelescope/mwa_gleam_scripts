@@ -183,7 +183,7 @@ if __name__=="__main__":
     table = load(infile)
 
     if options.week is None:
-        print "No week supplied, applying week-specific ra/dec cuts"
+        print "No week supplied, not applying week-specific ra/dec cuts"
     else:
         table = filter_RADEC(table,options.week)
     table = filter_GalacticPlane(table)
