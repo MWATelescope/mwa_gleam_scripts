@@ -1,0 +1,4 @@
+
+cd DATADIR/PROJ
+obsdownload.py -o OBSNUM
+

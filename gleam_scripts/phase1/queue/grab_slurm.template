@@ -1,10 +1,10 @@
 #!/bin/bash -l
 
-# Download calibrated measurement set
+# Queues up some data grabbing via obsdownload.py
 
 #SBATCH -p COPYQ
-#SBATCH --account=GROUPQ
-#SBATCH --time=10:00:00
+#SBATCH --account=GROUP
+#SBATCH --time=01:00:00
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --output=QUEUEDIR/OUTPUT.o%j

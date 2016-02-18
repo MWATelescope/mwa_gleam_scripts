@@ -1,0 +1,9 @@
+cd DATADIR/PROJ/OBSNUM
+make_metafits.py -g OBSNUM
+if [[ -e OBSNUM_flags.zip ]]
+then
+    unzip OBSNUM_flags.zip
+    flagfiles="-flagfiles OBSNUM_%%.mwaf"
+fi
+cotter $flagfiles -timeres 4 -freqres 40 *gpubox*.fits -edgewidth 80 -m OBSNUM.metafits -o OBSNUM.ms
+if [[ -d OBSNUM.ms ]] ; then rm *gpubox*fits *.zip *.mwaf ; fi
