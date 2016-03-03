@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 
 import numpy as np
 
@@ -28,8 +28,9 @@ tables = sorted(glob.glob('*_XY*.vot'))
 
 if options.make_plots:
 
-    import matplotlib.pyplot as pyplot
     import matplotlib as mpl
+    mpl.use('Agg') # So does not use display
+    import matplotlib.pyplot as pyplot
 
     sbplt_pad_left  = 0.125  # the left side of the subplots of the figure
     sbplt_pad_right = 0.9    # the right side of the subplots of the figure
