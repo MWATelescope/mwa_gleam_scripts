@@ -161,10 +161,14 @@ if __name__=="__main__":
     if options.make:
         make_mim()
         sys.exit(0)
-
+    
+    print options.input
     # Parse the input options
-    if options.input is None or not os.path.exists(options.input):
+    if options.input is None:
         print "Error! Must specify an input file."
+        sys.exit(1)
+    elif not os.path.exists(options.input):
+        print "File not found {0}".format(options.input)
         sys.exit(1)
     else:
         infile=options.input
