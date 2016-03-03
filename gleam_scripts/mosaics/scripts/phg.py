@@ -143,7 +143,13 @@ if __name__== "__main__":
                 car[:,j,i]=[np.nan,np.nan,np.nan]
     header['CTYPE3']=('Beam',"0=a,1=b,2=pa (degrees)")
     if options.output is None:
-        options.output = options.input.replace('_comp.vot','_psf.fits')
+# Try some common extensions
+        options.output = options.input.replace('_psf.vot','_psf.fits')
+        options.output = options.output.replace('_comp.vot','_psf.fits')
+        options.output = options.output.replace('.vot','_psf.fits')
+# Last-ditch, call it psf.fits
+        if options.output == options.input:
+            options.output == "psf.fits"
     hdulist = fits.HDUList(fits.PrimaryHDU(header=header, data=car))
     hdulist.writeto(options.output, clobber=True)
     print "wrote", options.output
