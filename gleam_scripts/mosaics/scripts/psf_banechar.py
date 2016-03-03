@@ -51,6 +51,8 @@ parser.add_option('--week',dest='week',default=None,
 
 # Parse the input options
 
+print "THIS SCRIPT IS DEPRECATED: USE PSF_SELECT.PY AND PHG.PY INSTEAD!!"
+
 if not os.path.exists(options.input):
     print "Error! Must specify an input file."
     sys.exit(1)
