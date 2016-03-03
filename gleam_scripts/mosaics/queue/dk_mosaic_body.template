@@ -355,8 +355,8 @@ then
     then
         zenithflag="--zenith"
     fi
-    $aprunsingle decfluxdependence_derive.py --mosaic=$root $zenithflag --plot
-    $aprunsingle fixingdecfluxdependence_apply.py --mosaic=$root
+    $aprunsingle derive_dec_polynomial.py --mosaic=$mosaicfile --plot --write
+    $aprunsingle apply_dec_polynomial.py --mosaic=$mosaicfile
 fi
 
 # Source-finding on the polyapplied mosaic
