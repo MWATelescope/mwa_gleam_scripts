@@ -70,7 +70,7 @@ if Dec_strip == -40. or Dec_strip == -55. or Dec_strip == -72. or ( week != "201
     if Dec_strip == -55. or Dec_strip == 1.6 or Dec_strip == 2. or Dec_strip == 1.:
         input_mosaic_polyfit = re.sub("201[0-9]{5}","20131107",input_root)
         poly_path = re.sub("201[0-9]{5}","20131107",os.getcwd())
-    if Dec_strip == -72. or Dec_strip == 18.6 or Dec_strip == 19. or Dec_strip == 18.:
+    if Dec_strip == -72. or Dec_strip == 18.6 or Dec_strip == 19. or Dec_strip == 18. or Dec_strip == 20.:
         input_mosaic_polyfit = re.sub("201[0-9]{5}","20131111",input_root)
         poly_path = re.sub("201[0-9]{5}","20131111",os.getcwd())
     if Dec_strip == -26.7 or Dec_strip == -27. or Dec_strip == -26.:
