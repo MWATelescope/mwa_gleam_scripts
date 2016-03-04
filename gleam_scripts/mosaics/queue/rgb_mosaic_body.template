@@ -1,8 +1,8 @@
-#!/bin/bash
 
 datadir=DATADIR
 proj=PROJ
 week=WEEK
+ncpus=NCPUS
 
 if [[ ! $PBS_ARRAY_INDEX ]]
 then
@@ -18,21 +18,25 @@ if [[ $color == "red" ]]
 then
     fiducial_freq="072-080MHz"
     lowfreq=71
+    midfreq=87675000
     highfreq=102
 elif [[ $color == "green" ]]
 then
     fiducial_freq="103-111MHz"
     lowfreq=102
+    midfreq=118395000
     highfreq=133
 elif [[ $color == "blue" ]]
 then
     fiducial_freq="139-147MHz"
     lowfreq=138
+    midfreq=154235000
     highfreq=169
 elif [[ $color == "white" ]]
 then
     fiducial_freq="170-177MHz"
     lowfreq=169
+    midfreq=200315000
     highfreq=232
 fi
 
@@ -63,33 +67,6 @@ echo "Final resolution will be $bmaj x $bmin deg."
 
 for freq in $freqs
 do
-    for file in ../${freq}/${week}_${freq}_rescaled.fits
-    do
-# Load and convolve-down all of the Week images, setting up for the no-weight run
-        localname=`basename $file | sed "s/_rescaled//g"`
-        if [[ ! -e $localname ]]
-        then
-            if [[ $localname != "${week}_${fiducial_freq}.fits" ]]
-            then
-                convbeam=`pyhead.py -p BMAJ ../${fiducial_freq}/${week}_${fiducial_freq}.fits | awk '{print $3*3600}'`
-                echo "Convolving $file to resolution of $convbeam arcsec."
-                imname=`basename $file | sed "s/.fits/.im/"`
-                $aprunsingle fits_unmask.py -i $file -o temp.fits
-                fits op=xyin in=temp.fits out=$imname
-                rm temp.fits
-                puthd in=$imname/bunit value="JY/BEAM"
-                convol map=$imname options="final" fwhm=$convbeam out=temp.im
-                fits op=xyout in=temp.im out=$localname
-                rm -rf temp.im
-                echo "Writing $localname, copying mask from $file."
-                copy_mask.py --mask=$file --mosaic=$localname
-            else
-                echo "$localname is already at the lowest resolution; linking instead."
-                ln -s $file $localname
-            fi
-        fi
-    done
-
     for file in ../${freq}/mosaic*ied.fits
     do
         localname=`basename $file`
@@ -128,32 +105,6 @@ do
    done
 done
 
-# No weight mosaic (frequency is the same, but noise varies over the image)
-if [[ ! -e ${week}_${color}_noweight.fits ]]
-then
-    $aprun swarp -c ../noweight.swarp ${week}*z.fits -IMAGEOUT_NAME ${week}_${color}_noweight.fits -WEIGHTOUT_NAME ${week}_${color}_noweight.weight.fits
-    $aprunsingle fits_trim.py ${week}_${color}_noweight.fits temp.fits
-    mv temp.fits ${week}_${color}_noweight.fits
-    $aprunsingle fits_trim.py ${week}_${color}_noweight.weight.fits temp.fits
-    mv temp.fits ${week}_${color}_noweight.weight.fits
-# Update with zenith fiducial frequency beam
-    pyhead.py -u BMAJ $bmaj ${week}_${color}_noweight.fits
-    pyhead.py -u BMIN $bmin ${week}_${color}_noweight.fits
-    pyhead.py -u BPA 0.0 ${week}_${color}_noweight.fits
-fi
-
-$aprun aegean.sh ${week}_${color}_noweight.fits bane compress
-$aprun newaegean.sh ${week}_${color}_noweight.fits bane compress
-if [[ ! -e ${week}_${color}_noweight_resid_excl_comp.vot ]]
-then
-    $aprunsingle QC_filter.py --input=${week}_${color}_noweight_resid_comp.vot --output=${week}_${color}_noweight_resid_excl_comp.vot
-fi
-if [[ ! -e ${week}_${color}_noweight_resid_excl_triple.fits ]]
-then
-    $aprunsingle psf_banechar.py --input=${week}_${color}_noweight_resid_excl_comp.vot --fitsfile=${week}_${color}_noweight.fits
-fi
-
-# Low noise mosaic (noise is reduced, but frequency varies over the image)
 if [[ ! -e ${week}_${color}_lownoise.fits ]]
 then
 # Rescale RMS maps in preparation for swarping
@@ -170,22 +121,52 @@ then
     pyhead.py -u BMAJ $bmaj ${week}_${color}_lownoise.fits
     pyhead.py -u BMIN $bmin ${week}_${color}_lownoise.fits
     pyhead.py -u BPA 0.0 ${week}_${color}_lownoise.fits
+# Update with frequency of middle observation
+    pyhead.py -u FREQ ${midfreq} ${week}_${color}_lownoise.fits
 # De-rescale RMS maps
     for file in *_polyapplied_rms_sigmoid.fits
     do
         $aprunsingle pyhead.py -u BSCALE 1.0 $file
     done
+# Update with frequency of middle observation
+    num=`ls ${week}*z.fits | wc -l | awk '{print $1/2}'`
+    freq=`ls ${week}*z.fits | head -$num | tail -1 | awk '{print 1000000*substr($1,11,3)}'`
+    pyhead.py -u FREQ ${freq} ${week}_${color}_noweight.fits
 fi
 
-$aprun aegean.sh ${week}_${color}_lownoise.fits bane compress
-$aprun newaegean.sh ${week}_${color}_lownoise.fits bane compress
-if [[ ! -e ${week}_${color}_lownoise_resid_excl_comp.vot ]]
+$aprun BANE.py --noclobber --compress --cores=1 ${week}_${color}_lownoise.fits 
+if [[ ! -e ${week}_${color}_lownoise_bkg.fits ]]
 then
-    $aprunsingle QC_filter.py --input=${week}_${color}_lownoise_resid_comp.vot --output=${week}_${color}_lownoise_resid_excl_comp.vot
+    echo "BANE failed to run!"
+    exit 1
 fi
-if [[ ! -e ${week}_${color}_lownoise_resid_excl_triple.fits ]]
+if [[ ! -e ${week}_${color}_lownoise_comp.vot ]]
 then
-    $aprunsingle psf_banechar.py --input=${week}_${color}_lownoise_resid_excl_comp.vot --fitsfile=${week}_${color}_lownoise.fits
+    $aprun aegean.py --cores=${ncpus} --telescope=mwa --island --maxsummits=5 --autoload --out=/dev/null --table=${week}_${color}_lownoise.vot,${week}_${color}_lownoise.reg ${week}_${color}_lownoise.fits
+fi
+
+# Filter everything in order to generate a flux scale
+if [[ ! -e ${week}_${color}_lownoise_comp_filter.vot ]]
+then
+    $aprunsingle QC_filter.py --input=${week}_${color}_lownoise_comp.vot --output=${week}_${color}_lownoise_comp_filter.vot --mimtable=$MWA_CODE_BASE/MWA_Tools/gleam_scripts/mosaics/scripts/all.mim --week=${week:4:1}
+fi
+# Rescale to correct flux
+if [[ ! -e ${week}_${color}_lownoise_fluxscale.fits ]]
+then
+    $aprunsingle check_flux_scale.py --mosaic=${week}_${color}_lownoise.fits --catalog=${week}_${color}_lownoise_comp_filter.vot --isles=${week}_${color}_lownoise_isle.vot --plot --write --table
+    $aprunsingle rescale_flux.py --mosaic=${week}_${color}_lownoise.fits --zerofits=${week}_${color}_lownoise_fluxscale.fits
+    $aprunsingle rescale_flux.py --mosaic=${week}_${color}_lownoise_bkg.fits --zerofits=${week}_${color}_lownoise_fluxscale.fits
+    $aprunsingle rescale_flux.py --mosaic=${week}_${color}_lownoise_rms.fits --zerofits=${week}_${color}_lownoise_fluxscale.fits
+fi
+# Filter everything but not with the week cuts, in order to get a good psf
+if [[ ! -e ${week}_${color}_lownoise_psf.fits ]]
+then
+    if [[ ! -e ${week}_${color}_lownoise_comp_partfilter.vot ]]
+    then
+       $aprunsingle QC_filter.py --input=${week}_${color}_lownoise_comp.vot --output=${week}_${color}_lownoise_comp_partfilter.vot --mimtable=$MWA_CODE_BASE/MWA_Tools/gleam_scripts/mosaics/scripts/all.mim # --week=${week:4:1} # no exclusion, so we get a good PSF
+    fi
+    $aprunsingle psf_select.py --input=${week}_${color}_lownoise_comp_partfilter.vot
+    $aprunsingle phg.py --input=${week}_${color}_lownoise_comp_partfilter_psf.vot
 fi
 
 exit 0

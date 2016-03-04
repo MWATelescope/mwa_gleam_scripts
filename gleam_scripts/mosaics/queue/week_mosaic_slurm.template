@@ -1,11 +1,14 @@
-#!/bin/bash
+#!/bin/bash -l
+
+# Make week-long mosaics
+
 #SBATCH --account=GROUPQ
 #SBATCH --partition=STANDARDQ
-#SBATCH --time=05:00:00
+#SBATCH --time=07:00:00
 #SBATCH --nodes=1
-#SBATCH --mem=HOSTMEMgb
 #SBATCH --output=QUEUEDIR/OUTPUT.o%A_%a
 #SBATCH --error=QUEUEDIR/OUTPUT.e%A_%a
+#SBATCH --export=NONE
 #SBATCH --array=1-20
 
 aprun="aprun -n 1 -d NCPUS "
