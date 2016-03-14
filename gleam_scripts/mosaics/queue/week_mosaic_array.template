@@ -1,6 +1,8 @@
+
 datadir=DATADIR
 proj=PROJ
 week=WEEK
+ncpus=NCPUS
 
 # Convert SLURM id to PBS id
 if [[ ! $PBS_ARRAY_INDEX ]]
@@ -89,7 +91,8 @@ then
 # Rescale RMS maps in preparation for swarping
     for file in *_polyapplied_rms_sigmoid.fits
     do
-        $aprunsingle pyhead.py -u BSCALE 0.000001
+# Modified 16/01/16 to 1000x smaller value to see if that fixes nans
+        $aprunsingle pyhead.py -u BSCALE 0.000000001
     done
 
     $aprun swarp -c ../weight.swarp mosaic*_polyapplied.fits -IMAGEOUT_NAME ${week}_${freq}.fits -WEIGHTOUT_NAME ${week}_${freq}.weight.fits
@@ -112,38 +115,34 @@ then
 else
     echo "${week}_${freq}.fits already exists, so I didn't bother to re-make it. Please delete and re-run if you want a new version."
 fi
-$aprun aegean.sh ${week}_${freq}.fits bane compress
-$aprun newaegean.sh ${week}_${freq}.fits bane compress
-# Filter only the bits of sky I care about
-if [[ ! -e ${week}_${freq}_resid_excl_comp.vot ]]
+$aprun BANE.py --cores=${ncpus} --noclobber --compress ${week}_${freq}.fits
+if [[ ! -e ${week}_${freq}_comp.vot ]]
 then
-    QC_filter.py --input=${week}_${freq}_resid_comp.vot --output=${week}_${freq}_resid_excl_comp.vot
+    $aprun aegean.py --cores=${ncpus} --telescope=mwa --island --maxsummits=5 --autoload --out=/dev/null --table=${week}_${freq}.vot,${week}_${freq}.reg ${week}_${freq}.fits
 fi
-# See what the peak and integrated fluxes look like
-#$aprunsingle flux_comparison.py --mosaic=${week}_${freq}_resid_excl --fitsfile=${week}_${freq}.fits
-#$aprunsingle flux_comparison.py --int --mosaic=${week}_${freq}_resid_excl --fitsfile=${week}_${freq}.fits
+# Filter out everything completely in order to calculate flux scale
+if [[ ! -e ${week}_${freq}_comp_filter.vot ]]
+then
+    $aprunsingle QC_filter.py --input=${week}_${freq}_comp.vot --output=${week}_${freq}_comp_filter.vot --mimtable=$MWA_CODE_BASE/MWA_Tools/gleam_scripts/mosaics/scripts/all.mim --week=${week:4:1}
+fi
+if [[ ! -e ${week}_${freq}_fluxscale.fits ]]
+then
+# Calculate the flux scale
+    $aprunsingle check_flux_scale.py --mosaic=${week}_${freq}.fits --catalog=${week}_${freq}_comp_filter.vot --isles=${week}_${freq}_isle.vot --plot --write --table
+# Apply the flux scale
+    $aprunsingle rescale_flux.py --mosaic=${week}_${freq}.fits --zerofits=${week}_${freq}_fluxscale.fits
+    $aprunsingle rescale_flux.py --mosaic=${week}_${freq}_bkg.fits --zerofits=${week}_${freq}_fluxscale.fits
+    $aprunsingle rescale_flux.py --mosaic=${week}_${freq}_rms.fits --zerofits=${week}_${freq}_fluxscale.fits
+fi
+# Now filter only part of the data in order to calculate the PSF (fluxes also don't matter for this stage)
 # Characterise the PSF
-if [[ ! -e ${week}_${freq}_resid_excl_triple.fits ]]
+if [[ ! -e ${week}_${freq}_partfilter_psf.fits ]]
 then
-    $aprunsingle psf_banechar.py --input=${week}_${freq}_resid_excl_comp.vot
+    if [[ ! -e ${week}_${freq}_comp_partfilter.vot ]]
+    then
+        $aprunsingle QC_filter.py --input=${week}_${freq}_comp.vot --output=${week}_${freq}_comp_partfilter.vot --mimtable=$MWA_CODE_BASE/MWA_Tools/gleam_scripts/mosaics/scripts/all.mim #--week=${week:4:1}
+    fi
+    $aprunsingle psf_select.py --input=${week}_${freq}_comp_partfilter.vot
+    $aprunsingle phg.py --input=${week}_${freq}_comp_partfilter_psf.vot
 fi
-# Update the catalogues by scaling the peak fluxes
-#update_catalogue.py --catalogue=${week}_${freq}_resid_excl_comp.vot --scaleint --output=${week}_${freq}_resid_excl_ddmod_int_comp.vot
-if [[ ! -e ${week}_${freq}_resid_excl_ddmod_comp.vot ]]
-then
-    update_catalogue.py --catalogue=${week}_${freq}_resid_excl_comp.vot --output=${week}_${freq}_resid_excl_ddmod_comp.vot
-# Now check the peak and integrated fluxes against the catalogue expectations
-fi
-if [[ ! -e ${week}_${freq}_peak_zero.fits ]]
-then
-    $aprunsingle flux_comparison.py --peak --mosaic=${week}_${freq}_resid_excl_ddmod --fitsfile=${week}_${freq}.fits --printaverage
-fi
-if [[ ! -e ${week}_${freq}_int_zero.fits ]]
-then
-    $aprunsingle flux_comparison.py --mosaic=${week}_${freq}_resid_excl_ddmod --fitsfile=${week}_${freq}.fits --printaverage
-fi
-# Unsafe -- Joe's corrections are not always reliable
-#if [[ ! -e ${week}_${freq}_rescaled.fits ]]
-#then
-#    $aprunsingle rescale_zerofits.py --mosaic=${week}_${freq}.fits --zerofits=${week}_${freq}_int_zero.fits
-#fi
+

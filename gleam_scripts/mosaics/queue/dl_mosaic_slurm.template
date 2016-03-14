@@ -10,3 +10,5 @@
 #SBATCH --mem=100mb
 #SBATCH --output=QUEUEDIR/OUTPUT.o%j
 #SBATCH --error=QUEUEDIR/OUTPUT.e%j
+#SBATCH --export=NONE
+

@@ -51,7 +51,7 @@ else:
     else:
     # Expecting to be in a directory named with the date in format YYYYMMDD
         date=re.search("201[0-9]{5}",os.getcwd()).group()
-        if date=="20130817" or date=="20131111" or date=="20140306" or date=="20140615" :
+        if date=="20130817" or date=="20131111" or date=="20140308" or date=="20140615" :
             plotdec=18.6
         elif date=="20130808" or date=="20131107" or date=="20140306" or date=="20140611":
             plotdec=1.6
@@ -85,14 +85,20 @@ for Xfits in files:
     Ifits=re.sub("XX","I",Xfits)
     Ivot=re.sub(".fits","_comp.vot",Ifits)
     if not os.path.exists(Yfits):
-       print "Missing "+Yfits
-       sys.exit(1)
+        print "Missing "+Yfits
+        sys.exit(1)
     if not os.path.exists(Ifits):
-       print "Missing "+Ifits
-       sys.exit(1)
+        print "Missing "+Ifits+", trying unused/"+Ifits
+        Ifits="unused/"+Ifits
+        if not os.path.exists(Ifits):
+            print "Missing "+Ifits
+            sys.exit(1)
     if not os.path.exists(Ivot):
-       print "Missing "+Ivot
-       sys.exit(1)
+        print "Missing "+Ivot+", trying unused/"+Ivot
+        Ivot="unused/"+Ivot
+        if not os.path.exists(Ivot):
+            print "Missing "+Ivot
+            sys.exit(1)
     Xfits_corr=re.sub(".fits","_corrected.fits",Xfits)
     Yfits_corr=re.sub(".fits","_corrected.fits",Yfits)
     Ifits_corr=re.sub(".fits","_corrected.fits",Ifits)
@@ -136,16 +142,19 @@ for Xfits,corr in files_to_check:
     matchvot=re.sub(".fits","_MRC.vot",Ifits)
 
     if not os.path.exists(matchvot):
-        os.system('stilts tpipe in='+MRCvot+' cmd=\'select NULL_MFLAG\' cmd=\'addcol PA "0.0"\' cmd=\'addcol S_'+freq_str+' "S408*pow(('+str(freq)+'/408000000.0),-0.85)"\' out=temp1.vot')
-        os.system('stilts tpipe in='+Ivot+' cmd=\'select local_rms<1.0\' out=temp2.vot')
-        os.system('stilts tmatch2 matcher=skyellipse params=30 in1=temp1.vot in2=temp2.vot out=temp.vot values1="_RAJ2000 _DEJ2000 e_RA2000 e_DE2000 PA" values2="ra dec a b pa" ofmt=votable')
-    # Exclude extended sources
-        os.system('stilts tpipe in=temp.vot cmd=\'select ((int_flux/peak_flux)<2)\' cmd=\'addcol logratio "(ln(S_'+freq_str+'/int_flux))"\' cmd=\'addcol weight "(int_flux/local_rms)"\' cmd=\'addcol delRA "(_RAJ2000-ra)"\' cmd=\'addcol delDec "(_DEJ2000-dec)"\' omode=out ofmt=vot out=temp3.vot')
-        os.system('stilts tpipe in=temp3.vot cmd=\'select abs(delRA)<1.0\' out='+matchvot)
-        os.remove('temp.vot')
-        os.remove('temp1.vot')
-        os.remove('temp2.vot')
-        os.remove('temp3.vot')
+        print "Missing "+matchvot+", trying unused/"+matchvot
+        matchvot="unused/"+matchvot
+        if not os.path.exists(matchvot):
+            os.system('stilts tpipe in='+MRCvot+' cmd=\'select NULL_MFLAG\' cmd=\'addcol PA "0.0"\' cmd=\'addcol S_'+freq_str+' "S408*pow(('+str(freq)+'/408000000.0),-0.85)"\' out=temp1.vot')
+            os.system('stilts tpipe in='+Ivot+' cmd=\'select local_rms<1.0\' out=temp2.vot')
+            os.system('stilts tmatch2 matcher=skyellipse params=30 in1=temp1.vot in2=temp2.vot out=temp.vot values1="_RAJ2000 _DEJ2000 e_RA2000 e_DE2000 PA" values2="ra dec a b pa" ofmt=votable')
+        # Exclude extended sources
+            os.system('stilts tpipe in=temp.vot cmd=\'select ((int_flux/peak_flux)<2)\' cmd=\'addcol logratio "(ln(S_'+freq_str+'/int_flux))"\' cmd=\'addcol weight "(int_flux/local_rms)"\' cmd=\'addcol delRA "(_RAJ2000-ra)"\' cmd=\'addcol delDec "(_DEJ2000-dec)"\' omode=out ofmt=vot out=temp3.vot')
+            os.system('stilts tpipe in=temp3.vot cmd=\'select abs(delRA)<1.0\' out='+matchvot)
+            os.remove('temp.vot')
+            os.remove('temp1.vot')
+            os.remove('temp2.vot')
+            os.remove('temp3.vot')
 
     t = parse_single_table(matchvot)
     if corr:
