@@ -48,7 +48,7 @@ def filter_RADEC(table, week):
     print "RADEC filter"
     if week==1:
         band1 =                       (table['dec']<-30)  & (table['ra']>=21*15) 
-        band2 = (table['dec']>=-30) & (table['dec']<0)    & (table['ra']>=19.5*15)
+        band2 = (table['dec']>=-30) & (table['dec']<0)    & (table['ra']>=20*15)
         good = np.where(band1 | band2)
     elif week==2:
         good = np.where( (table['ra']<8*15) & (table['dec']<30) )
@@ -59,7 +59,7 @@ def filter_RADEC(table, week):
         good = np.where(band1 | band2 | band3)
     elif week==4:
         band1 =                      (table['dec']<-30)  & (table['ra']>=13.5*15) & (table['ra']<21*15)
-        band2 = (table['dec']>=-30) & (table['dec']<0)   & (table['ra']>=15.5*15) & (table['ra']<19.5*15)
+        band2 = (table['dec']>=-30) & (table['dec']<0)   & (table['ra']>=15.5*15) & (table['ra']<20*15)
         band3 = (table['dec']>=0)   & (table['dec']<30)  & (table['ra']>=14.5*15) & (table['ra']<22*15)
         good = np.where(band1 | band2 | band3)
     else:
