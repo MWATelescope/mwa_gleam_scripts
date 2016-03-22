@@ -29,6 +29,7 @@ def read_table(inputfile):
     table = parse_single_table(inputfile)
     return table.to_table()
 
+
 @np.vectorize
 def unwrap(ang):
     r = ang - 2*np.pi*(ang//(2*np.pi))
@@ -37,12 +38,12 @@ def unwrap(ang):
     return r
 
 
-
 # add a HEALPix pixel column to the table
 def radec2hpix(ra,dec, order=4):
     phi = unwrap(np.radians(ra))
     theta = unwrap(np.radians(90-dec))
     return hp.ang2pix(2**order, theta, phi)
+
 
 def get_neighbours(pix, order=4, nn=1):
     neighbours = set([pix])
@@ -51,6 +52,18 @@ def get_neighbours(pix, order=4, nn=1):
             theta,phi = hp.pix2ang(2**order,p)
             neighbours|= set(hp.pixelfunc.get_all_neighbours(2**order,theta,phi))
             neighbours -=set([-1])
+    return list(neighbours)
+
+
+def get_h_neighbours(pix, order=4, nn=1):
+    neighbours = set([pix])
+    for i in range (nn):
+        for p in neighbours.copy():
+            theta,phi = hp.pix2ang(2**order,p)
+            nb = list(set(hp.pixelfunc.get_all_neighbours(2**order,theta,phi)) - set([-1]))
+            nb_theta, nb_phi = zip(*[hp.pix2ang(2**order, a) for a in nb])
+            mask = np.where(abs(nb_phi-phi)<0.1)[0]
+            neighbours |= set(nb[i] for i in mask)
     return list(neighbours)
 
 
@@ -84,13 +97,29 @@ if __name__== "__main__":
     for p in set(table['hpx']):
         pixels |= set( get_neighbours(p,order=options.order,nn=2) )
     pix_dict = {}
+    missed = []
     for p in pixels:
         # find all the neighbours
         nb = get_neighbours(p,order=options.order)
-        src_mask = np.in1d(table['hpx'], nb)
+        src_mask = np.where(np.in1d(table['hpx'], nb))[0]
         if sum(src_mask)<5:
-            continue
+            missed.append(p)
         # calculate the median values of a/b/pa
+        a = np.mean(table[src_mask]['a'])/3600.
+        b = np.mean(table[src_mask]['b'])/3600.
+        pa = np.mean(table[src_mask]['pa'])
+        nsrc = len(src_mask)
+        pix_dict[p] = (a,b,pa,nsrc)
+
+    for m in missed:
+        nb = get_h_neighbours(p,order=options.order, nn=2)
+        src_mask = np.where(np.in1d(table['hpx'], nb))[0]
+        # if sum(src_mask)<5:
+        #     print m, src_mask, 'still missed'
+        #     continue
+        # else:
+        #     print "fixed up",m
+        ## calculate the median values of a/b/pa
         a = np.mean(table[src_mask]['a'])/3600.
         b = np.mean(table[src_mask]['b'])/3600.
         pa = np.mean(table[src_mask]['pa'])
