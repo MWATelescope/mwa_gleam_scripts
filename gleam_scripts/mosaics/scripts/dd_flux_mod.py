@@ -18,6 +18,8 @@ parser.add_option('--mosaic',type="string", dest="mosaic",
                     help="The filename of the mosaic you want to read in.")
 parser.add_option('--psf',type="string", dest="psf",
                     help="The filename of the psf image you want to read in.")
+parser.add_option('--output',type="string", dest="output",
+                    help="The filename of the output rescaled image.")
 (options, args) = parser.parse_args()
 
 latitude=-26.70331940
@@ -97,4 +99,4 @@ blur_tmp = blur[l_int,k_int]
 blur_corr = blur_tmp.reshape(mosaic[0].data.shape[0],mosaic[0].data.shape[1])
 mosaic[0].data*=blur_corr
 
-mosaic.writeto('test_corrected.fits',clobber=True)
+mosaic.writeto(options.output,clobber=True)
