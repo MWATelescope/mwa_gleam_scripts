@@ -52,34 +52,35 @@ bmin = mosaic[0].header['BMIN']
 
 # Read in the PSF
 psf = fits.open(options.psf)
-a = psf[0].data[0]
-b = psf[0].data[1]
+#a = psf[0].data[0]
+#b = psf[0].data[1]
+blur = psf[0].data[3]
 #pa = psf[0].data[2]
 
 w_psf = wcs.WCS(psf[0].header,naxis=2)
 
-#create an array but don't set the values (they are random)
-indexes = np.empty( (psf[0].data.shape[1]*psf[0].data.shape[2],2),dtype=int)
-#since I know exactly what the index array needs to look like I can construct
-# it faster than list comprehension would allow
-#we do this only once and then recycle it
-idx = np.array([ (j,0) for j in xrange(psf[0].data.shape[2])])
-j=psf[0].data.shape[2]
-for i in xrange(psf[0].data.shape[1]):
-    idx[:,1]=i
-    indexes[i*j:(i+1)*j] = idx
-
-ra_psf,dec_psf = w_psf.wcs_pix2world(indexes,1).transpose()
-za_psf = latitude - dec_psf
-
-corr = np.cos(np.radians(za_psf))
-reshapedcorr=corr.reshape(psf[0].data.shape[1],psf[0].data.shape[2])
-
-# Test file: write out number we will multiply by
-#psf[0].data[0]=a*b*reshapedcorr/(bmaj*bmin)
-#psf.writeto('test.fits',clobber=True)
-
-blur = a*b*reshapedcorr/(bmaj*bmin)
+##create an array but don't set the values (they are random)
+#indexes = np.empty( (psf[0].data.shape[1]*psf[0].data.shape[2],2),dtype=int)
+##since I know exactly what the index array needs to look like I can construct
+## it faster than list comprehension would allow
+##we do this only once and then recycle it
+#idx = np.array([ (j,0) for j in xrange(psf[0].data.shape[2])])
+#j=psf[0].data.shape[2]
+#for i in xrange(psf[0].data.shape[1]):
+#    idx[:,1]=i
+#    indexes[i*j:(i+1)*j] = idx
+#
+#ra_psf,dec_psf = w_psf.wcs_pix2world(indexes,1).transpose()
+#za_psf = latitude - dec_psf
+#
+#corr = np.cos(np.radians(za_psf))
+#reshapedcorr=corr.reshape(psf[0].data.shape[1],psf[0].data.shape[2])
+#
+## Test file: write out number we will multiply by
+##psf[0].data[0]=a*b*reshapedcorr/(bmaj*bmin)
+##psf.writeto('test.fits',clobber=True)
+#
+#blur = a*b*reshapedcorr/(bmaj*bmin)
 
 # Now need to correct the original mosaic based on its (RA, Dec) co-ordinates.
 
