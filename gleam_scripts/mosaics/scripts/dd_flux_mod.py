@@ -71,7 +71,6 @@ for i in xrange(psf[0].data.shape[1]):
 
 ra_psf,dec_psf = w_psf.wcs_pix2world(indexes,1).transpose()
 za_psf = latitude - dec_psf
-elevation_psf = 90.0 - za_psf
 
 corr = np.cos(np.radians(za_psf))
 reshapedcorr=corr.reshape(psf[0].data.shape[1],psf[0].data.shape[2])
