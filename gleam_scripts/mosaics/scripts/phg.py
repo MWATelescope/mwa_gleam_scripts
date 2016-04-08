@@ -143,7 +143,7 @@ if __name__== "__main__":
         a = np.mean(table[src_mask]['a'])/3600.
         b = np.mean(table[src_mask]['b'])/3600.
         pa = np.mean(table[src_mask]['pa'])
-        blur = np.mean(table[src_mask]['a']*table[src_mask]['b']*np.cos(np.radians(latitude-table[src_mask]['dec']))/(bmaj*bmin))
+        blur = np.mean(table[src_mask]['a']*table[src_mask]['b']*np.cos(np.radians(latitude-table[src_mask]['dec']))/(bmaj*bmin*3600*3600))
         nsrc = len(src_mask)
         pix_dict[p] = (a,b,pa,blur,nsrc)
 

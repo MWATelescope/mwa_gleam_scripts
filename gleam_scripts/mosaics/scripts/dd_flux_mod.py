@@ -96,7 +96,7 @@ k, l = w_psf.wcs_world2pix(ra,dec,1)
 k_int = [np.floor(x) for x in k]
 k_int = [x if (x>=0) and (x<=360) else 0 for x in k_int]
 l_int = [np.floor(x) for x in l]
-l_int = [x if (x>=0) and (x=<180) else 0 for x in l_int]
+l_int = [x if (x>=0) and (x<=180) else 0 for x in l_int]
 blur_tmp = blur[l_int,k_int]
 blur_corr = blur_tmp.reshape(mosaic[0].data.shape[0],mosaic[0].data.shape[1])
 mosaic[0].data*=blur_corr
