@@ -142,6 +142,11 @@ then
     echo "BANE failed to run!"
     echo "Trying again with a single core."
     $aprun BANE.py --noclobber --compress --cores=1 ${week}_${color}_lownoise.fits 
+    if [[ ! -e ${week}_${color}_lownoise_bkg.fits ]]
+    then
+        echo "BANE wouldn't run even with a single core!"
+        exit 1
+    fi
 fi
 
 # Run some blind source-finding so I can do other tasks
