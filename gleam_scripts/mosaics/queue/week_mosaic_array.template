@@ -1,3 +1,4 @@
+#!/bin/bash
 
 datadir=DATADIR
 proj=PROJ
@@ -115,34 +116,66 @@ then
 else
     echo "${week}_${freq}.fits already exists, so I didn't bother to re-make it. Please delete and re-run if you want a new version."
 fi
+
 $aprun BANE.py --cores=${ncpus} --noclobber --compress ${week}_${freq}.fits
+if [[ ! -e ${week}_${freq}_bkg.fits ]]
+then
+    echo "BANE failed to run!"
+    echo "Trying again with a single core."
+    $aprun BANE.py --noclobber --compress --cores=1 ${week}_${freq}.fits
+    if [[ ! -e ${week}_${freq}_bkg.fits ]]
+    then
+        echo "BANE wouldn't run even with a single core!"
+        exit 1
+    fi
+fi
+
+# Run some blind source-finding so I can do other tasks
 if [[ ! -e ${week}_${freq}_comp.vot ]]
 then
     $aprun aegean.py --cores=${ncpus} --telescope=mwa --island --maxsummits=5 --autoload --out=/dev/null --table=${week}_${freq}.vot,${week}_${freq}.reg ${week}_${freq}.fits
 fi
-# Filter out everything completely in order to calculate flux scale
-if [[ ! -e ${week}_${freq}_comp_filter.vot ]]
+
+# Filter only part of the data in order to calculate the PSF (fluxes also don't matter for this stage)
+# Characterise the PSF
+#if [[ ! -e ${week}_${freq}_partfilter_psf.fits ]]
+#then
+#    if [[ ! -e ${week}_${freq}_comp_partfilter.vot ]]
+#    then
+#        $aprunsingle QC_filter.py --input=${week}_${freq}_comp.vot --output=${week}_${freq}_comp_partfilter.vot --mimtable=$MWA_CODE_BASE/MWA_Tools/gleam_scripts/mosaics/scripts/all.mim #--week=${week:4:1}
+#    fi
+#    $aprunsingle psf_select.py --input=${week}_${freq}_comp_partfilter.vot
+#    $aprunsingle phg.py --input=${week}_${freq}_comp_partfilter_psf.vot
+#fi
+
+# Make an unfiltered PSF -- the filtered one wasn't that useful
+$aprunsingle psf_select.py --input=${week}_${freq}_comp.vot
+$aprunsingle phg.py --input=${week}_${freq}_comp_psf.vot
+
+# Rescale the map using the PSF, so that peak fluxes agree with int fluxes
+
+$aprunsingle dd_flux_mod.py --mosaic=${week}_${freq}.fits --psf=${week}_${freq}_comp_psf.fits --output=${week}_${freq}_ddmod.fits
+$aprunsingle dd_flux_mod.py --mosaic=${week}_${freq}_bkg.fits --psf=${week}_${freq}_comp_psf.fits --output=${week}_${freq}_ddmod_bkg.fits
+$aprunsingle dd_flux_mod.py --mosaic=${week}_${freq}_rms.fits --psf=${week}_${freq}_comp_psf.fits --output=${week}_${freq}_ddmod_rms.fits
+
+# Run the source-finding using the new PSF
+if [[ ! -e ${week}_${freq}_wpsf_comp.vot ]]
 then
-    $aprunsingle QC_filter.py --input=${week}_${freq}_comp.vot --output=${week}_${freq}_comp_filter.vot --mimtable=$MWA_CODE_BASE/MWA_Tools/gleam_scripts/mosaics/scripts/all.mim --week=${week:4:1}
+    $aprun aegean.py --cores=${ncpus} --psf=${week}_${freq}_comp_psf.fits --island --maxsummits=5 --autoload --out=/dev/null --table=${week}_${freq}_wpsf.vot,${week}_${freq}_wpsf.reg ${week}_${freq}_ddmod.fits
+fi
+
+# Filter out everything completely in order to calculate flux scale
+if [[ ! -e ${week}_${freq}_wpsf_comp_filter.vot ]]
+then
+    $aprunsingle QC_filter.py --input=${week}_${freq}_wpsf_comp.vot --output=${week}_${freq}_wpsf_comp_filter.vot --mimtable=$MWA_CODE_BASE/MWA_Tools/gleam_scripts/mosaics/scripts/all.mim --week=${week:4:1}
 fi
 if [[ ! -e ${week}_${freq}_fluxscale.fits ]]
 then
 # Calculate the flux scale
-    $aprunsingle check_flux_scale.py --mosaic=${week}_${freq}.fits --catalog=${week}_${freq}_comp_filter.vot --isles=${week}_${freq}_isle.vot --plot --write --table
+    $aprunsingle check_flux_scale.py --mosaic=${week}_${freq}.fits --catalog=${week}_${freq}_wpsf_comp_filter.vot --isles=${week}_${freq}_wpsf_isle.vot --plot --write --table
 # Apply the flux scale
-    $aprunsingle rescale_flux.py --mosaic=${week}_${freq}.fits --zerofits=${week}_${freq}_fluxscale.fits
-    $aprunsingle rescale_flux.py --mosaic=${week}_${freq}_bkg.fits --zerofits=${week}_${freq}_fluxscale.fits
-    $aprunsingle rescale_flux.py --mosaic=${week}_${freq}_rms.fits --zerofits=${week}_${freq}_fluxscale.fits
-fi
-# Now filter only part of the data in order to calculate the PSF (fluxes also don't matter for this stage)
-# Characterise the PSF
-if [[ ! -e ${week}_${freq}_partfilter_psf.fits ]]
-then
-    if [[ ! -e ${week}_${freq}_comp_partfilter.vot ]]
-    then
-        $aprunsingle QC_filter.py --input=${week}_${freq}_comp.vot --output=${week}_${freq}_comp_partfilter.vot --mimtable=$MWA_CODE_BASE/MWA_Tools/gleam_scripts/mosaics/scripts/all.mim #--week=${week:4:1}
-    fi
-    $aprunsingle psf_select.py --input=${week}_${freq}_comp_partfilter.vot
-    $aprunsingle phg.py --input=${week}_${freq}_comp_partfilter_psf.vot
+    $aprunsingle rescale_flux.py --mosaic=${week}_${freq}_ddmod.fits --zerofits=${week}_${freq}_fluxscale.fits
+    $aprunsingle rescale_flux.py --mosaic=${week}_${freq}_ddmod_bkg.fits --zerofits=${week}_${freq}_fluxscale.fits
+    $aprunsingle rescale_flux.py --mosaic=${week}_${freq}_ddmod_rms.fits --zerofits=${week}_${freq}_fluxscale.fits
 fi
 

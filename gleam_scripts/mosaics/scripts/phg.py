@@ -76,10 +76,29 @@ if __name__== "__main__":
                       help="Specify step size in degrees (default = 1 deg)")
     parser.add_option('--output', dest="output", default=None,
                       help="Output psf fits file -- default is based on input table")
+    parser.add_option('--bmaj', dest="bmaj", default=None,
+                      help="Original restoring beam major axis (default = search for matching fits file)")
+    parser.add_option('--bmin', dest="bmin", default=None,
+                      help="Original restoring beam minor axis (default = search for matching fits file)")
     parser.add_option('--order', dest="order", default=4, type='int',
                       help='Healpix order')
     (options, args) = parser.parse_args()
 
+    if options.bmaj is None or options.bmin is None:
+        mosaic = options.input.replace('_comp_psf.vot','.fits')
+        if os.path.exists(mosaic):
+            hdu = fits.open(mosaic)
+            bmaj = hdu[0].header['BMAJ']
+            bmin = hdu[0].header['BMIN']
+        else:
+            print 'Could not find valid restoring beam values! Exiting.'
+            sys.exit(1)
+    else:
+        bmaj = options.bmaj
+        bmin = options.bmin
+
+    # Latitude of the MWA
+    latitude=-26.70331940
 
     # read and filter the data
     print 'read and filter'
@@ -108,8 +127,9 @@ if __name__== "__main__":
         a = np.mean(table[src_mask]['a'])/3600.
         b = np.mean(table[src_mask]['b'])/3600.
         pa = np.mean(table[src_mask]['pa'])
+        blur = np.mean(table[src_mask]['a']*table[src_mask]['b']*np.cos(np.radians(latitude-table[src_mask]['dec']))/(bmaj*bmin*3600*3600))
         nsrc = len(src_mask)
-        pix_dict[p] = (a,b,pa,nsrc)
+        pix_dict[p] = (a,b,pa,blur,nsrc)
 
     for m in missed:
         nb = get_h_neighbours(p,order=options.order, nn=2)
@@ -123,14 +143,15 @@ if __name__== "__main__":
         a = np.mean(table[src_mask]['a'])/3600.
         b = np.mean(table[src_mask]['b'])/3600.
         pa = np.mean(table[src_mask]['pa'])
+        blur = np.mean(table[src_mask]['a']*table[src_mask]['b']*np.cos(np.radians(latitude-table[src_mask]['dec']))/(bmaj*bmin*3600*3600))
         nsrc = len(src_mask)
-        pix_dict[p] = (a,b,pa,nsrc)
+        pix_dict[p] = (a,b,pa,blur,nsrc)
 
     print 'making car grid'
 # make a grid for our cartesian projection
     nx = int(360//options.stepsize)
     ny = int(180//options.stepsize)
-    car = np.empty((3,ny,nx),dtype=np.float32)*np.nan
+    car = np.empty((4,ny,nx),dtype=np.float32)*np.nan
     
     # make an image header from scratch
     hd={}
@@ -167,10 +188,10 @@ if __name__== "__main__":
             else:
                 p=-1
             if pix_dict.has_key(p):
-                car[:,j,i]=pix_dict[p][:3]
+                car[:,j,i]=pix_dict[p][:4]
             else:
-                car[:,j,i]=[np.nan,np.nan,np.nan]
-    header['CTYPE3']=('Beam',"0=a,1=b,2=pa (degrees)")
+                car[:,j,i]=[np.nan,np.nan,np.nan,np.nan]
+    header['CTYPE3']=('Beam',"0=a,1=b,2=pa (degrees),3=blur")
     if options.output is None:
 # Try some common extensions
         options.output = options.input.replace('_psf.vot','_psf.fits')
