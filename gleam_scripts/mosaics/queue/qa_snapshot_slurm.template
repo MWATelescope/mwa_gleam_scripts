@@ -1,0 +1,18 @@
+#!/bin/bash -l
+
+# - QA
+# - source-finding on I snapshots
+# - MRC flux corrections
+
+#SBATCH --export=NONE
+#SBATCH --account=GROUPQ
+#SBATCH --partition=STANDARDQ
+#SBATCH --time=03:00:00
+#SBATCH --nodes=1
+#SBATCH --mem=HOSTMEMgb
+#SBATCH --output=QUEUEDIR/OUTPUT.o%A_%a
+#SBATCH --error=QUEUEDIR/OUTPUT.e%A_%a
+#SBATCH --array=1-NSNAP
+
+aprun="aprun -n 1 -d NCPUS -q "
+aprunsingle="aprun -n 1 -d 1 -q "

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -l
 
 # Mosaic Dec strips, including:
 # - QA
@@ -13,13 +13,15 @@
 # - Dec-dependent flux corrections
 # - source-finding on flux-corrected mosaics
 
+#SBATCH --export=NONE
 #SBATCH --account=GROUPQ
 #SBATCH --partition=STANDARDQ
-#SBATCH --time=12:00:00
+#SBATCH --time=08:00:00
 #SBATCH --nodes=1
 #SBATCH --mem=HOSTMEMgb
 #SBATCH --output=QUEUEDIR/OUTPUT.o%A_%a
 #SBATCH --error=QUEUEDIR/OUTPUT.e%A_%a
 #SBATCH --array=0-3
 
-aprun="aprun -n 1 -d NCPUS "
+aprun="aprun -n 1 -d NCPUS -q "
+aprunsingle="aprun -n 1 -d 1 -q "

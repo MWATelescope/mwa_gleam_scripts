@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 
 import numpy as n
 
@@ -26,7 +26,7 @@ input_mosaic=options.mosaic
 
 dec_zenith=-26.7
 
-cutdir=os.environ['MWA_CODE_BASE']
+cutdir=os.environ['MWA_CODE_BASE']+'/MWA_Tools/gleam_scripts/mosaics'
 centre_dec, freq_band, RA_lim1, RA_lim2, Dec_lim1, Dec_lim2 = n.loadtxt(cutdir+'/ra_dec_limits_polyderivation.dat',skiprows=2,unpack=True)
 
 dec_freq_comb = [centre_dec, freq_band]
@@ -78,7 +78,7 @@ if Dec_strip == -40. or Dec_strip == -55. or Dec_strip == -72. :
         Dec_lim1 = -90.0
     print "Dec strip "+str(Dec_strip)+": using mirrored indices for "+str(dec_centre)+": "+str(Dec_lim1)+" to "+str(Dec_lim2)
 # Zenith Dec -35 hard cut is incorrect for these purposes; better to use Dec-13 but shifted by 14 deg
-elif Dec_strip == -26.7 or Dec_strip == -27.0:
+elif Dec_strip == -26.7 or Dec_strip == -27.0 or Dec_strip == -26.0:
     dec_centre = -13
     cut_ind = n.where((centre_dec == dec_centre) & (freq_band == subband))
     Dec_lim1 = Dec_lim1[cut_ind]+(dec_zenith-dec_centre)
