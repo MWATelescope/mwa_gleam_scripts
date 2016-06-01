@@ -98,7 +98,7 @@ if Dec_strip == -40. or Dec_strip == -55. or Dec_strip == -72.:
     x_mir = np.array(qdata['x'])[0]
     y_mir = np.array(qdata['y'])[0]
     z_mir = np.array(qdata['z'])[0]
-    input_xxyy = re.sub("r[-]?[0-2].[0-9]_recomb","",input_root)+"XY_r-1.0"
+    input_xxyy = re.sub("r[-]?[0-2].[0-9]_recomb","",input_root)+"XY_"+weight
     quint = fits.open(input_xxyy+'_xxyy_coefficients.fits')
     qdata = quint[1].data
     quint.close()
@@ -109,7 +109,7 @@ if Dec_strip == -40. or Dec_strip == -55. or Dec_strip == -72.:
     y_self = np.array(qdata['y'])[0]
     z_self = np.array(qdata['z'])[0]
 elif Dec_strip == -26.7 or Dec_strip == -27. or Dec_strip == -26.:
-    input_xxyy = re.sub("r[-]?[0-2].[0-9]_recomb","",input_root)+"XY_r-1.0"
+    input_xxyy = re.sub("r[-]?[0-2].[0-9]_recomb","",input_root)+"XY_"+weight
     quint = fits.open(input_xxyy+'_xxyy_coefficients.fits')
     qdata = quint[1].data
     quint.close()
