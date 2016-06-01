@@ -62,8 +62,10 @@ dec_zenith = -26.7
 # So get ALL of these solutions from other weeks
 
 week=input_root.split("_")[1][0:6]
+weight=input_root.split("_")[3]
 
-if Dec_strip == -40. or Dec_strip == -55. or Dec_strip == -72. or ( week != "20131107" and week != "20131111" and week != "20131125" and week != "20130822" ):
+print weight
+if weight == "r0.0" or Dec_strip == -40. or Dec_strip == -55. or Dec_strip == -72. or ( week != "20131107" and week != "20131111" and week != "20131125" and week != "20130822" ):
     if Dec_strip == -40. or Dec_strip == -13.:
         input_mosaic_polyfit = re.sub("201[0-9]{5}","20130822",input_root)
         poly_path = re.sub("201[0-9]{5}","20130822",os.getcwd())
@@ -76,10 +78,52 @@ if Dec_strip == -40. or Dec_strip == -55. or Dec_strip == -72. or ( week != "201
     if Dec_strip == -26.7 or Dec_strip == -27. or Dec_strip == -26.:
         input_mosaic_polyfit = re.sub("201[0-9]{5}","20131125",input_root)
         poly_path = re.sub("201[0-9]{5}","20131125",os.getcwd())
+    if weight == "r0.0":
+        poly_path = re.sub("robust0","G0008",poly_path)
+        input_mosaic_polyfit = re.sub("r0.0","r-1.0",input_mosaic_polyfit)
     hdulist = fits.open(poly_path+'/'+input_mosaic_polyfit+'_simple_coefficients.fits')
     print 'Using corrections from '+poly_path+'/'+input_mosaic_polyfit+'_simple_coefficients.fits'
 else:
     hdulist = fits.open(input_root+'_simple_coefficients.fits')
+
+if Dec_strip == -40. or Dec_strip == -55. or Dec_strip == -72.:
+# Always use robust -1.0 if you have it
+    input_xxyy = re.sub("r[-]?[0-2].[0-9]_recomb","",input_mosaic_polyfit)+"XY_r-1.0"
+    quint = fits.open(poly_path+'/'+input_xxyy+'_xxyy_coefficients.fits')
+    qdata = quint[1].data
+    quint.close()
+    u_mir = np.array(qdata['u'])[0]
+    v_mir = np.array(qdata['v'])[0]
+    w_mir = np.array(qdata['w'])[0]
+    x_mir = np.array(qdata['x'])[0]
+    y_mir = np.array(qdata['y'])[0]
+    z_mir = np.array(qdata['z'])[0]
+    input_xxyy = re.sub("r[-]?[0-2].[0-9]_recomb","",input_root)+"XY_r-1.0"
+    quint = fits.open(input_xxyy+'_xxyy_coefficients.fits')
+    qdata = quint[1].data
+    quint.close()
+    u_self = np.array(qdata['u'])[0]
+    v_self = np.array(qdata['v'])[0]
+    w_self = np.array(qdata['w'])[0]
+    x_self = np.array(qdata['x'])[0]
+    y_self = np.array(qdata['y'])[0]
+    z_self = np.array(qdata['z'])[0]
+elif Dec_strip == -26.7 or Dec_strip == -27. or Dec_strip == -26.:
+    input_xxyy = re.sub("r[-]?[0-2].[0-9]_recomb","",input_root)+"XY_r-1.0"
+    quint = fits.open(input_xxyy+'_xxyy_coefficients.fits')
+    qdata = quint[1].data
+    quint.close()
+    u_self  = np.array(qdata['u'])[0]
+    v_self  = np.array(qdata['v'])[0]
+    w_self  = np.array(qdata['w'])[0]
+    x_self  = np.array(qdata['x'])[0]
+    y_self  = np.array(qdata['y'])[0]
+    z_self  = np.array(qdata['z'])[0]
+else:
+# We're in the North, and don't need to modify the correction
+# Revisit to make sure I've got this the right way around
+    u,v,w,x,y=0.0,0.0,0.0,0.0,0.0
+    z = 1.0
 
 hdulist.verify('fix')
 tbdata = hdulist[1].data
@@ -89,6 +133,9 @@ a  = np.array(tbdata['a'])
 b  = np.array(tbdata['b'])
 c  = np.array(tbdata['c'])
 d  = np.array(tbdata['d'])
+
+#if (Dec_strip == -26.0 or Dec_strip == -26.7 or Dec_strip == -27.0):
+#    e  = np.array(tbdata['e'])
 
     # wcs in format [x,y,stokes,freq]; stokes and freq are length 1 if they exist
 w=wcs.WCS(hdu_in[0].header)
@@ -103,12 +150,27 @@ j=hdu_in[0].data.shape[1]
 for i in xrange(hdu_in[0].data.shape[0]):
     idx[:,1]=i
     indexes[i*j:(i+1)*j] = idx
-#put ALL the pixles into our vectorized functions and minimised our overheads
+#put ALL the pixels into our vectorized functions and minimise our overheads
 ra,dec = w.wcs_pix2world(indexes,1).transpose()
 if Dec_strip == -40. or Dec_strip == -55. or Dec_strip == -72.:
-    print "Applying mirror correction to Dec"+str(Dec_strip)
+    print "Applying mirror correction including projection squash correction to Dec"+str(Dec_strip)
     # Reflecting cubic around the x-axis and shifting to new centre dec
     corr=np.exp(-d[0]*np.power((dec-(2*dec_zenith)),3)+c[0]*np.power((dec-(2*dec_zenith)),2)-b[0]*((dec-(2*dec_zenith)))+a[0])
+# Calculate the projection correction
+    mirror = -u_mir*np.power((dec-(2*dec_zenith)),5) + v_mir*np.power((dec-(2*dec_zenith)),4) -w_mir*np.power((dec-(2*dec_zenith)),3) + x_mir*np.power((dec-(2*dec_zenith)),2) -y_mir*(dec-(2*dec_zenith)) + z_mir
+    self = u_self*np.power(dec,5) + v_self*np.power(dec,4) + w_self*np.power(dec,3) + x_self*np.power(dec,2) + y_self*(dec) + z_self
+    projcorr = mirror/self
+    corr*=projcorr
+elif (Dec_strip == -26.0 or Dec_strip == -26.7 or Dec_strip == -27.0):
+    print "Applying correction using half a projection squash correction for Dec"+str(Dec_strip)
+#    corr=np.exp(e[0]*np.power(dec,4)+d[0]*np.power(dec,3)+c[0]*np.power(dec,2)+b[0]*dec+a[0])
+    mirror = -u_self*np.power((dec-(2*dec_zenith)),5) + v_self*np.power((dec-(2*dec_zenith)),4) -w_self*np.power((dec-(2*dec_zenith)),3) + x_self*np.power((dec-(2*dec_zenith)),2) -y_self*(dec-(2*dec_zenith)) + z_self
+    self = u_self*np.power(dec,5) + v_self*np.power(dec,4) + w_self*np.power(dec,3) + x_self*np.power(dec,2) + y_self*(dec) + z_self
+    corr=np.exp(d[0]*np.power(dec,3)+c[0]*np.power(dec,2)+b[0]*dec+a[0])
+    revcorr=np.exp(-d[0]*np.power(dec-(2*dec_zenith),3)+c[0]*np.power(dec-(2*dec_zenith),2)-b[0]*(dec-(2*dec_zenith))+a[0])
+    projcorr = mirror/self
+# But only apply for dec < -26.7
+    corr[np.where(dec<dec_zenith)]=revcorr[np.where(dec<dec_zenith)]*projcorr[np.where(dec<dec_zenith)]
 else:
     print "Applying normal correction to Dec"+str(Dec_strip)
     corr=np.exp(d[0]*np.power(dec,3)+c[0]*np.power(dec,2)+b[0]*dec+a[0])
