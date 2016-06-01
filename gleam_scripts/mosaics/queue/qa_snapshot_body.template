@@ -204,7 +204,11 @@ snaplist=`ls $obsid*_??_*v2.?_corrected.fits*`
 # Generate image RMS for XX and YY corrected images
 for file in $snaplist
 do
-    $aprunsingle rms_measure.py --corners --write -f $file
+    imagerms=`pyhead.py -p IMAGERMS $file | awk '{print $3}'`
+    if [[ $imagerms == "open" ]]
+    then
+        $aprunsingle rms_measure.py --corners --write -f $file
+    fi
 done
 
 
