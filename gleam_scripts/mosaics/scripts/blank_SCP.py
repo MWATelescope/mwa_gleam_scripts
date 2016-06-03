@@ -19,7 +19,7 @@ parser.add_option('-r','--radius',dest="flag_radius",default=60.0,
 parser.add_option('-f','--filename',dest="filename",default=None,
                   help="Input file to blank <FILE>",metavar="FILE")
 parser.add_option('-o','--output',dest="output",default=None,
-                  help="Output file <FILE>",metavar="FILE")
+                  help="Output file <FILE> (default = overwrite input)",metavar="FILE")
 (options, args) = parser.parse_args()
 
 # For unwrapping RA values which bridge the meridian
@@ -37,7 +37,7 @@ else:
     if options.output:
         output=options.output
     else:
-        output=options.filename.replace('.fits','_crop.fits')
+        output=options.filename #.replace('.fits','_crop.fits')
     # Snapshot observation:
     # wcs in format [stokes,freq,x,y]; stokes and freq are length 1 if they exist
     hdu_in = pyfits.open(options.filename)

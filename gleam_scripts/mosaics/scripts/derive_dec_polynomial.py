@@ -42,8 +42,8 @@ dec_zenith=-26.7
 
 #def quad_curvefit_zenith(dec, c, a): # defining quadratic which turns over at the zenith
 #    return c*(np.power(dec,2) + dec_zenith*2*dec) + a
-def quad_curvefit_zenith(dec, c, a): # defining quadratic which turns over at the zenith
-    return c*np.power((dec-dec_zenith),2) + a
+def quad_curvefit_zenith(dec,d, c, a): # defining quadratic which turns over at the zenith
+    return d*np.power((dec-dec_zenith),4) + c*np.power((dec-dec_zenith),2) + a
 
 def powlaw(freq, a, alpha): # defining powlaw as S = a*nu^alpha.
     return a*(freq**alpha)
@@ -98,7 +98,8 @@ tbdata = hdulist[1].data
 hdulist.close()
 
 week=input_root.split("_")[1][0:8]
-if Dec_strip == -40. or Dec_strip == -55. or Dec_strip == -72. or ( week != "20131107" and week != "20131111" and week != "20131125" and week != "20130822" ):
+weight=input_root.split("_")[4]
+if weight == "r0.0" or Dec_strip == -40. or Dec_strip == -55. or Dec_strip == -72. or ( week != "20131107" and week != "20131111" and week != "20131125" and week != "20130822" ):
     print "Will automatically use corrections from another mosaic."
     sys.exit(0)
 
@@ -177,13 +178,23 @@ try:
 except IndexError:
     w=np.array(np.concatenate((w_mrc,w_highdec),axis=0),dtype="float32")
 
-if (Dec_strip == -26.0 or Dec_strip == -26.7 or Dec_strip == -27.0):
-    p_guess_quad_zenith = [0.005,-0.1]
-    pzen, pcovquad_zenith = curve_fit(quad_curvefit_zenith, x, y, p0 = p_guess_quad_zenith, sigma = 1/np.sqrt(w),absolute_sigma=False)
-# Somewhat convoluted, but necessary to convert the constrained quadratic into a cubic function of Dec, rather than (Dec-zenith)
-    polycoeffs=[0.0,pzen[0],-2.0*pzen[0]*dec_zenith,pzen[1]+pzen[0]*dec_zenith**2]
-else:
-    polycoeffs=np.polyfit(x,y,3,w=w)
+#if (Dec_strip == -26.0 or Dec_strip == -26.7 or Dec_strip == -27.0):
+#    p_guess_quad_zenith = [0.001, 0.005,-0.1]
+#    pzen, pcovquad_zenith = curve_fit(quad_curvefit_zenith, x, y, p0 = p_guess_quad_zenith, sigma = 1/np.sqrt(w),absolute_sigma=False)
+## Somewhat convoluted, but necessary to convert the constrained quadratic into a cubic function of Dec, rather than (Dec-zenith)
+#    print pzen
+#    polycoeffs=[0.0,pzen[0],-2.0*pzen[0]*dec_zenith,pzen[1]+pzen[0]*dec_zenith**2]
+## Converting from constrained 4th func is even more of a pain
+#    k = pzen[0]
+#    l = -4 * dec_zenith * pzen[0]
+#    m = 6 * dec_zenith**2 * pzen[0] + pzen[1]
+#    n = -4 * dec_zenith**3 * pzen[0] -2 * dec_zenith * pzen[1]
+#    p = dec_zenith**4 * pzen[0] + dec_zenith**2 * pzen[1] + pzen[2]
+## NB: 4th power has to go at the end so as not to break everything else
+#    polycoeffs=[l,m,n,p,k]
+#else:
+polycoeffs=np.polyfit(x,y,3,w=w)
+print polycoeffs
 
 if options.write_coefficients:
     outcoeff=input_root+'_simple_coefficients.fits'
@@ -195,6 +206,10 @@ if options.write_coefficients:
     col2 = fits.Column(name='b', format = 'E', array = [polycoeffs[2]])
     col3 = fits.Column(name='c', format = 'E', array = [polycoeffs[1]])
     col4 = fits.Column(name='d', format = 'E', array = [polycoeffs[0]])
+#    if (Dec_strip == -26.0 or Dec_strip == -26.7 or Dec_strip == -27.0):
+#        col5 = fits.Column(name='e', format = 'E', array = [polycoeffs[4]])
+#        cols = fits.ColDefs([col1, col2, col3, col4, col5])
+#    else:
     cols = fits.ColDefs([col1, col2, col3, col4])
     tbhdu = fits.new_table(cols)
     tbhdu.writeto(outcoeff, clobber = True)
@@ -207,6 +222,9 @@ if options.make_plots:
     y=[Y for (W,Y) in sorted(zip(w,y))]
     w=sorted(w)
     SNR=np.log10(w)
+#    if (Dec_strip == -26.0 or Dec_strip == -26.7 or Dec_strip == -27.0):
+#        fitmodel = np.poly1d([polycoeffs[4],polycoeffs[0],polycoeffs[1],polycoeffs[2],polycoeffs[3]])
+#    else:
     fitmodel = np.poly1d(polycoeffs)
     fitplot=pyplot.figure(figsize=figsize)
     ax = fitplot.add_subplot(111)

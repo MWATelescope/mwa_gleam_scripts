@@ -21,13 +21,21 @@ from optparse import OptionParser
 
 usage="Usage: %prog [options]\n"
 parser = OptionParser(usage=usage)
+parser.add_option('-i','--input',dest="input",default=None,
+                  help="Input obsid to correct")
 parser.add_option('--plot',action="store_true",dest="make_plots",default=False,
-                  help="Make vector plots? (off by default)")
+                  help="Make vector plot? (off by default)")
 parser.add_option('--dec',dest="dec",default=None,type="float",
                   help="Declination of the observations to set plotting ranges. (default is to try to get from the date)")
 parser.add_option('--date',dest="date",default=None,type="string",
                   help="Date of observations in YYYYMMDD format? (default is try to read from directory name) Not used if --dec is specified.")
 (options, args) = parser.parse_args()
+
+if options.input and re.match("^[0-9]{10}$",options.input):
+    obsid=options.input
+else:
+    print "Must specify input obsid"
+    sys.exit(1)
 
 def unwrap(x):
     if x>250:
@@ -70,12 +78,12 @@ else:
             print "Defaulting to zenith in the absence of a known plotdeclination."
             plotdec=-27
 
-corrfile=date+"_"+"Dec"+str(plotdec)+"_"+chan+"_corrections.txt"
+corrfile=options.input+"_corrections.txt"
 f=open(corrfile,"w")
 
-# Expects to act on a directory full of Phase 2 XX, YY, I snapshots and their source-finding results.
+# Expects to act on an obsid with relevant Phase 2 XX, YY, I snapshots and their source-finding results.
 # Would probably work on Phase 1 but hasn't been tested.
-files=sorted(glob.glob("10*XX*2.?.fits")) #[::-1]
+files=sorted(glob.glob(obsid+"*XX*2.?.fits")) #[::-1]
 
 if options.make_plots:
     # Assume that the first file is at the right frequency!
@@ -163,17 +171,17 @@ for Xfits,corr in files_to_check:
                 matchvot="unused/"+matchvot
 # Need to make a new matchtable
             else:
-                os.system('stilts tpipe in='+MRCvot+' cmd=\'select NULL_MFLAG\' cmd=\'addcol PA "0.0"\' cmd=\'addcol S_'+freq_str+' "S408*pow(('+str(freq)+'/408000000.0),-0.85)"\' out=temp1.vot')
-                os.system('stilts tpipe in='+vot+' cmd=\'select local_rms<1.0\' out=temp2.vot')
-                os.system('stilts tmatch2 matcher=skyellipse params=30 in1=temp1.vot in2=temp2.vot out=temp.vot values1="_RAJ2000 _DEJ2000 e_RA2000 e_DE2000 PA" values2="ra dec a b pa" ofmt=votable')
+                os.system('stilts tpipe in='+MRCvot+' cmd=\'select NULL_MFLAG\' cmd=\'addcol PA "0.0"\' cmd=\'addcol S_'+freq_str+' "S408*pow(('+str(freq)+'/408000000.0),-0.85)"\' out='+image+'temp1.vot')
+                os.system('stilts tpipe in='+vot+' cmd=\'select local_rms<1.0\' out='+image+'temp2.vot')
+                os.system('stilts tmatch2 matcher=skyellipse params=30 in1='+image+'temp1.vot in2='+image+'temp2.vot out='+image+'temp.vot values1="_RAJ2000 _DEJ2000 e_RA2000 e_DE2000 PA" values2="ra dec a b pa" ofmt=votable')
             # Exclude extended sources
 # weight is currently S/N
-                os.system('stilts tpipe in=temp.vot cmd=\'select ((int_flux/peak_flux)<2)\' cmd=\'addcol logratio "(ln(S_'+freq_str+'/int_flux))"\' cmd=\'addcol weight "(int_flux/local_rms)"\' cmd=\'addcol delRA "(_RAJ2000-ra)"\' cmd=\'addcol delDec "(_DEJ2000-dec)"\' omode=out ofmt=vot out=temp3.vot')
-                os.system('stilts tpipe in=temp3.vot cmd=\'select abs(delRA)<1.0\' out='+matchvot)
-                os.remove('temp.vot')
-                os.remove('temp1.vot')
-                os.remove('temp2.vot')
-                os.remove('temp3.vot')
+                os.system('stilts tpipe in='+image+'temp.vot cmd=\'select ((int_flux/peak_flux)<2)\' cmd=\'addcol logratio "(ln(S_'+freq_str+'/int_flux))"\' cmd=\'addcol weight "(int_flux/local_rms)"\' cmd=\'addcol delRA "(_RAJ2000-ra)"\' cmd=\'addcol delDec "(_DEJ2000-dec)"\' omode=out ofmt=vot out='+image+'temp3.vot')
+                os.system('stilts tpipe in='+image+'temp3.vot cmd=\'select abs(delRA)<1.0\' out='+matchvot)
+                os.remove(image+'temp.vot')
+                os.remove(image+'temp1.vot')
+                os.remove(image+'temp2.vot')
+                os.remove(image+'temp3.vot')
 
 # First do the ionospheric corrections, using the "I" table, since it has the best S/N
 # Check the matched table actually has entries
