@@ -25,7 +25,7 @@ def zap(table, names):
 
 if __name__ == '__main__':
     names = get_src_list()
-    table = fits.open('GLEAMIDR4.fits')
+    table = fits.open('GLEAMIDR5.fits')
     ntable = zap(table[1].data,names)
     table[1].data = ntable
-    table.writeto("GLEAMIDR4_zapped.fits")
+    table.writeto("GLEAMIDR5_zapped.fits")
