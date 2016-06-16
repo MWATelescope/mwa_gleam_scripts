@@ -10,18 +10,21 @@ host=`hostname`
 if [[ "${host:0:4}" == "gala" ]]
 then
     computer="galaxy"
-    groupq="mwaops"
+    groupq="mwasci"
     standardq="workq"
-    copyq="gpuq"
     hostmem="64"
     scheduler="slurm"
     ncpus=20
     rootdir=/scratch2/$groupq
+
+# Modifications for using the GPUq
+#    standardq="gpuq"
+#    hostmem="32"
+#    ncpus=8
 else
     computer="fornax"
     groupq="partner1002"
     standardq="workq"
-    copyq="copyq"
     hostmem="70"
     scheduler="pbs"
     ncpus=12
@@ -38,14 +41,18 @@ else
 fi
 
 datadir=$rootdir/$user
-queuedir=/home/$user/queue
-# We're getting so specific here that I doubt this is going to change!
-proj=G0008
+queuedir=$datadir/queue
 
 
 cd $queuedir
 
 week=$1
+proj=$2
+
+if [[ $proj == "" ]]
+then
+    proj="G0008"
+fi
 
 if [[ $week == "Week1" ]]
 then
@@ -76,7 +83,10 @@ fi
 
 swarpscript=swarp_${week}.sh
 cat week_mosaic_${scheduler}.template | sed "s;GROUPQ;${groupq};g" | sed "s;STANDARDQ;${standardq};g" | sed "s;HOSTMEM;${hostmem};g" | sed "s;NCPUS;$ncpus;g" |  sed "s;OUTPUT;${swarpscript};g" | sed "s;QUEUEDIR;${queuedir};" > $swarpscript
-cat week_mosaic_array.template  | sed "1,40s;PROJ;${proj};g" | sed "s;DATADIR;${datadir};g" | sed "s;WEEK;${week};g" >> $swarpscript
-$qsub $swarpscript
+cat week_mosaic_array.template  | sed "1,40s;PROJ;${proj};g" | sed "s;DATADIR;${datadir};g" | sed "s;WEEK;${week};g" | sed "s;NCPUS;$ncpus;g" >> $swarpscript
+$qsub --dependency=afterok:1240843 $swarpscript
+#$qsub --dependency=afterok:901046,afterok:901045,afterok:901044 $swarpscript
+#$qsub  $swarpscript
+#$qsub --begin=2015-06-03T04:00:00 $swarpscript
 
 exit 0

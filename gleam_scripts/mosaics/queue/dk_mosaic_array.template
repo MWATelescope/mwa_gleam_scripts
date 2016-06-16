@@ -1,0 +1,204 @@
+#!/bin/bash
+
+ra=TARGETRA
+dec=TARGETDEC
+xsize=XSIZE
+ysize=YSIZE
+chan=CHAN
+date=DATE
+datadir=DATADIR
+proj=PROJ
+
+if [[ ! $PBS_ARRAY_INDEX ]]
+then
+    PBS_ARRAY_INDEX=$SLURM_ARRAY_TASK_ID
+fi
+
+# float number comparison
+function fcomp() {
+    awk -v n1=$1 -v n2=$2 'BEGIN{ if (n1<n2) exit 0; exit 1}'
+}
+
+if [[ $ra && $dec ]]
+then
+    postring="--ra=$ra --dec=$dec"
+fi
+
+# Harder to match MRC further north since it runs out at +20
+if [[ $dec == "18.6" || $dec == "+18.6"  || $dec == "19" || $dec == "+19" ]]
+then
+    MRCtarget=50
+else
+    MRCtarget=100
+fi
+
+if [[ ! $xsize || ! $ysize ]]
+then
+    xsize=0
+    ysize=0
+fi
+
+if [[ $chan -eq 69 ]]
+then
+    rmscutoff=1.0
+elif [[ $chan -eq 93 ]]
+then
+    rmscutoff=0.24
+else
+    rmscutoff=0.2
+fi
+
+# For Dec-72 scans, blank out the larger HAs to reduce ionospheric blurring
+if [[ $date == "20131112" || $date == "20130818" || $date == "20140309" ||  $date == "20140614" ]]
+then
+    docrop="True"
+else
+# Same for the lowest frequency of Dec -55
+    if [[ $chan -eq 69 ]]
+    then
+        if [[ $date == "20131108" || $date == "20130809" || $date == "20140317" ||  $date == "20140612" ]]
+        then
+            docrop="True"
+        fi
+    fi
+fi
+
+cd $datadir/$proj/$date/$chan
+
+dir="subchan"$PBS_ARRAY_INDEX
+cd $dir
+date >> checkpoint.log
+if ! ls mosaic_*fits >> /dev/null
+then
+    echo "No extant mosaics detected: starting the mosaic process." | tee -a checkpoint.log
+    if ls *_corrected.fits 1>> /dev/null 2>> /dev/null
+    then
+        $aprun python $MWA_CODE_BASE/bin/mosaic_driftscan.py -v --copybeam --reduce --clean --scalar=IMAGERMS --function=inversesquare --separate --proj=ZEA $postring --arguments="-IMAGE_SIZE $xsize,$ysize" *_XX_*_corrected.fits *_YY_*_corrected.fits
+    else
+        echo "MRC corrections did not work! Exiting." | tee -a checkpoint.log
+        exit 1
+    fi
+
+# Get info to rename mosaics
+    file_to_check=`ls *2.?_corrected.fits | head -1`
+    crval3=`pyhead.py -p CRVAL3 $file_to_check | awk '{print $3}'`
+    beam=`pyhead.py -p BMAJ $file_to_check | awk '{print $3}'`
+    freqrange=`echo $file_to_check | awk 'BEGIN {FS="_"} {print $2}'`
+    robustness=`echo $file_to_check | awk 'BEGIN {FS="_"} {print $4}'`
+
+# rename mosaics
+# from mosaic.swarp?.fits and mosaic.weight?.fits
+
+    if ls mosaic*.fits 1>> /dev/null 2>> /dev/null
+    then
+        for mosaicfile in mosaic.*.fits
+        do
+# more naming information
+            mostype=`echo $mosaicfile | sed "s/[XY]//g" | awk 'BEGIN {FS="."} {print $2}'`
+            if [[ $mostype == "swarp" ]]
+            then
+                mostype="mosaic"
+            fi
+            pol=`echo $mosaicfile | sed "s/mosaic.swarp//g" | sed "s/mosaic.weight//g" | sed "s/.fits//g"`
+            pol=$pol$pol
+            newname="${mostype}_${date}_${freqrange}_${pol}_${robustness}.fits"
+
+# trim file to sensible size
+            echo "Trimming and modifying header of $mosaicfile." | tee -a checkpoint.log
+            $aprunsingle fits_trim.py $mosaicfile $newname
+            if [[ -e $newname ]]
+            then
+# add sensible keywords to the header
+                pyhead.py -u FREQ $crval3 $newname
+                pyhead.py -u BMAJ $beam $newname
+                pyhead.py -u BMIN $beam $newname
+                pyhead.py -u BPA 0.0 $newname
+# delete unrefined mosaic
+                rm $mosaicfile
+            else
+                echo "Mosaics failed to trim and rename for some reason! Exiting." | tee -a checkpoint.log
+                exit 1
+            fi
+        done
+    else
+        echo "Mosaics failed to create for some reason! Exiting." | tee -a checkpoint.log
+        exit 1
+    fi
+else
+    echo "Mosaics already exist: will not overwrite." | tee -a checkpoint.log
+fi
+
+for mosaicfile in mosaic_*r*.0.fits
+do
+# Source finding on the mosaic files
+# need full-res RMS maps for good XX:YY combination
+    sf=`echo $mosaicfile | sed "s/.fits/_comp.vot/"`
+    if [[ ! -e $sf ]]
+    then
+        echo "Source-finding on $mosaicfile." | tee -a checkpoint.log
+        $aprun aegean.sh $mosaicfile bane
+    else
+        echo "$sf already exists, not rerunning source-finding."
+    fi
+done
+
+file_to_check=`ls *2.?_corrected.fits | head -1`
+crval3=`pyhead.py -p CRVAL3 $file_to_check | awk '{print $3}'`
+# Correct the XX:YY to make "recomb" mosaic
+recomfile=`echo $mosaicfile | sed "s/[XY][XY]_r-1.0/r-1.0_recomb/" | sed "s/[XY][XY]_r0.0/r0.0_recomb/"`
+if [[ ! -e $recomfile ]]
+then
+    echo "Running XX:YY correction and combination script." | tee -a checkpoint.log
+# Switching to swarp as it's more reliable
+    swarp_XY.sh
+fi
+echo "searching for $recomfile"
+
+# Source-finding on the recombined mosaic
+if [[ -e $recomfile ]]
+then
+    mosaicfile=$recomfile
+    echo "Source-finding on $mosaicfile." | tee -a checkpoint.log
+    $aprun aegean.sh $mosaicfile bane
+else
+    echo "Combination script failed for some reason: exiting." | tee -a checkpoint.log
+    exit 1
+fi
+
+deccorrfile=`echo $recomfile | sed "s/.fits/_polyapplied.fits/"`
+# Dec-dependent flux corrections
+if [[ ! -e $deccorrfile ]]
+then
+    echo "Running Dec-dependent flux corrections." | tee -a checkpoint.log
+    root=`echo $mosaicfile | sed "s/.fits//"`
+    if [[ $date=="20131125" || $date=="20130810" || $date=="20140303" || $date=="20140609" ]]
+    then
+        zenithflag="--zenith"
+    fi
+    $aprunsingle derive_dec_polynomial.py --mosaic=$mosaicfile --plot --write
+    $aprunsingle apply_dec_polynomial.py --mosaic=$mosaicfile
+fi
+
+# Source-finding on the polyapplied mosaic
+if [[ -e $deccorrfile ]]
+then
+    echo "Source-finding on $deccorrfile." | tee -a checkpoint.log
+    $aprun aegean.sh $deccorrfile bane
+else
+    echo "Dec-dependent flux corrections failed for some reason: exiting." | tee -a checkpoint.log
+    exit 1
+fi
+
+
+cd ../
+
+#    /scratch/mwaops/ngas/ngamsCClient -host store04.icrar.org -port 7777 -cmd QARCHIVE -mimeType application/octet-stream -fileUri $newname | tee ngas_test.txt
+#    if ! grep -q "SUCCESS" ngas_test.txt
+#    then
+#        echo "mosaic $newname failed to upload!"
+#        exit 1
+#    else
+#        rm ngas_test.txt
+#    fi
+
+exit 0

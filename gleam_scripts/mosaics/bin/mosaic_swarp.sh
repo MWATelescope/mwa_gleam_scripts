@@ -47,7 +47,8 @@ fi
 
 datadir=$rootdir/$user
 imagedir=$imagerootdir/$user
-queuedir=/home/$user/queue
+queuedir=$rootdir/$user/queue
+queuedir=$datadir/queue
 
 cd $queuedir
 

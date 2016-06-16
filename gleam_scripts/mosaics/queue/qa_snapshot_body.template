@@ -64,11 +64,19 @@ else
 fi
 
 cd $datadir/$proj/$date/$chan
+if [[ ! -d unused ]]
+then
+    mkdir unused
+fi
+
 
 Xfile=`sed "${PBS_ARRAY_INDEX}q;d" snapshots_to_process.txt`
 cd `dirname $Xfile`
 Xfile=`basename $Xfile`
 obsid=`echo $Xfile | awk 'BEGIN {FS="_"} {print $1}'`
+
+echo "Processing $Xfile from week $date, channel $chan."
+
 
 # Storing the Is in unused/ as we won't need them until we've done the QA on the XX and YY images
 mv $obsid*_I_*2.?.fits unused/
@@ -81,11 +89,12 @@ then
 fi
 
 Yfile=`echo $Xfile | sed "s/XX/YY/g"`
-if [[ ! -e $Yfile ]]
+if [[ ! -e $Yfile ]] || [[ ! -e $Xfile ]]
 then
-    echo "$Xfile somehow made it through the QA checks when there is no $Yfile. Perhaps an old version? Removing $Xfile now."
+    echo "Either $Xfile or $Yfile is missing. Moving to unused/"
     mv $Xfile unused/
     mv $Yfile unused/
+    exit 0
 else
     ifile=`echo $Xfile | awk 'BEGIN {FS="_"} {print $1}'`
     mv unused/${ifile}*_I_* ./
@@ -169,15 +178,17 @@ do
     obsid=`echo $file | awk 'BEGIN {FS="_"} {print $1}'`
     if [[ ! -e $vot ]]
     then
-        echo "$file didn't source-find correctly! Moving to unused along with its XX and YY counterparts."
+        echo "$file didn't source-find correctly! Moving all files associated with $obsid to unused and terminating QA for this snapshot."
         mv ${obsid}* unused/
+        exit 0
     else
 # Check how many sources were in the file
         nmatch=`grep "<TR>" $vot | wc -l`
         if [[ $nmatch -lt $MRCtarget ]]
         then
-            echo "$file did not match enough MRC sources."
+            echo "$file did not match enough MRC sources. Moving all files associated with $obsid to unused and terminating QA for this snapshot."
             mv ${obsid}* unused/
+            exit 0
         fi
     fi
 done
@@ -199,6 +210,14 @@ else
 fi
 
 mv ${obsid}*_I_* unused/
+
+Yfile=`echo $Xfile | sed "s/XX/YY/g"`
+if [[ ! -e $Yfile ]] || [[ ! -e $Xfile ]]
+then
+    echo "Either $Xfile or $Yfile is missing. Moving all files associated with $obsid to unused and terminating QA for this snapshot."
+    mv ${obsid}* unused/
+    exit 0
+fi
 
 snaplist=`ls $obsid*_??_*v2.?_corrected.fits*`
 # Generate image RMS for XX and YY corrected images
