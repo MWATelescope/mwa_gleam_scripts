@@ -96,7 +96,7 @@ for mid,frange  in zip(mids,freqs):
     metas['psf_pa'+suffix]       = {'ucd':'pos.posAng;instr.det.psf',                        'units':'deg',    'description':'Position angle of the point spread function in '+frange+' image'}
 
     
-cmd = 'stilts tpipe in=GLEAMIDR4.fits out=GLEAMIDR4_meta.fits ofmt="fits-plus" cmd="'
+cmd = 'stilts tpipe in=GLEAMIDR5.fits out=GLEAMIDR5_meta.fits ofmt="fits-plus" cmd="'
 for k in metas.keys():
     cmd += "colmeta -units '{0[units]}' -ucd '{0[ucd]}' -desc '{0[description]}' '{1}'; ".format(metas[k],k)
 cmd+='"'

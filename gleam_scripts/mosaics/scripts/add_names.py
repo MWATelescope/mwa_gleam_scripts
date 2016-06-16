@@ -70,4 +70,4 @@ tab['ra_str_wide'].name = 'ra_str'
 tab['dec_str_wide'].name = 'dec_str'
 
 print "saving"
-tab.write('GLEAMIDR4.fits')
+tab.write('GLEAMIDR5.fits')
