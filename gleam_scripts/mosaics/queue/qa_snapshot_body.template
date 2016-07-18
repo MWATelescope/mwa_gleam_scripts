@@ -1,0 +1,306 @@
+#!/bin/bash
+
+ra=TARGETRA
+dec=TARGETDEC
+xsize=XSIZE
+ysize=YSIZE
+chan=CHAN
+date=DATE
+datadir=DATADIR
+proj=PROJ
+
+if [[ ! $PBS_ARRAY_INDEX ]]
+then
+    PBS_ARRAY_INDEX=$SLURM_ARRAY_TASK_ID
+fi
+
+# float number comparison
+function fcomp() {
+    awk -v n1=$1 -v n2=$2 'BEGIN{ if (n1<n2) exit 0; exit 1}'
+}
+
+#if [[ $ra && $dec ]]
+#then
+#    postring="--ra=$ra --dec=$dec"
+#fi
+
+# Harder to match MRC further north since it runs out at +20
+if [[ $dec == "18.6" || $dec == "+18.6"  || $dec == "19" || $dec == "+19" ]]
+then
+    MRCtarget=50
+else
+    MRCtarget=100
+fi
+
+#if [[ ! $xsize || ! $ysize ]]
+#then
+#    xsize=0
+#    ysize=0
+#fi
+
+if [[ $chan -eq 69 ]]
+then
+    rmscutoff=1.0
+elif [[ $chan -eq 93 ]]
+then
+    rmscutoff=0.24
+else
+    rmscutoff=0.2
+fi
+
+# For Dec-72 scans, blank out the larger HAs to reduce ionospheric blurring
+if [[ $date == "20131112" || $date == "20130818" || $date == "20140309" ||  $date == "20140614" ]]
+then
+    docrop="True"
+else
+# Same for the lowest frequency of Dec -55
+    if [[ $chan -eq 69 ]]
+    then
+        if [[ $date == "20131108" || $date == "20130809" || $date == "20140317" ||  $date == "20140612" ]]
+        then
+            docrop="True"
+        fi
+    fi
+fi
+
+cd $datadir/$proj/$date/$chan
+if [[ ! -d unused ]]
+then
+    mkdir unused
+fi
+
+
+Xfile=`sed "${PBS_ARRAY_INDEX}q;d" snapshots_to_process.txt`
+cd `dirname $Xfile`
+Xfile=`basename $Xfile`
+obsid=`echo $Xfile | awk 'BEGIN {FS="_"} {print $1}'`
+
+echo "Processing $Xfile from week $date, channel $chan."
+
+
+# Storing the Is in unused/ as we won't need them until we've done the QA on the XX and YY images
+mv $obsid*_I_*2.?.fits unused/
+
+# If the pointing is Dec -72, flag out the SCP
+if [[ $docrop == "True" ]]
+then
+    echo "Low Dec observation: blanking edges of $Xfile"
+    $aprunsingle blank_SCP.py --filename=$Xfile
+fi
+
+Yfile=`echo $Xfile | sed "s/XX/YY/g"`
+if [[ ! -e $Yfile ]] || [[ ! -e $Xfile ]]
+then
+    echo "Either $Xfile or $Yfile is missing. Moving to unused/"
+    mv $Xfile unused/
+    mv $Yfile unused/
+    exit 0
+else
+    ifile=`echo $Xfile | awk 'BEGIN {FS="_"} {print $1}'`
+    mv unused/${ifile}*_I_* ./
+fi
+
+# Make primary-beam-corrected XX and YY images in order to measure correction w.r.t. MRC
+delays=`pyhead.py -p DELAYS $Xfile | awk '{print $3}' | sed "s/\[//" | sed "s/\]//"`
+freq=`echo $Xfile | awk 'BEGIN {FS="_"} {print $2}'`
+dec=`get_central_dec.py -f $Xfile --round`
+# Check for the existence of the primary beams
+if [[ ! -d ../../../pbeams ]]
+then
+    mkdir ../../../pbeams
+fi
+if [[ ! -d ../../../pbeams/Dec${dec} ]]
+then
+    mkdir ../../../pbeams/Dec${dec}
+fi
+
+imsize=`pyhead.py -p NAXIS2 $Xfile | awk '{print $3}'`
+if [[ $imsize -eq 4000 ]]
+then
+# Generate the primary beam, if it doesn't already exist
+    if [[ ! -e ../../../pbeams/Dec${dec}/beam_${freq}_XX.fits ]]
+    then
+        $aprun make_beam.py -d $delays -f $Xfile
+        Xb=`echo $Xfile | sed "s/.fits/_beamXX.fits/"`
+        Yb=`echo $Xfile | sed "s/.fits/_beamYY.fits/"`
+        mv $Xb ../../../pbeams/Dec${dec}/beam_${freq}_XX.fits
+        mv $Yb ../../../pbeams/Dec${dec}/beam_${freq}_YY.fits
+    fi
+# Use the standard sized beam to correct the image
+    Xcorr=`echo $Xfile | sed "s/.fits/_pb.fits/"`
+    Yfile=`echo $Xfile | sed "s/XX/YY/"`
+    Ycorr=`echo $Yfile | sed "s/.fits/_pb.fits/"`
+    if [[ ! -e $Xcorr ]]
+    then
+        $aprunsingle pb_correct.py --input $Xfile --output $Xcorr --beam ../../../pbeams/Dec${dec}/beam_${freq}_XX.fits
+    fi
+    if [[ ! -e $Ycorr ]]
+    then
+        $aprunsingle pb_correct.py --input $Yfile --output $Ycorr --beam ../../../pbeams/Dec${dec}/beam_${freq}_YY.fits
+    fi
+else
+# Sometimes we make extra-large images, and they can't use the usual beams
+# Make an observation-specific primary beam instead
+    $aprun make_beam.py -d $delays -f $Xfile
+    Xb=`echo $Xfile | sed "s/.fits/_beamXX.fits/"`
+    Yb=`echo $Xfile | sed "s/.fits/_beamYY.fits/"`
+    $aprunsingle pb_correct.py --input $Xfile --output $Xcorr -beam $Xb
+    $aprunsingle pb_correct.py --input $Yfile --output $Ycorr -beam $Yb
+fi
+
+# Source-finding on the I and pb-corrected XX and YY snapshots
+# We can use cheap backgrounding since we only need bright source fluxes
+snaplist=`ls $obsid*_I_*v2.?.fits $obsid*_??_*v2.?_pb.fits*`
+
+for file in $snaplist
+do
+    xaxis=`pyhead.py -p NAXIS1 $file | awk '{print $3}'`
+    if [[ $xaxis -ne 4000 ]]
+    then
+        echo "$file is not a standard size: $xaxis pixels across instead of 4000."
+        echo "Cropping $file to match the standard size."
+        rstart=`expr \( $xaxis - 4000 \) / 2`
+        rend=`expr $xaxis - $rstart - 1`
+        $aprunsingle getfits -o temp.fits $file $rstart-$rend $rstart-$rend
+        $aprunsingle unflatten.py temp.fits
+        mv $file unused/
+        mv temp.fits $file
+    fi
+    vot=`echo $file | sed "s/.fits/_comp.vot/"`
+    if [[ ! -e $vot ]]
+    then
+        echo "Source-finding on $file."
+        $aprun aegean_snapshot.sh $file
+    else
+        echo "Source-finding has already been performed on $file."
+    fi
+# Had to write this check for a SINGLE edge case in 10,000s of observations checked so far!!
+    obsid=`echo $file | awk 'BEGIN {FS="_"} {print $1}'`
+    if [[ ! -e $vot ]]
+    then
+        echo "$file didn't source-find correctly! Moving all files associated with $obsid to unused and terminating QA for this snapshot."
+        mv ${obsid}* unused/
+        exit 0
+    else
+# Check how many sources were in the file
+        nmatch=`grep "<TR>" $vot | wc -l`
+        if [[ $nmatch -lt $MRCtarget ]]
+        then
+            echo "$file did not match enough MRC sources. Moving all files associated with $obsid to unused and terminating QA for this snapshot."
+            mv ${obsid}* unused/
+            exit 0
+        fi
+    fi
+done
+
+# MRC flux and position corrections to smooth out any changes in flux scale and astrometry with RA
+
+ncorr=`ls ${obsid}*_corrected.fits | wc -l | awk '{print $1}'`
+
+if [[ $ncorr -lt 3 ]]
+then
+    echo "Running MRC-based correction script on $obsid."
+    $aprunsingle correct_mrc_snapshot.py --input=$obsid
+elif [[ $ncorr -eq 3 ]]
+then
+    echo "$obsid has already been corrected to MRC flux scale."
+else
+    echo "$obsid has $ncorr corrected files -- that's a bit weird!"
+    exit 1
+fi
+
+mv ${obsid}*_I_* unused/
+
+Yfile=`echo $Xfile | sed "s/XX/YY/g"`
+if [[ ! -e $Yfile ]] || [[ ! -e $Xfile ]]
+then
+    echo "Either $Xfile or $Yfile is missing. Moving all files associated with $obsid to unused and terminating QA for this snapshot."
+    mv ${obsid}* unused/
+    exit 0
+fi
+
+snaplist=`ls $obsid*_??_*v2.?_corrected.fits*`
+# Generate image RMS for XX and YY corrected images
+for file in $snaplist
+do
+    imagerms=`pyhead.py -p IMAGERMS $file | awk '{print $3}'`
+    if [[ $imagerms == "open" ]]
+    then
+        $aprunsingle rms_measure.py --corners --write -f $file
+    fi
+done
+
+
+
+## Start the enormous QA process! -- NB: this needs updating/replacing
+#    for file in $obsid*2.?.fits
+#    do
+#        echo $file
+## Fix DATE-OBS bug
+#        datestr=`pyhead.py -p DATE-OBS $file | awk '{print $3}'`
+#        minutes=`echo $datestr | awk 'BEGIN {FS=":"} {print $2}'` 
+#        if [[ $minutes -eq 60 ]]
+#        then
+#            hrs=`echo $datestr | awk 'BEGIN {FS="T"} {print $2}' | awk 'BEGIN {FS=":"} {print $1}'` 
+#            ((hrs+=1)) 
+#            startstr=`echo $datestr | awk 'BEGIN {FS="T"} {print $1}'`
+#            endstr=`echo $datestr | awk 'BEGIN {FS=":"} {print $3}'`
+#            newdatestr="${startstr}T${hrs}:00:${endstr}" 
+#            pyhead.py -u DATE-OBS $newdatestr $file
+#        fi 
+#        corfile=`echo $file | sed "s/.fits/_corrected.fits/g"`
+## If the corrected file already exists, assume that the QA worked the first time
+#        if [[ ! -e $corfile ]]
+#        then
+#            pol=`echo $file | awk 'BEGIN {FS="_"} {print $3}'`
+#            if [[ $pol == "XX" ]]
+#            then
+#                altfile=`echo $file | sed "s/XX/YY/g"`
+#            else
+#                altfile=`echo $file | sed "s/YY/XX/g"`
+#            fi
+#            if [[ ! -e $altfile && ! -e unused/$altfile ]]
+#            then
+#                echo "$file has no opposite pol!"
+#                mv $file unused/
+#            else
+#   # discard images with the wrong pixel scale
+#                cdel=`pyhead.py -p CDELT2 $file | awk '{printf("%0.8f\n",$3)}' | awk '{print substr($1,0,9)}'`
+#                scale=`echo "1.1 / $chan" | bc -l | awk '{printf("%0.8f\n",$1)}' | awk '{print substr($1,0,9)}'`
+#                if fcomp $scale $cdel
+#                then
+#                    echo "$file has the wrong pixel scale ($cdel instead of ${scale})! Trying to find another version." | tee -a checkpoint.log
+#                    wget --quiet -O $file  http://store04.icrar.org:7777/RETRIEVE?file_id=$file\&file_version=1
+#                    wget --quiet -O $altfile  http://store04.icrar.org:7777/RETRIEVE?file_id=$altfile\&file_version=1
+#                fi
+#                cdel=`pyhead.py -p CDELT2 $file | awk '{printf("%0.8f\n",$3)}' | awk '{print substr($1,0,9)}'`
+#                scale=`echo "1.1 / $chan" | bc -l | awk '{printf("%0.8f\n",$1)}' | awk '{print substr($1,0,9)}'`
+#                if fcomp $scale $cdel
+#                then
+#                    echo "$file still has the wrong pixel scale! Giving up and moving on." | tee -a checkpoint.log
+#                    mv $file unused/
+#                    mv $altfile unused/
+#                else
+#                    echo "$file pixel scale is fine." | tee -a checkpoint.log
+#        # File sometimes gone by this point -- double check it's still there
+#                    if [[ -e $file ]]
+#                    then
+#        # crop extra-large images
+#                        xaxis=`pyhead.py -p NAXIS1 $file | awk '{print $3}'`
+#                        if [[ $xaxis -ne 4000 ]]
+#                        then
+#                            echo "$file is not a standard size: $xaxis pixels across instead of 4000." | tee -a checkpoint.log
+#                            echo "Cropping $file to match the standard size." | tee -a checkpoint.log
+#                            rstart=`expr \( $xaxis - 4000 \) / 2`
+#                            rend=`expr $xaxis - $rstart - 1`
+#                            $aprunsingle getfits -o temp.fits $file $rstart-$rend $rstart-$rend
+#                            $aprunsingle unflatten.py temp.fits
+#                            mv $file unused/
+#                            mv temp.fits $file
+#                        fi
+#                    fi
+#                fi
+#            fi
+#        fi
+#    done
+

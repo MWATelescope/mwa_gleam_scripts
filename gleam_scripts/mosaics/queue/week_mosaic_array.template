@@ -169,13 +169,13 @@ if [[ ! -e ${week}_${freq}_wpsf_comp_filter.vot ]]
 then
     $aprunsingle QC_filter.py --input=${week}_${freq}_wpsf_comp.vot --output=${week}_${freq}_wpsf_comp_filter.vot --mimtable=$MWA_CODE_BASE/MWA_Tools/gleam_scripts/mosaics/scripts/all.mim --week=${week:4:1}
 fi
-if [[ ! -e ${week}_${freq}_fluxscale.fits ]]
+if [[ ! -e ${week}_${freq}_ddmod_fluxscale.fits ]]
 then
 # Calculate the flux scale
-    $aprunsingle check_flux_scale.py --mosaic=${week}_${freq}.fits --catalog=${week}_${freq}_wpsf_comp_filter.vot --isles=${week}_${freq}_wpsf_isle.vot --plot --write --table
+    $aprunsingle check_flux_scale.py --mosaic=${week}_${freq}_ddmod.fits --catalog=${week}_${freq}_wpsf_comp_filter.vot --isles=${week}_${freq}_wpsf_isle.vot --plot --write --table
 # Apply the flux scale
-    $aprunsingle rescale_flux.py --mosaic=${week}_${freq}_ddmod.fits --zerofits=${week}_${freq}_fluxscale.fits
-    $aprunsingle rescale_flux.py --mosaic=${week}_${freq}_ddmod_bkg.fits --zerofits=${week}_${freq}_fluxscale.fits
-    $aprunsingle rescale_flux.py --mosaic=${week}_${freq}_ddmod_rms.fits --zerofits=${week}_${freq}_fluxscale.fits
+    $aprunsingle rescale_flux.py --mosaic=${week}_${freq}_ddmod.fits --zerofits=${week}_${freq}_ddmod_fluxscale.fits
+    $aprunsingle rescale_flux.py --mosaic=${week}_${freq}_ddmod_bkg.fits --zerofits=${week}_${freq}_ddmod_fluxscale.fits
+    $aprunsingle rescale_flux.py --mosaic=${week}_${freq}_ddmod_rms.fits --zerofits=${week}_${freq}_ddmod_fluxscale.fits
 fi
 

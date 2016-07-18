@@ -181,12 +181,12 @@ then
 fi
 
 # Rescale to correct flux
-if [[ ! -e ${week}_${color}_lownoise_fluxscale.fits ]]
+if [[ ! -e ${week}_${color}_lownoise_ddmod_fluxscale.fits ]]
 then
     $aprunsingle check_flux_scale.py --mosaic=${week}_${color}_lownoise_ddmod.fits --catalog=${week}_${color}_lownoise_wpsf_comp_filter.vot --isles=${week}_${color}_lownoise_wpsf_isle.vot --plot --write --table
-    $aprunsingle rescale_flux.py --mosaic=${week}_${color}_lownoise_ddmod.fits --zerofits=${week}_${color}_lownoise_fluxscale.fits
-    $aprunsingle rescale_flux.py --mosaic=${week}_${color}_lownoise_ddmod_bkg.fits --zerofits=${week}_${color}_lownoise_fluxscale.fits
-    $aprunsingle rescale_flux.py --mosaic=${week}_${color}_lownoise_ddmod_rms.fits --zerofits=${week}_${color}_lownoise_fluxscale.fits
+    $aprunsingle rescale_flux.py --mosaic=${week}_${color}_lownoise_ddmod.fits --zerofits=${week}_${color}_lownoise_ddmod_fluxscale.fits
+    $aprunsingle rescale_flux.py --mosaic=${week}_${color}_lownoise_ddmod_bkg.fits --zerofits=${week}_${color}_lownoise_ddmod_fluxscale.fits
+    $aprunsingle rescale_flux.py --mosaic=${week}_${color}_lownoise_ddmod_rms.fits --zerofits=${week}_${color}_lownoise_ddmod_fluxscale.fits
 fi
 
 exit 0
