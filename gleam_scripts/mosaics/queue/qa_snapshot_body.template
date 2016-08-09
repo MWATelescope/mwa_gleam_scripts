@@ -96,8 +96,7 @@ then
     mv $Yfile unused/
     exit 0
 else
-    ifile=`echo $Xfile | awk 'BEGIN {FS="_"} {print $1}'`
-    mv unused/${ifile}*_I_* ./
+    mv unused/${obsid}*_I_* ./
 fi
 
 # Make primary-beam-corrected XX and YY images in order to measure correction w.r.t. MRC
@@ -200,7 +199,7 @@ ncorr=`ls ${obsid}*_corrected.fits | wc -l | awk '{print $1}'`
 if [[ $ncorr -lt 3 ]]
 then
     echo "Running MRC-based correction script on $obsid."
-    $aprunsingle correct_mrc_snapshot.py --input=$obsid
+    $aprunsingle correct_mrc_snapshot.py --input=$obsid --plot --dec=TARGETDEC
 elif [[ $ncorr -eq 3 ]]
 then
     echo "$obsid has already been corrected to MRC flux scale."
@@ -211,6 +210,7 @@ fi
 
 mv ${obsid}*_I_* unused/
 
+Xfile=`echo $Xfile | sed "s/.fits/_corrected.fits/"`
 Yfile=`echo $Xfile | sed "s/XX/YY/g"`
 if [[ ! -e $Yfile ]] || [[ ! -e $Xfile ]]
 then

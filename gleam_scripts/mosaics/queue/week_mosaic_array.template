@@ -27,6 +27,10 @@ elif [[ $week == "Week4" ]]
 then
     dateprefix=201406
     zenith=20140609
+elif [[ $week == "Week5" ]]
+then
+    dateprefix=201607
+    zenith=20140609
 else
     echo "Week not given correctly: specify like 'WeekN', where N=1-4"
     exit 1
@@ -167,7 +171,11 @@ fi
 # Filter out everything completely in order to calculate flux scale
 if [[ ! -e ${week}_${freq}_wpsf_comp_filter.vot ]]
 then
-    $aprunsingle QC_filter.py --input=${week}_${freq}_wpsf_comp.vot --output=${week}_${freq}_wpsf_comp_filter.vot --mimtable=$MWA_CODE_BASE/MWA_Tools/gleam_scripts/mosaics/scripts/all.mim --week=${week:4:1}
+    if [[ ${week} != "Week5" ]]
+    then
+        weekfilter="--week=${week:4:1}"
+    fi
+    $aprunsingle QC_filter.py --input=${week}_${freq}_wpsf_comp.vot --output=${week}_${freq}_wpsf_comp_filter.vot --mimtable=$MWA_CODE_BASE/MWA_Tools/gleam_scripts/mosaics/scripts/all.mim $weekfilter
 fi
 if [[ ! -e ${week}_${freq}_ddmod_fluxscale.fits ]]
 then
