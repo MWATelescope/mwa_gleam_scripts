@@ -9,7 +9,7 @@ import os
 import sys
 import glob
 import shutil
-import numpy
+import numpy as np
 from astropy.io import fits
 from astropy.io.votable import parse_single_table
 import re
@@ -42,7 +42,7 @@ def unwrap(x):
         return x-360
     else:
         return x
-vunwrap=numpy.vectorize(unwrap)
+vunwrap=np.vectorize(unwrap)
 
 catdir=os.environ['MWA_CODE_BASE']
 MRCvot=catdir+"/MWA_Tools/catalogues/MRC.vot"
@@ -52,7 +52,7 @@ if not os.path.exists(MRCvot):
     sys.exit(1)
 
 if options.dec:
-    plotdec=options.dec
+    dec=options.dec
 else:
     if options.date:
         date=options.date
@@ -60,23 +60,23 @@ else:
     # Expecting to be in a directory named with the date in format YYYYMMDD
         date=re.search("201[0-9]{5}",os.getcwd()).group()
         chan=re.search("\/[0-9]{2,3}\/",os.getcwd()).group().replace("/","")
-        if date=="20130817" or date=="20131111" or date=="20140308" or date=="20140615" :
-            plotdec=18.6
-        elif date=="20130808" or date=="20131107" or date=="20140306" or date=="20140611":
-            plotdec=1.6
-        elif date=="20130822" or date=="20131105" or date=="20140304" or date=="20140613" or date=="20140616":
-            plotdec=-13
+        if date=="20130817" or date=="20131111" or date=="20140308" or date=="20140615" or date=="20160728" :
+            dec=18.6
+        elif date=="20130808" or date=="20131107" or date=="20140306" or date=="20140611" or date=="20160729":
+            dec=1.6
+        elif date=="20130822" or date=="20131105" or date=="20140304" or date=="20140613" or date=="20140616" or date=="20141031":
+            dec=-13
         elif date=="20130810" or date=="20131125" or date=="20140303" or date=="20140609":
-            plotdec=-27
+            dec=-27
         elif date=="20130825" or date=="20131106" or date=="20140316" or date=="20140610":
-            plotdec=-40
+            dec=-40
         elif date=="20130809" or date=="20131108" or date=="20140317" or date=="20140612" or date=="20140618":
-            plotdec=-55
+            dec=-55
         elif date=="20130818" or date=="20131112" or date=="20140309" or date=="20140614":
-            plotdec=-72
+            dec=-72
         else:
-            print "Defaulting to zenith in the absence of a known plotdeclination."
-            plotdec=-27
+            print "Defaulting to zenith in the absence of a known declination."
+            dec=-27
 
 corrfile=options.input+"_corrections.txt"
 f=open(corrfile,"w")
@@ -141,10 +141,16 @@ ratio=1.0
 
 for Xfits,corr in files_to_check:
 
-    ra=fits.getheader(Xfits)['CRVAL1']
-    dec=fits.getheader(Xfits)['CRVAL2']
-    freq=fits.getheader(Xfits)['CRVAL3']
-    freq_str="%03.0f" % (freq/1e6)
+    crval1 = fits.getheader(Xfits)['CRVAL1']
+    crval2 = fits.getheader(Xfits)['CRVAL2']
+    freq = fits.getheader(Xfits)['CRVAL3']
+    freq_str = "%03.0f" % (freq/1e6)
+    naxis = fits.getheader(Xfits)['NAXIS1']
+    cdelt = fits.getheader(Xfits)['CDELT2']
+    fov = naxis*cdelt/2.
+    freq = fits.getheader(Xfits)['CRVAL3']
+# Can't get dec from header because of -minw -shiftback
+
 
 # surely these filename substitutions can be made more pythonic
     Ifits=re.sub("XX","I",Xfits)
@@ -190,10 +196,10 @@ for Xfits,corr in files_to_check:
     if t.array.shape[0]>0:
 
     # Calculate ionospheric offsets
-        delRA=numpy.average(a=t.array['delRA'],weights=(t.array['weight'])) #*(distfunc)))
-        delDec=numpy.average(a=t.array['delDec'],weights=(t.array['weight'])) #*(distfunc)))
-        delRAstdev=numpy.std(a=t.array['delRA'])
-        delDecstdev=numpy.std(a=t.array['delDec'])
+        delRA=np.average(a=t.array['delRA'],weights=(t.array['weight'])) #*(distfunc)))
+        delDec=np.average(a=t.array['delDec'],weights=(t.array['weight'])) #*(distfunc)))
+        delRAstdev=np.std(a=t.array['delRA'])
+        delDecstdev=np.std(a=t.array['delDec'])
 
     # Now calculate the correction factors for the I, XX and YY snapshots
         for pb in Ifits,Xpb,Ypb:
@@ -201,8 +207,8 @@ for Xfits,corr in files_to_check:
             matchvot = pb.replace(".fits","_MRC.vot")
             t = parse_single_table(matchvot)
             if t.array.shape[0]>0:
-                ratio=numpy.exp(numpy.average(a=t.array['logratio'],weights=(t.array['weight']))) #*(distfunc)))
-                stdev=numpy.std(a=t.array['logratio'])
+                ratio=np.exp(np.average(a=t.array['logratio'],weights=(t.array['weight']))) #*(distfunc)))
+                stdev=np.std(a=t.array['logratio'])
                 print "Ratio of "+str(ratio)+" between "+image+" and MRC."
                 print "stdev= "+str(stdev)
 
@@ -211,8 +217,8 @@ for Xfits,corr in files_to_check:
                     hdu_in = fits.open(image)
                 # Modify to fix ionosphere
                     hdr_in = hdu_in[0].header
-                    hdr_in['CRVAL1'] = ra + delRA
-                    hdr_in['CRVAL2'] = dec + delDec
+                    hdr_in['CRVAL1'] = crval1 + delRA
+                    hdr_in['CRVAL2'] = crval2 + delDec
                 # Modify to fix flux scaling
                     hdu_in[0].data=hdu_in[0].data*ratio
                 # Remove stupid bonus keywords, if they have been added
@@ -240,25 +246,30 @@ for Xfits,corr in files_to_check:
             U=t.array['ra']
         Y=t.array['_DEJ2000']
         V=t.array['dec']
-        fig=plt.figure(figsize=(20, 10))
+        fig=plt.figure(figsize=(10, 10))
         fig.suptitle(Iroot)
         ax = plt.gca()
-        M = numpy.arctan((V-Y)/(U-X))
+#        M = np.arctan((V-Y)/(U-X))
+#        ax.quiver(X,Y,60*(X-U),60*(Y-V),M,angles='xy',scale_units='xy',scale=1)
+        M = np.arctan((Y-V)/(X-U))
         ax.quiver(X,Y,60*(U-X),60*(V-Y),M,angles='xy',scale_units='xy',scale=1)
-        ax.set_xlim([min(ras)-margin,max(ras)+margin])
-        umargin=plotdec+margin
+        ax.set_xlim(np.median(X)+fov,np.median(X)-fov)
+        ax.set_ylim(dec-fov,dec+fov)
+
+#        ax.set_xlim([min(ras)-margin,max(ras)+margin])
+#        umargin=dec+margin
         #if umargin > 90.0:
         #    umargin=90.0
-        #umargin=plotdec+margin*numpy.cos(numpy.deg2rad(umargin))
-        if umargin > 90.0:
-            umargin=90.0
-        lmargin=plotdec-margin
+        #umargin=dec+margin*np.cos(np.deg2rad(umargin))
+#        if umargin > 90.0:
+#            umargin=90.0
+#        lmargin=dec-margin
         #if lmargin < -90.0:
         #    lmargin=-90.0
-        #lmargin=plotdec-margin*numpy.cos(numpy.deg2rad(lmargin))
-        if lmargin < -90.0:
-            lmargin=-90.0
-        ax.set_ylim([lmargin,umargin])
+        #lmargin=dec-margin*np.cos(np.deg2rad(lmargin))
+#        if lmargin < -90.0:
+#            lmargin=-90.0
+#        ax.set_ylim([lmargin,umargin])
         ax.set_ylabel('Declination (deg)')
         ax.set_xlabel('RA (deg)')
         plt.savefig(outputpng)

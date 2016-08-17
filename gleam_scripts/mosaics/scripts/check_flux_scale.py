@@ -104,6 +104,9 @@ elif week == "Week3":
 elif week == "Week4":
     RA_min = 200
     RA_max = 280
+elif week == "Week5":
+    RA_min = 330
+    RA_max = 360
 Dec_min = -30
 Dec_max = 30
 ylims=(0.5,1.5)
