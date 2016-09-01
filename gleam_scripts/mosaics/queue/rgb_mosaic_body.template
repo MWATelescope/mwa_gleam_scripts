@@ -177,16 +177,20 @@ fi
 # Filter everything in order to generate a flux scale
 if [[ ! -e ${week}_${color}_lownoise_wpsf_comp_filter.vot ]]
 then
-    $aprunsingle QC_filter.py --input=${week}_${color}_lownoise_wpsf_comp.vot --output=${week}_${color}_lownoise_wpsf_comp_filter.vot --mimtable=$MWA_CODE_BASE/MWA_Tools/gleam_scripts/mosaics/scripts/all.mim --week=${week:4:1}
+    if [[ ${week} != "Week5" ]]
+    then
+        weekfilter="--week=${week:4:1}"
+    fi
+    $aprunsingle QC_filter.py --input=${week}_${color}_lownoise_wpsf_comp.vot --output=${week}_${color}_lownoise_wpsf_comp_filter.vot --mimtable=$MWA_CODE_BASE/MWA_Tools/gleam_scripts/mosaics/scripts/all.mim $weekfilter
 fi
 
 # Rescale to correct flux
-if [[ ! -e ${week}_${color}_lownoise_fluxscale.fits ]]
+if [[ ! -e ${week}_${color}_lownoise_ddmod_fluxscale.fits ]]
 then
     $aprunsingle check_flux_scale.py --mosaic=${week}_${color}_lownoise_ddmod.fits --catalog=${week}_${color}_lownoise_wpsf_comp_filter.vot --isles=${week}_${color}_lownoise_wpsf_isle.vot --plot --write --table
-    $aprunsingle rescale_flux.py --mosaic=${week}_${color}_lownoise_ddmod.fits --zerofits=${week}_${color}_lownoise_fluxscale.fits
-    $aprunsingle rescale_flux.py --mosaic=${week}_${color}_lownoise_ddmod_bkg.fits --zerofits=${week}_${color}_lownoise_fluxscale.fits
-    $aprunsingle rescale_flux.py --mosaic=${week}_${color}_lownoise_ddmod_rms.fits --zerofits=${week}_${color}_lownoise_fluxscale.fits
+    $aprunsingle rescale_flux.py --mosaic=${week}_${color}_lownoise_ddmod.fits --zerofits=${week}_${color}_lownoise_ddmod_fluxscale.fits
+    $aprunsingle rescale_flux.py --mosaic=${week}_${color}_lownoise_ddmod_bkg.fits --zerofits=${week}_${color}_lownoise_ddmod_fluxscale.fits
+    $aprunsingle rescale_flux.py --mosaic=${week}_${color}_lownoise_ddmod_rms.fits --zerofits=${week}_${color}_lownoise_ddmod_fluxscale.fits
 fi
 
 exit 0
