@@ -1,9 +1,8 @@
 #!/usr/bin/env python
 
-# Create a simplified version of the GLEAM catalogue with two fluxes and a spectral index
-# And errors
-# I print two fluxes so that Andre's tools can easily generate peelable models
-# Modified to use PUMA's crossmatched table
+# Fit simple power-law SEDs to all sources in a GLEAM catalogue
+# Create a simplified version of the GLEAM catalogue with two fluxes and a spectral index, and errors
+# Also include two fluxes so that Andre's tools can easily generate peelable models
 
 import os, sys
 
@@ -32,6 +31,8 @@ parser.add_option('--catalogue',type="string", dest="catalogue",
                     help="The filename of the catalogue you want to read in.", default=None)
 parser.add_option('--output',type="string", dest="output",
                     help="The filename of the output.", default=None)
+parser.add_option('--andre',type="string", dest="andre",
+                    help="If desired, the output text file suitable for use in Andre's tools (default = don't make one).", default=None)
 #parser.add_option('--plot',action="store_true",dest="make_plots",default=False,
 #                  help="Make fit plots? (default = False)")
 parser.add_option('--order',dest="poly_order",default=1,type=int,
@@ -40,8 +41,8 @@ parser.add_option('--cores',dest="cores",default=None,type=int,
                   help="How many cores to use. (default = all available)")
 parser.add_option('--limit',dest="flux_limit",default=0.0,type=float,
                   help="Minimum flux density at any frequency for source to be included to in fit (default = 0.0Jy)")
-parser.add_option('--plot',dest="plot",default=False,action="store_true",
-                  help="Make plots?")
+parser.add_option('--calerror',dest="calerror",default=0.02,type=float,
+                  help="Estimated calibration error (default = 0.02, i.e. 2%)")
 (options, args) = parser.parse_args()
 
 # http://scipy-cookbook.readthedocs.org/items/FittingData.html
@@ -78,7 +79,7 @@ else:
 
 # Spectral index fitting function
 
-def fit_spectrum(name,freq_array,flux_array,flux_errors,plot):
+def fit_spectrum(name,freq_array,flux_array,flux_errors): #,plot):
     pinit = [-2.0, -0.7]
     pinit = [0.0, -0.7]
     fit = leastsq(errfunc, pinit, args=(freq_array, flux_array, flux_errors), full_output=1)
@@ -124,7 +125,7 @@ def fit_spectrum(name,freq_array,flux_array,flux_errors,plot):
 # Set up the parameters and do the fitting
 
 # Representative calibration error -- 8% is too big, and gives unbelievable chi2; 2% seems to give believable chi2
-calibration_error = 0.02
+calibration_error = options.calerror
 
 # Frequencies to write out -- use the full band since it shows the range I did the fitting over
 freq1=72
@@ -167,7 +168,7 @@ results = pprocess.Map(limit=cores)
 calc = results.manage(pprocess.MakeParallel(fit_spectrum))
 
 for i in range(0,len(brightsrcs)):
-    calc(names[i],freq_array,flux_array[i],flux_errors[i],options.plot)
+    calc(names[i],freq_array,flux_array[i],flux_errors[i]) # ,options.plot)
 
 # Unpack results
 alpha, err_alpha, amp, err_amp, chi2red = map(list, zip(*results))
@@ -179,8 +180,6 @@ err_flux1 = err_amp*flux1
 flux2 = vpowerlaw(np.tile(freq2,len(amp)),amp,alpha)
 flux2-=1
 err_flux2 = err_amp*flux2
-
-
 
 # Generate the output VO table
 outtable=Table()
@@ -202,16 +201,16 @@ if os.path.exists(output):
     os.remove(output)
 outtable.write(output,format='votable')
 
-# Generate an output in Andre's sky model format
-formatter="source {{\n  name \"{Name:s}\"\n  component {{\n    type gaussian\n    position {RA:s} {Dec:s}\n    shape {a:2.1f} {b:2.1f} {pa:4.1f}\n    sed {{\n      frequency {freq:3.0f} MHz\n      fluxdensity Jy {flux:4.7f} 0 0 0\n      spectral-index {{ {alpha:2.2f} {beta:2.2f} }}\n    }}\n  }}\n}}\n"
+if options.andre is not None:
+    # Generate an output in Andre's sky model format
+    formatter="source {{\n  name \"{Name:s}\"\n  component {{\n    type gaussian\n    position {RA:s} {Dec:s}\n    shape {a:2.1f} {b:2.1f} {pa:4.1f}\n    sed {{\n      frequency {freq:3.0f} MHz\n      fluxdensity Jy {flux:4.7f} 0 0 0\n      spectral-index {{ {alpha:2.2f} {beta:2.2f} }}\n    }}\n  }}\n}}\n"
 
-bigzip=zip(data['Name'][brightsrcs],data['ra_str'][brightsrcs],data['dec_str'][brightsrcs],data['a_wide'][brightsrcs],data['b_wide'][brightsrcs],data['pa_wide'][brightsrcs],flux2,alpha)
+    bigzip=zip(data['Name'][brightsrcs],data['ra_str'][brightsrcs],data['dec_str'][brightsrcs],data['a_wide'][brightsrcs],data['b_wide'][brightsrcs],data['pa_wide'][brightsrcs],flux2,alpha)
 
-f = open("test.txt","w")
-f.write("skymodel fileformat 1.1\n")
-f.close()
+    f = open(options.andre,"w")
+    f.write("skymodel fileformat 1.1\n")
+    f.close()
 
-with open("test.txt","a") as f:
-    for Name,RA,Dec,a,b,pa,flux,alpha in bigzip:
-        f.write(formatter.format(Name=Name,RA=RA,Dec=Dec,a=a,b=b,pa=pa,flux=flux,alpha=alpha,beta=0.0,freq=231.))
-
+    with open(options.andre,"a") as f:
+        for Name,RA,Dec,a,b,pa,flux,alpha in bigzip:
+            f.write(formatter.format(Name=Name,RA=RA,Dec=Dec,a=a,b=b,pa=pa,flux=flux,alpha=alpha,beta=0.0,freq=231.))
