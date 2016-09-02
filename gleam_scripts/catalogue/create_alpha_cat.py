@@ -142,10 +142,16 @@ freq_array = np.log(np.ma.array([float(int(x)) for x in freqs]),dtype="float32")
 #else:
 #    brightsrcs = np.where(data["int_flux_wide"]>0.0)
 # And are not NaN at any frequency
-brightsrcs = np.where(data["int_flux_wide"]>options.flux_limit)
+#brightsrcs = np.where(data["int_flux_wide"]>options.flux_limit)
+# HACK: only include sources which are really faint, so we can get some crap estimates later
+brightsrcs = np.where(data["int_flux_wide"]<0.1)
 for x in freqs:
 #    brightsrcs = np.intersect1d(brightsrcs,np.where(np.isfinite(data["int_flux_"+x])))
     brightsrcs = np.intersect1d(brightsrcs,np.where(data["int_flux_"+x]>options.flux_limit))
+
+brightsrcs = np.squeeze(brightsrcs)
+
+print "Fitting",len(brightsrcs),"source spectral energy distributions"
 
 flux_list = []
 err_list = []
@@ -171,23 +177,33 @@ for i in range(0,len(brightsrcs)):
 # Unpack results
 alpha, err_alpha, amp, err_amp, chi2red = map(list, zip(*results))
 
-# Generate flux density columns, subtracting 100 to reconstruct the original flux densities
-flux1 = vpowerlaw(np.tile(freq1,len(amp)),amp,alpha)
-err_flux1 = err_amp*flux1
-flux2 = vpowerlaw(np.tile(freq2,len(amp)),amp,alpha)
-err_flux2 = err_amp*flux2
+# Convert to numpy arrays
+alpha = np.array(alpha, dtype="float32")
+err_alpha = np.array(err_alpha, dtype="float32")
+amp = np.array(amp, dtype="float32")
+err_amp = np.array(err_amp, dtype="float32")
+chi2red = np.array(chi2red, dtype="float32")
+
+# Exclude any sources which came out with NaN alphas or amps
+good = np.squeeze(np.where(np.isfinite(alpha)))
+
+# Generate flux density columns
+flux1 = vpowerlaw(np.tile(freq1,len(amp[good])),amp[good],alpha[good])
+err_flux1 = err_amp[good]*flux1
+flux2 = vpowerlaw(np.tile(freq2,len(amp[good])),amp[good],alpha[good])
+err_flux2 = err_amp[good]*flux2
 
 # Generate the output VO table
 outtable=Table()
-outtable.add_column(Column(data=data['Name'][brightsrcs],name='Name'))
-outtable.add_column(Column(data=data['RAJ2000'][brightsrcs],name='RAJ2000'))
-outtable.add_column(Column(data=data['DEJ2000'][brightsrcs],name='DEJ2000'))
-outtable.add_column(Column(data=data['int_flux_wide'][brightsrcs],name='int_flux_wide'))
-outtable.add_column(Column(data=data['peak_flux_wide'][brightsrcs],name='peak_flux_wide'))
-outtable.add_column(Column(data=data['local_rms_wide'][brightsrcs],name='local_rms_wide'))
-outtable.add_column(Column(data=alpha,name='alpha'))
-outtable.add_column(Column(data=err_alpha,name='err_alpha'))
-outtable.add_column(Column(data=chi2red,name='reduced_chi2'))
+outtable.add_column(Column(data=data['Name'][brightsrcs[good]],name='Name'))
+outtable.add_column(Column(data=data['RAJ2000'][brightsrcs[good]],name='RAJ2000'))
+outtable.add_column(Column(data=data['DEJ2000'][brightsrcs[good]],name='DEJ2000'))
+outtable.add_column(Column(data=data['int_flux_wide'][brightsrcs[good]],name='int_flux_wide'))
+outtable.add_column(Column(data=data['peak_flux_wide'][brightsrcs[good]],name='peak_flux_wide'))
+outtable.add_column(Column(data=data['local_rms_wide'][brightsrcs[good]],name='local_rms_wide'))
+outtable.add_column(Column(data=alpha[good],name='alpha'))
+outtable.add_column(Column(data=err_alpha[good],name='err_alpha'))
+outtable.add_column(Column(data=chi2red[good],name='reduced_chi2'))
 outtable.add_column(Column(data=flux1,name='S_72'))
 outtable.add_column(Column(data=err_flux1,name='err_S_72'))
 outtable.add_column(Column(data=flux2,name='S_231'))
@@ -201,7 +217,7 @@ if options.andre is not None:
     # Generate an output in Andre's sky model format
     formatter="source {{\n  name \"{Name:s}\"\n  component {{\n    type gaussian\n    position {RA:s} {Dec:s}\n    shape {a:2.1f} {b:2.1f} {pa:4.1f}\n    sed {{\n      frequency {freq:3.0f} MHz\n      fluxdensity Jy {flux:4.7f} 0 0 0\n      spectral-index {{ {alpha:2.2f} {beta:2.2f} }}\n    }}\n  }}\n}}\n"
 
-    bigzip=zip(data['Name'][brightsrcs],data['ra_str'][brightsrcs],data['dec_str'][brightsrcs],data['a_wide'][brightsrcs],data['b_wide'][brightsrcs],data['pa_wide'][brightsrcs],flux2,alpha)
+    bigzip=zip(data['Name'][brightsrcs[good]],data['ra_str'][brightsrcs[good]],data['dec_str'][brightsrcs[good]],data['a_wide'][brightsrcs[good]],data['b_wide'][brightsrcs[good]],data['pa_wide'][brightsrcs[good]],flux2,alpha[good])
 
     f = open(options.andre,"w")
     f.write("skymodel fileformat 1.1\n")
