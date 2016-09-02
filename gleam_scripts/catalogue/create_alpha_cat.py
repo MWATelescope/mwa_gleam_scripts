@@ -155,9 +155,7 @@ for x in freqs:
     fitting_error = data["err_int_flux_"+x][brightsrcs]/data["int_flux_"+x][brightsrcs]
     err_list.append(np.sqrt(fitting_error**2 + calibration_error**2))
     
-# Add 1 to avoid logging negative fluxes
-flux_array = np.transpose(np.ma.vstack(flux_list)+1).astype("float32")
-#flux_array = np.transpose(np.ma.vstack(flux_list)).astype("float32")
+flux_array = np.transpose(np.ma.vstack(flux_list)).astype("float32")
 flux_array = np.ma.log(flux_array)
 flux_errors = np.transpose(np.ma.vstack(err_list)).astype("float32")
 names = data["Name"][brightsrcs]
@@ -175,10 +173,8 @@ alpha, err_alpha, amp, err_amp, chi2red = map(list, zip(*results))
 
 # Generate flux density columns, subtracting 100 to reconstruct the original flux densities
 flux1 = vpowerlaw(np.tile(freq1,len(amp)),amp,alpha)
-flux1-=1
 err_flux1 = err_amp*flux1
 flux2 = vpowerlaw(np.tile(freq2,len(amp)),amp,alpha)
-flux2-=1
 err_flux2 = err_amp*flux2
 
 # Generate the output VO table
