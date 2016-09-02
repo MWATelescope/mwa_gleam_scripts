@@ -142,9 +142,7 @@ freq_array = np.log(np.ma.array([float(int(x)) for x in freqs]),dtype="float32")
 #else:
 #    brightsrcs = np.where(data["int_flux_wide"]>0.0)
 # And are not NaN at any frequency
-#brightsrcs = np.where(data["int_flux_wide"]>options.flux_limit)
-# HACK: only include sources which are really faint, so we can get some crap estimates later
-brightsrcs = np.where(data["int_flux_wide"]<0.1)
+brightsrcs = np.where(data["int_flux_wide"]>options.flux_limit)
 for x in freqs:
 #    brightsrcs = np.intersect1d(brightsrcs,np.where(np.isfinite(data["int_flux_"+x])))
     brightsrcs = np.intersect1d(brightsrcs,np.where(data["int_flux_"+x]>options.flux_limit))
