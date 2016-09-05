@@ -1,10 +1,16 @@
 #! /usr/bin/env python
 
 """
-update the metadata for the GLEAM IDR3 source catalog.
+update the metadata for the GLEAM IDR? source catalog.
 """
+import sys
 __author__ = "Paul Hancock"
 
+if not len(sys.argv)==3:
+    print "usage update_meta.py input output"
+    sys.exit(1)
+output = sys.argv[-1]
+input = sys.argv[-2]
 
 mids = """
 076
@@ -96,7 +102,7 @@ for mid,frange  in zip(mids,freqs):
     metas['psf_pa'+suffix]       = {'ucd':'pos.posAng;instr.det.psf',                        'units':'deg',    'description':'Position angle of the point spread function in '+frange+' image'}
 
     
-cmd = 'stilts tpipe in=GLEAMIDR5.fits out=GLEAMIDR5_meta.fits ofmt="fits-plus" cmd="'
+cmd = 'stilts tpipe in='+input+' out='+output+' ofmt="fits-plus" cmd="'
 for k in metas.keys():
     cmd += "colmeta -units '{0[units]}' -ucd '{0[ucd]}' -desc '{0[description]}' '{1}'; ".format(metas[k],k)
 cmd+='"'
