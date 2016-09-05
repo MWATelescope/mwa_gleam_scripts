@@ -42,7 +42,9 @@ parser.add_option('--cores',dest="cores",default=None,type=int,
 parser.add_option('--limit',dest="flux_limit",default=0.0,type=float,
                   help="Minimum flux density at any frequency for source to be included to in fit (default = 0.0Jy)")
 parser.add_option('--calerror',dest="calerror",default=0.02,type=float,
-                  help="Estimated calibration error (default = 0.02, i.e. 2%)")
+                  help="Estimated calibration error for -72<Dec<+18.5 (default = 0.02, i.e. 2%)")
+parser.add_option('--hldec_calerror',dest="hldec_calerror",default=0.03,type=float,
+                  help="Estimated calibration error for Dec<-72 and Dec>18.5 (default = 0.03, i.e. 3%)")
 (options, args) = parser.parse_args()
 
 # http://scipy-cookbook.readthedocs.org/items/FittingData.html
@@ -124,9 +126,6 @@ def fit_spectrum(name,freq_array,flux_array,flux_errors): #,plot):
 
 # Set up the parameters and do the fitting
 
-# Representative calibration error -- 8% is too big, and gives unbelievable chi2; 2% seems to give believable chi2
-calibration_error = options.calerror
-
 # Frequencies to write out -- use the full band since it shows the range I did the fitting over
 freq1=72
 freq2=231
@@ -150,6 +149,15 @@ for x in freqs:
 brightsrcs = np.squeeze(brightsrcs)
 
 print "Fitting",len(brightsrcs),"source spectral energy distributions"
+
+# Extreme Dec sources = 3% calibration error
+calibration_error = options.hldec_calerror*np.ones(len(brightsrcs))
+
+# Mid-range Dec sources = 2% calibration error
+midsrcs = np.intersect1d(brightsrcs,np.where(data["DEJ2000"]<=18.5))
+midsrcs = np.intersect1d(midsrcs,np.where(data["DEJ2000"]>=-72.))
+midsrcs = np.squeeze(midsrcs)
+calibration_error[midsrcs] = options.calerror
 
 flux_list = []
 err_list = []
