@@ -3,6 +3,14 @@ from astropy.io.votable import from_table, writeto
 import numpy as np
 import sys
 
+
+if not len(sys.argv)==3:
+    print "usage add_names.py input output"
+    sys.exit(1)
+input = sys.argv[-2]
+output = sys.argv[-1]
+
+
 mids = """
 076
 084
@@ -30,7 +38,7 @@ killring = ['Name', 'island_deep', 'source_deep', 'uuid_deep','flags_deep']
 killring.extend([ 'uuid_{0}'.format(f) for f in mids])
 
 print "table load"
-tab = Table.read("all_wide.fits")
+tab = Table.read(input)  # "all_wide.fits")
 # remove columns we don't want
 print "killing columns"
 for n in killring:
@@ -70,4 +78,4 @@ tab['ra_str_wide'].name = 'ra_str'
 tab['dec_str_wide'].name = 'dec_str'
 
 print "saving"
-tab.write('GLEAMIDR5.fits')
+tab.write(output)  # 'GLEAMIDR5.fits')
