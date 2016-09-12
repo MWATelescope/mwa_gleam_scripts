@@ -19,7 +19,7 @@ from astropy.table import Table, Column
 # Parallelise the code
 import multiprocessing
 # multiple cores support
-import AegeanTools.pprocess as pprocess
+import pprocess
 
 import matplotlib.pyplot as plt
 
