@@ -8,7 +8,6 @@ from sqlalchemy import desc
 from datetime import datetime, timedelta
 
 @app.route('/api/graph_data', methods=['GET'])
-@login_required
 def graph_data():
 
   last_x_months = int(request.args.get("last_x_months", 0))

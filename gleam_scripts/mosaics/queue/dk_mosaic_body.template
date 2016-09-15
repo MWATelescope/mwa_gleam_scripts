@@ -1,0 +1,384 @@
+
+ra=TARGETRA
+dec=TARGETDEC
+xsize=XSIZE
+ysize=YSIZE
+chan=CHAN
+date=DATE
+datadir=DATADIR
+proj=PROJ
+
+if [[ ! $PBS_ARRAY_INDEX ]]
+then
+    PBS_ARRAY_INDEX=$SLURM_ARRAY_TASK_ID
+fi
+
+# float number comparison
+function fcomp() {
+    awk -v n1=$1 -v n2=$2 'BEGIN{ if (n1<n2) exit 0; exit 1}'
+}
+
+if [[ $ra && $dec ]]
+then
+    postring="--ra=$ra --dec=$dec"
+fi
+
+# Harder to match MRC further north since it runs out at +20
+if [[ $dec == "18.6" || $dec == "+18.6" ]]
+then
+    MRCtarget=50
+else
+    MRCtarget=100
+fi
+
+if [[ ! $xsize || ! $ysize ]]
+then
+    xsize=0
+    ysize=0
+fi
+
+if [[ $chan -eq 69 ]]
+then
+    rmscutoff=1.0
+elif [[ $chan -eq 93 ]]
+then
+    rmscutoff=0.24
+else
+    rmscutoff=0.2
+fi
+
+# For Dec-72 scans, blank out the larger HAs to reduce ionospheric blurring
+if [[ $date == "20131112" || $date == "20130818" || $date == "20140309" ||  $date == "20140614" ]]
+then
+    docrop="True"
+else
+# Same for the lowest frequency of Dec -55
+    if [[ $chan -eq 69 ]]
+    then
+        if [[ $date == "20131108" || $date == "20130809" || $date == "20140317" ||  $date == "20140612" ]]
+        then
+            docrop="True"
+        fi
+    fi
+fi
+
+cd $datadir/$proj/$date/$chan
+
+dir="subchan"$PBS_ARRAY_INDEX
+cd $dir
+date >> checkpoint.log
+if ! ls mosaic_*fits >> /dev/null
+then
+    echo "No extant mosaics detected: starting the mosaic process." | tee -a checkpoint.log
+    if [[ ! -d unused ]]
+    then
+        mkdir unused
+    fi
+
+# Storing the Is in unused/ as we won't need them until we've done the QA on the XX and YY images
+    mv *_I_*2.?.fits unused/
+
+# Start the enormous QA process!
+    for file in *2.?.fits
+    do
+        echo $file
+# Fix DATE-OBS bug
+        datestr=`pyhead.py -p DATE-OBS $file | awk '{print $3}'`
+        minutes=`echo $datestr | awk 'BEGIN {FS=":"} {print $2}'` 
+        if [[ $minutes -eq 60 ]]
+        then
+            hrs=`echo $datestr | awk 'BEGIN {FS="T"} {print $2}' | awk 'BEGIN {FS=":"} {print $1}'` 
+            ((hrs+=1)) 
+            startstr=`echo $datestr | awk 'BEGIN {FS="T"} {print $1}'`
+            endstr=`echo $datestr | awk 'BEGIN {FS=":"} {print $3}'`
+            newdatestr="${startstr}T${hrs}:00:${endstr}" 
+            pyhead.py -u DATE-OBS $newdatestr $file
+        fi 
+        corfile=`echo $file | sed "s/.fits/_corrected.fits/g"`
+# If the corrected file already exists, assume that the QA worked the first time
+        if [[ ! -e $corfile ]]
+        then
+            pol=`echo $file | awk 'BEGIN {FS="_"} {print $3}'`
+            if [[ $pol == "XX" ]]
+            then
+                altfile=`echo $file | sed "s/XX/YY/g"`
+            else
+                altfile=`echo $file | sed "s/YY/XX/g"`
+            fi
+            if [[ ! -e $altfile && ! -e unused/$altfile ]]
+            then
+                echo "$file has no opposite pol!"
+                mv $file unused/
+            else
+   # discard images with the wrong pixel scale
+                cdel=`pyhead.py -p CDELT2 $file | awk '{printf("%0.8f\n",$3)}' | awk '{print substr($1,0,9)}'`
+                scale=`echo "1.1 / $chan" | bc -l | awk '{printf("%0.8f\n",$1)}' | awk '{print substr($1,0,9)}'`
+                if fcomp $scale $cdel
+                then
+                    echo "$file has the wrong pixel scale ($cdel instead of ${scale})! Trying to find another version." | tee -a checkpoint.log
+                    wget --quiet -O $file  http://store04.icrar.org:7777/RETRIEVE?file_id=$file\&file_version=1
+                    wget --quiet -O $altfile  http://store04.icrar.org:7777/RETRIEVE?file_id=$altfile\&file_version=1
+                fi
+                cdel=`pyhead.py -p CDELT2 $file | awk '{printf("%0.8f\n",$3)}' | awk '{print substr($1,0,9)}'`
+                scale=`echo "1.1 / $chan" | bc -l | awk '{printf("%0.8f\n",$1)}' | awk '{print substr($1,0,9)}'`
+                if fcomp $scale $cdel
+                then
+                    echo "$file still has the wrong pixel scale! Giving up and moving on." | tee -a checkpoint.log
+                    mv $file unused/
+                    mv $altfile unused/
+                else
+                    echo "$file pixel scale is fine." | tee -a checkpoint.log
+        # File sometimes gone by this point -- double check it's still there
+                    if [[ -e $file ]]
+                    then
+        # crop extra-large images
+                        xaxis=`pyhead.py -p NAXIS1 $file | awk '{print $3}'`
+                        if [[ $xaxis -ne 4000 ]]
+                        then
+                            echo "$file is not a standard size: $xaxis pixels across instead of 4000." | tee -a checkpoint.log
+                            echo "Cropping $file to match the standard size." | tee -a checkpoint.log
+                            rstart=`expr \( $xaxis - 4000 \) / 2`
+                            rend=`expr $xaxis - $rstart - 1`
+                            $aprunsingle getfits -o temp.fits $file $rstart-$rend $rstart-$rend
+                            $aprunsingle unflatten.py temp.fits
+                            mv $file unused/
+                            mv temp.fits $file
+                        fi
+                    fi
+                fi
+            fi
+        fi
+    done
+
+    # Congratulations, made it through all the QA!
+    # If the pointing is Dec -72, flag out the SCP
+    if [[ $docrop == "True" ]]
+    then
+        echo "Low Dec observation: blanking edges of the images." | tee -a checkpoint.log
+        $aprunsingle blank_SCP_batch.py
+    fi
+# Final QA step to check that all XXs have YYs and vice versa, and grab the useful Is out of the unused/ directory
+
+    for xfile in *XX*2.?.fits
+    do
+       yfile=`echo $xfile | sed "s/XX/YY/g"`
+       if [[ ! -e $yfile ]]
+       then
+            echo "$xfile somehow made it through the QA checks when there is no $yfile. Perhaps an old version? Removing $xfile now." | tee -a checkpoint.log
+            mv $xfile unused/
+            mv $yfile unused/
+       else
+            ifile=`echo $xfile | awk 'BEGIN {FS="_"} {print $1}'`
+            mv unused/${ifile}*_I_* ./
+       fi
+    done
+
+    for yfile in *YY*2.?.fits
+    do
+       xfile=`echo $yfile | sed "s/XX/YY/g"`
+       if [[ ! -e $xfile ]]
+       then
+            echo "$yfile somehow made it through the QA checks when there is no $xfile. Perhaps an old version? Removing $yfile now." | tee -a checkpoint.log
+            mv $yfile unused/
+            mv $xfile unused/
+       fi
+    done
+
+# Source-finding on the I snapshots
+# We can use cheap backgrounding since we only need bright source fluxes
+
+    for file in *_I_*2.?.fits
+    do
+        echo "Source-finding on $file." | tee -a checkpoint.log
+        xaxis=`pyhead.py -p NAXIS1 $file | awk '{print $3}'`
+        if [[ $xaxis -ne 4000 ]]
+        then
+            echo "$file is not a standard size: $xaxis pixels across instead of 4000." | tee -a checkpoint.log
+            echo "Cropping $file to match the standard size." | tee -a checkpoint.log
+            rstart=`expr \( $xaxis - 4000 \) / 2`
+            rend=`expr $xaxis - $rstart - 1`
+            $aprunsingle getfits -o temp.fits $file $rstart-$rend $rstart-$rend
+            $aprunsingle unflatten.py temp.fits
+            mv $file unused/
+            mv temp.fits $file
+        fi
+        $aprun aegean_snapshot.sh $file
+# Had to write this check for a SINGLE edge case in 10,000s of observations checked so far!!
+        Icat=`echo $file | sed "s/.fits/_comp.vot/"`
+        obsid=`echo $file | awk 'BEGIN {FS="_"} {print $1}'`
+        if [[ ! -e $Icat ]]
+        then
+            echo "$file didn't source-find correctly! Moving to unused along with its XX and YY counterparts." | tee -a checkpoint.log
+            mv ${obsid}* unused/
+        fi
+    done
+
+# MRC flux and position corrections to smooth out any changes in flux scale and astrometry with RA
+# NB: This script expects the directory to be full of "10*XX*2.?.fits"
+
+    echo "Running MRC-based correction script." | tee -a checkpoint.log
+    $aprunsingle correct_mrc.py | tee -a checkpoint.log
+
+    if ls *_corrected.fits 1>> /dev/null 2>> /dev/null
+    then
+# Now that we have a bunch of corrected files, run the mosaicking
+# First check whether there were enough MRC sources to keep the fits image
+        echo "MRC corrections worked: checking that each snapshot cross-matched with enough sources." | tee -a checkpoint.log
+
+        for file in *_corrected.fits
+        do
+            pol=`echo $file | awk 'BEGIN {FS="_"} {print $3}'`
+            if [[ $pol == "XX" || $pol == "YY" ]]
+            then
+                if [[ $pol == "XX" ]]
+                then
+                    altfile=`echo $file | sed "s/XX/YY/g"`
+                else
+                    altfile=`echo $file | sed "s/YY/XX/g"`
+                fi
+                Ivot=`echo $file | sed "s/XX/I/g" | sed "s/YY/I/g" | sed "s/_corrected.fits/_MRC.vot/"`
+                if [[ -e $Ivot ]]
+                then
+                    nmatch=`grep "<TR>" $Ivot | wc -l`
+                elif [[ -e unused/$Ivot ]]
+                then
+                    nmatch=`grep "<TR>" unused/$Ivot | wc -l`
+                else
+                    echo "Couldn't find matching Stokes I MRC-cross-matched VO table for $file! Moving to unused." | tee -a checkpoint.log
+                    mv $file unused/
+                    mv $altfile unused/
+                fi
+                if [[ $nmatch -lt $MRCtarget ]]
+                then
+                    echo "$file did not match enough MRC sources." | tee -a checkpoint.log
+                    mv $file unused/
+                    mv $altfile unused/
+                fi
+            fi
+        done
+        # Then re-generate the IMAGERMS keywords so that swarp gets good weighting
+        $aprunsingle rms_measure_batch.py --corners
+        echo "IMAGERMS keywords done: running the mosaicking." | tee -a checkpoint.log
+        mv *_I_* unused/
+        $aprun python $MWA_CODE_BASE/bin/mosaic_driftscan.py -v --copybeam --reduce --clean --scalar=IMAGERMS --function=inversesquare --separate --proj=ZEA $postring --arguments="-IMAGE_SIZE $xsize,$ysize" *XX*_corrected.fits *YY*_corrected.fits
+    else
+        echo "MRC corrections did not work! Exiting." | tee -a checkpoint.log
+        exit 1
+    fi
+
+# Get info to rename mosaics
+    file_to_check=`ls *2.?_corrected.fits | head -1`
+    crval3=`pyhead.py -p CRVAL3 $file_to_check | awk '{print $3}'`
+    beam=`pyhead.py -p BMAJ $file_to_check | awk '{print $3}'`
+    freqrange=`echo $file_to_check | awk 'BEGIN {FS="_"} {print $2}'`
+    robustness=`echo $file_to_check | awk 'BEGIN {FS="_"} {print $4}'`
+
+# rename mosaics
+# from mosaic.swarp?.fits and mosaic.weight?.fits
+
+    if ls mosaic*.fits 1>> /dev/null 2>> /dev/null
+    then
+        for mosaicfile in mosaic.*.fits
+        do
+# more naming information
+            mostype=`echo $mosaicfile | sed "s/[XY]//g" | awk 'BEGIN {FS="."} {print $2}'`
+            if [[ $mostype == "swarp" ]]
+            then
+                mostype="mosaic"
+            fi
+            pol=`echo $mosaicfile | sed "s/mosaic.swarp//g" | sed "s/mosaic.weight//g" | sed "s/.fits//g"`
+            pol=$pol$pol
+            newname="${mostype}_${date}_${freqrange}_${pol}_${robustness}.fits"
+
+# trim file to sensible size
+            echo "Trimming and modifying header of $mosaicfile." | tee -a checkpoint.log
+            $aprunsingle fits_trim.py $mosaicfile $newname
+            if [[ -e $newname ]]
+            then
+# add sensible keywords to the header
+                pyhead.py -u FREQ $crval3 $newname
+                pyhead.py -u BMAJ $beam $newname
+                pyhead.py -u BMIN $beam $newname
+                pyhead.py -u BPA 0.0 $newname
+# delete unrefined mosaic
+                rm $mosaicfile
+            else
+                echo "Mosaics failed to trim and rename for some reason! Exiting." | tee -a checkpoint.log
+                exit 1
+            fi
+        done
+    else
+        echo "Mosaics failed to create for some reason! Exiting." | tee -a checkpoint.log
+        exit 1
+    fi
+else
+    echo "Mosaics already exist: will not overwrite." | tee -a checkpoint.log
+fi
+
+for mosaicfile in mosaic_*r-1.0.fits
+do
+# Source finding on the mosaic files
+# need full-res RMS maps for good XX:YY combination
+    echo "Source-finding on $mosaicfile." | tee -a checkpoint.log
+    $aprun aegean.sh $mosaicfile bane
+done
+
+file_to_check=`ls *2.?_corrected.fits | head -1`
+crval3=`pyhead.py -p CRVAL3 $file_to_check | awk '{print $3}'`
+# Correct the XX:YY to make "recomb" mosaic
+recomfile=`echo $mosaicfile | sed "s/[XY][XY]_r-1.0/r-1.0_recomb/"`
+if [[ ! -e $recomfile ]]
+then
+    echo "Running XX:YY correction and combination script." | tee -a checkpoint.log
+# Switching to swarp as it's more reliable
+    swarp_XY.sh
+fi
+
+# Source-finding on the recombined mosaic
+if [[ -e $recomfile ]]
+then
+    mosaicfile=$recomfile
+    echo "Source-finding on $mosaicfile." | tee -a checkpoint.log
+    $aprun aegean.sh $mosaicfile bane
+else
+    echo "Combination script failed for some reason: exiting." | tee -a checkpoint.log
+    exit 1
+fi
+
+deccorrfile=`echo $recomfile | sed "s/.fits/_polyapplied.fits/"`
+# Dec-dependent flux corrections
+if [[ ! -e $deccorrfile ]]
+then
+    echo "Running Dec-dependent flux corrections." | tee -a checkpoint.log
+    root=`echo $mosaicfile | sed "s/.fits//"`
+    if [[ $date=="20131125" || $date=="20130810" || $date=="20140303" || $date=="20140609" ]]
+    then
+        zenithflag="--zenith"
+    fi
+    $aprunsingle derive_dec_polynomial.py --mosaic=$mosaicfile --plot --write
+    $aprunsingle apply_dec_polynomial.py --mosaic=$mosaicfile
+fi
+
+# Source-finding on the polyapplied mosaic
+if [[ -e $deccorrfile ]]
+then
+    echo "Source-finding on $deccorrfile." | tee -a checkpoint.log
+    $aprun aegean.sh $deccorrfile bane
+else
+    echo "Dec-dependent flux corrections failed for some reason: exiting." | tee -a checkpoint.log
+    exit 1
+fi
+
+
+cd ../
+
+#    /scratch/mwaops/ngas/ngamsCClient -host store04.icrar.org -port 7777 -cmd QARCHIVE -mimeType application/octet-stream -fileUri $newname | tee ngas_test.txt
+#    if ! grep -q "SUCCESS" ngas_test.txt
+#    then
+#        echo "mosaic $newname failed to upload!"
+#        exit 1
+#    else
+#        rm ngas_test.txt
+#    fi
+
+exit 0

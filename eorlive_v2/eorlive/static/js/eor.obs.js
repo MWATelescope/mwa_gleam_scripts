@@ -3,7 +3,7 @@ EoR.obs = {};
 EoR.obs.create_mit_observations = function(){
   return $("<div/>")
     .attr("id", "mit_observations_container")
-    .append("<h4>Current And Past observations</h3>")
+    .append("<h5>Current And Past observations</h5>")
     .append( $("<table/>")
       .addClass("gs_table table table-striped")
       .append("<thead><tr><th>Obs. Number</th><th>Obs. Name</th><th>Project ID</th><th>Start Time</th><th>Stop Time</th><th>Files</th></tr></thead>")
@@ -16,7 +16,7 @@ EoR.obs.create_mit_observations = function(){
 EoR.obs.create_mit_future_observation_counts = function(){
   return $("<div/>")
     .attr("id", "mit_future_obs_div")
-    .append("<h4>Scheduled Observation Counts</h3>")
+    .append("<h5>Scheduled Observation Counts</h5>")
     .append( $("<table/>")
       .addClass("gs_table table table-striped")
       .append("<thead><tr><th>Total Scheduled</th><th>Next 24 Hours</th></tr></thead>")
@@ -94,8 +94,9 @@ EoR.obs.fetch_future_observation_counts = function(callback){
 
 EoR.obs.init = function(){
   $("#mit_observations")
-    .append( $("<button/>").attr("type", "button").addClass("btn btn-primary refresh")
-      .text("Refresh")
+    .append('<h4 class="title-with-link">Observations</h4>')
+    .append( $("<span/>").addClass("link refresh")
+      .text("refresh")
       .click(function(e){
         EoR.obs.fetch_observations(EoR.obs.fetch_future_observation_counts);
       })

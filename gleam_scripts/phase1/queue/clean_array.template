@@ -1,0 +1,27 @@
+#!/bin/bash
+
+# Clean the data
+# budget 10 minutes per clean
+# 2 pols, 5 freq ranges, 5 weighting schemes = 50 images
+# 500 minutes ~ 8.5 hours; finding it's dying after 9 so increased to 10
+
+#PBS -W group_list=GROUPQ
+#PBS -q STANDARDQ
+#PBS -l walltime=11:00:00
+#PBS -l select=1:ncpus=12:mem=HOSTMEM
+#PBS -J 1-FILELENGTH
+
+groupq="GROUPQ"
+
+if [[ $groupq == "astronomy818" ]]
+then
+   computer=epic
+else
+   computer=fornax
+fi
+
+cd DATADIR/PROJ
+obsnum=`sed "${PBS_ARRAY_INDEX}q;d" FILELIST`
+cd $obsnum
+cat QUEUEDIR/clean_array_casa.template | sed "s/OBSNUM/$obsnum/g" | sed "s/COMPUTER/$computer/g" > clean.py
+DATADIR/casapy-42.0.28322-021-1-64b/casapy --nologger -c clean.py

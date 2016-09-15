@@ -1,0 +1,189 @@
+#!/bin/bash
+
+datadir=DATADIR
+proj=PROJ
+week=WEEK
+ncpus=NCPUS
+
+# Convert SLURM id to PBS id
+if [[ ! $PBS_ARRAY_INDEX ]]
+then
+    PBS_ARRAY_INDEX=$SLURM_ARRAY_TASK_ID
+fi
+
+if [[ $week == "Week1" ]]
+then
+    dateprefix=201308
+    zenith=20130810
+elif [[ $week == "Week2" ]]
+then
+    dateprefix=201311
+    zenith=20131125
+elif [[ $week == "Week3" ]]
+then
+    dateprefix=201403
+    zenith=20140303
+elif [[ $week == "Week4" ]]
+then
+    dateprefix=201406
+    zenith=20140609
+elif [[ $week == "Week5" ]]
+then
+    dateprefix=201607
+    zenith=20140609
+else
+    echo "Week not given correctly: specify like 'WeekN', where N=1-4"
+    exit 1
+fi
+
+cd $datadir/$proj/
+
+if [[ ! -d $week ]]
+then
+    mkdir $week
+fi
+
+cd $week
+
+# Get list of frequencies and zenith psf from the header of the zenith mosaic
+testdir=`ls -d $datadir/$proj/$zenith`
+file=`ls $testdir/*/subchan?/*polyapplied.fits | head -${PBS_ARRAY_INDEX} | tail -1`
+freq=`basename $file | awk 'BEGIN {FS="_"} {print $3}'`
+bmaj=`pyhead.py -p BMAJ $file | awk '{print $3}'`
+bmin=`pyhead.py -p BMIN $file | awk '{print $3}'`
+
+if [[ ! -d $freq ]]
+then
+    mkdir $freq
+fi
+
+cd $freq
+
+if [[ ! -e ${week}_${freq}.fits ]]
+then
+    for file in $datadir/$proj/${dateprefix}??/*/subchan?/*$freq*_polyapplied.fits
+    do
+       localfile=`basename $file`
+       rms=`echo $file | sed "s;.fits;_rms.fits;"`
+       localrms=`basename $rms`
+       if [[ -h $localfile ]]
+       then
+           rm $localfile
+       fi
+       if [[ -h $localrms ]]
+       then
+           rm $localrms
+       fi
+       ln -s $file
+       echo "ln -s $file"
+    # Link RMS
+       ln -s $rms
+       echo "ln -s $rms"
+    done
+
+    for file in *_polyapplied_rms.fits
+    do
+       newfile=`echo $file | sed "s/_rms.fits/_rms_sigmoid.fits/"`
+       if [[ ! -e $newfile ]]
+       then
+           echo "Modifying the weights at the edges of $file, to produce $newfile."
+           $aprunsingle sigmoid_weight.py --mosaic=$file
+       else
+           echo "$newfile already exists"
+       fi
+    done
+
+# Rescale RMS maps in preparation for swarping
+    for file in *_polyapplied_rms_sigmoid.fits
+    do
+# Modified 16/01/16 to 1000x smaller value to see if that fixes nans
+        $aprunsingle pyhead.py -u BSCALE 0.000000001
+    done
+
+    $aprun swarp -c ../weight.swarp mosaic*_polyapplied.fits -IMAGEOUT_NAME ${week}_${freq}.fits -WEIGHTOUT_NAME ${week}_${freq}.weight.fits
+
+# De-rescale RMS maps
+    for file in *_polyapplied_rms_sigmoid.fits
+    do
+        $aprunsingle pyhead.py -u BSCALE 1.0 $file
+    done
+
+# Trim off the dead zones
+    $aprunsingle fits_trim.py ${week}_${freq}.fits temp.fits
+    mv temp.fits ${week}_${freq}.fits
+    $aprunsingle fits_trim.py ${week}_${freq}.weight.fits temp.fits
+    mv temp.fits ${week}_${freq}.weight.fits
+# Use the zenith psf as the header beam
+    pyhead.py -u BMAJ $bmaj ${week}_${freq}.fits
+    pyhead.py -u BMIN $bmin ${week}_${freq}.fits
+    pyhead.py -u BPA 0.0 ${week}_${freq}.fits
+else
+    echo "${week}_${freq}.fits already exists, so I didn't bother to re-make it. Please delete and re-run if you want a new version."
+fi
+
+$aprun BANE.py --cores=${ncpus} --noclobber --compress ${week}_${freq}.fits
+if [[ ! -e ${week}_${freq}_bkg.fits ]]
+then
+    echo "BANE failed to run!"
+    echo "Trying again with a single core."
+    $aprun BANE.py --noclobber --compress --cores=1 ${week}_${freq}.fits
+    if [[ ! -e ${week}_${freq}_bkg.fits ]]
+    then
+        echo "BANE wouldn't run even with a single core!"
+        exit 1
+    fi
+fi
+
+# Run some blind source-finding so I can do other tasks
+if [[ ! -e ${week}_${freq}_comp.vot ]]
+then
+    $aprun aegean.py --cores=${ncpus} --telescope=mwa --island --maxsummits=5 --autoload --out=/dev/null --table=${week}_${freq}.vot,${week}_${freq}.reg ${week}_${freq}.fits
+fi
+
+# Filter only part of the data in order to calculate the PSF (fluxes also don't matter for this stage)
+# Characterise the PSF
+#if [[ ! -e ${week}_${freq}_partfilter_psf.fits ]]
+#then
+#    if [[ ! -e ${week}_${freq}_comp_partfilter.vot ]]
+#    then
+#        $aprunsingle QC_filter.py --input=${week}_${freq}_comp.vot --output=${week}_${freq}_comp_partfilter.vot --mimtable=$MWA_CODE_BASE/MWA_Tools/gleam_scripts/mosaics/scripts/all.mim #--week=${week:4:1}
+#    fi
+#    $aprunsingle psf_select.py --input=${week}_${freq}_comp_partfilter.vot
+#    $aprunsingle phg.py --input=${week}_${freq}_comp_partfilter_psf.vot
+#fi
+
+# Make an unfiltered PSF -- the filtered one wasn't that useful
+$aprunsingle psf_select.py --input=${week}_${freq}_comp.vot
+$aprunsingle phg.py --input=${week}_${freq}_comp_psf.vot
+
+# Rescale the map using the PSF, so that peak fluxes agree with int fluxes
+
+$aprunsingle dd_flux_mod.py --mosaic=${week}_${freq}.fits --psf=${week}_${freq}_comp_psf.fits --output=${week}_${freq}_ddmod.fits
+$aprunsingle dd_flux_mod.py --mosaic=${week}_${freq}_bkg.fits --psf=${week}_${freq}_comp_psf.fits --output=${week}_${freq}_ddmod_bkg.fits
+$aprunsingle dd_flux_mod.py --mosaic=${week}_${freq}_rms.fits --psf=${week}_${freq}_comp_psf.fits --output=${week}_${freq}_ddmod_rms.fits
+
+# Run the source-finding using the new PSF
+if [[ ! -e ${week}_${freq}_wpsf_comp.vot ]]
+then
+    $aprun aegean.py --cores=${ncpus} --psf=${week}_${freq}_comp_psf.fits --island --maxsummits=5 --autoload --out=/dev/null --table=${week}_${freq}_wpsf.vot,${week}_${freq}_wpsf.reg ${week}_${freq}_ddmod.fits
+fi
+
+# Filter out everything completely in order to calculate flux scale
+if [[ ! -e ${week}_${freq}_wpsf_comp_filter.vot ]]
+then
+    if [[ ${week} != "Week5" ]]
+    then
+        weekfilter="--week=${week:4:1}"
+    fi
+    $aprunsingle QC_filter.py --input=${week}_${freq}_wpsf_comp.vot --output=${week}_${freq}_wpsf_comp_filter.vot --mimtable=$MWA_CODE_BASE/MWA_Tools/gleam_scripts/mosaics/scripts/all.mim $weekfilter
+fi
+if [[ ! -e ${week}_${freq}_ddmod_fluxscale.fits ]]
+then
+# Calculate the flux scale
+    $aprunsingle check_flux_scale.py --mosaic=${week}_${freq}_ddmod.fits --catalog=${week}_${freq}_wpsf_comp_filter.vot --isles=${week}_${freq}_wpsf_isle.vot --plot --write --table
+# Apply the flux scale
+    $aprunsingle rescale_flux.py --mosaic=${week}_${freq}_ddmod.fits --zerofits=${week}_${freq}_ddmod_fluxscale.fits
+    $aprunsingle rescale_flux.py --mosaic=${week}_${freq}_ddmod_bkg.fits --zerofits=${week}_${freq}_ddmod_fluxscale.fits
+    $aprunsingle rescale_flux.py --mosaic=${week}_${freq}_ddmod_rms.fits --zerofits=${week}_${freq}_ddmod_fluxscale.fits
+fi
+

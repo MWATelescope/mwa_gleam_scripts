@@ -1,0 +1,12 @@
+#!/bin/bash
+
+# Queues up some data grabbing via obsdownload.py
+
+#PBS -W group_list=GROUPQ
+#PBS -q copyq
+#PBS -m e
+#PBS -l walltime=02:00:00,mem=6gb
+
+module load python/2.6.9 numpy/1.6.2 scipy/0.11.0
+cd DATADIR/PROJ
+obsdownload.py -o OBSNUM 1>> DATADIR/PROJ/output.log 2>>DATADIR/PROJ/error.log

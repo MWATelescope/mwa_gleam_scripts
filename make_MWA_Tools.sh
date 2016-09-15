@@ -27,17 +27,27 @@ then
   cd cfitsio
   ./configure
   make
-    if [ "$?" -ne 0 ];
-        then
-        echo 'internal cfitsio install failed'
-        cd ..
-        exit
-    fi
+  if [ "$?" -ne 0 ];
+      then
+      echo 'internal cfitsio install failed'
+      cd ..
+      exit
+  fi
   cd ..
-  else
-  echo 'using $CFITSIO = '${CFITSIO}
-  export CFITSLIB=${CFITSIO}/lib/
-  export CFITSINC=${CFITSIO}/include/
+else
+    if [ -z "$CFITSLIB" ]
+    then
+        export CFITSLIB=${CFITSIO}/lib/
+    else
+        echo "CFITSLIB environment variable set to $CFITSLIB; overwriting default"
+    fi
+    if [ -z "$CFITSINC" ]
+    then
+        export CFITSINC=${CFITSIO}/include/
+    else
+        echo "CFITSINC environment variable set to $CFITSINC; overwriting default"
+    fi
+        echo 'using $CFITSIO = '${CFITSIO}
 fi
 
 echo "building LFILE & read_mwac utilities"

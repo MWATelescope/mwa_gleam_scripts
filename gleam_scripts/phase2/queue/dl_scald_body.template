@@ -1,0 +1,16 @@
+obsnum=SOLOBS
+wget -O ${obsnum}_phase2.tar.gz http://store04.icrar.org:7777/RETRIEVE?file_id=${obsnum}_phase2.tar.gz
+
+testfile=${obsnum}_${freq}_XX_r-1.0_v2.0.fits
+wget --quiet -O  $testfile  http://store04.icrar.org:7777/RETRIEVE?file_id=$testfile
+if [[ ! -s $testfile ]]
+then
+    rm $testfile
+    testfile=${obsnum}_${freq}_XX_r0.0_v2.0.fits
+    wget --quiet -O  $testfile  http://store04.icrar.org:7777/RETRIEVE?file_id=$testfile
+fi
+if [[ ! -s $testfile ]]
+then
+    echo "Could not download a test image for the Phase 2 observation ${obsnum}; will not be able to clean to a particular threshold."
+    rm $testfile
+fi

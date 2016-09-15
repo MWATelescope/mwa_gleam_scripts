@@ -12,6 +12,7 @@ eor_conn = None # Lazy load globals
 ngas_conn = None
 mwa_conn = None
 local_conn = None
+qc_conn = None
 profiling_mark = None
 
 TESTING = False
@@ -39,6 +40,8 @@ def send_ngas_query(query): return send_query(ngas_conn, query)
 def send_mwa_query(query): return send_query(mwa_conn, query)
 
 def send_local_query(query): return send_query(local_conn, query)
+
+def send_qc_query(query): return send_query(qc_conn,query)
 
 def profile():
   global profiling_mark
@@ -161,9 +164,9 @@ def update():
   write_to_log("The giant iteration ran in %f seconds" %profile())
 
   # UVFITS hours
-  total_uvfits_hours = float (send_mwa_query(
+  total_uvfits_hours = float (send_qc_query(
     '''
-    SELECT COUNT(*) FROM uvfits_location WHERE version = 3 AND subversion = 1
+    SELECT COUNT(*) FROM uvfits WHERE version = 4 AND subversion = 1
     ''').fetchone()[0] ) * 112. / 3600.
 
   write_to_log("total_uvvits_hours query ran in %f seconds" %profile())
@@ -217,7 +220,11 @@ if __name__=='__main__':
   except Exception, e:
     write_to_log("Can't connect to the mwa database at mwa.mit.edu - %s" %e)
     exit(1)
-
+  try:
+    qc_conn = psycopg2.connect(database='mwa_qc',user='mwa',password='BowTie',host='eor-00.mit.edu')
+  except Exception, e:
+    write_to_log("Can't connect to the mwa_qc database at eor-00.mit.edu - %s"%e)
+    exit(1)
   try:
     local_conn = psycopg2.connect(database='eor',user=LOCAL_DB_U,password=LOCAL_DB_P,host=LOCAL_DB_HOST)
   except Exception, e:

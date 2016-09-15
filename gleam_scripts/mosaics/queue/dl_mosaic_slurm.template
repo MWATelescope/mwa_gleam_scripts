@@ -1,0 +1,14 @@
+#!/bin/bash
+
+# Download images ready to mosaic
+
+#SBATCH --account=GROUPQ
+#SBATCH --partition=COPYQ
+#SBATCH --time=10:00:00
+#SBATCH --nodes=1
+#SBATCH --ntasks-per-node=1
+#SBATCH --mem=100mb
+#SBATCH --output=QUEUEDIR/OUTPUT.o%j
+#SBATCH --error=QUEUEDIR/OUTPUT.e%j
+#SBATCH --export=NONE
+

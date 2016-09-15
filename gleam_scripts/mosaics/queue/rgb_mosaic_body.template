@@ -1,0 +1,197 @@
+#!/bin/bash
+
+datadir=DATADIR
+proj=PROJ
+week=WEEK
+ncpus=NCPUS
+
+if [[ ! $PBS_ARRAY_INDEX ]]
+then
+    PBS_ARRAY_INDEX=$SLURM_ARRAY_TASK_ID
+fi
+
+# Giant RGB mosaics
+colors="red green blue white"
+arr=($colors)
+color=${arr[$PBS_ARRAY_INDEX]}
+
+if [[ $color == "red" ]]
+then
+    fiducial_freq="072-080MHz"
+    lowfreq=71
+    midfreq=87675000
+    highfreq=102
+elif [[ $color == "green" ]]
+then
+    fiducial_freq="103-111MHz"
+    lowfreq=102
+    midfreq=118395000
+    highfreq=133
+elif [[ $color == "blue" ]]
+then
+    fiducial_freq="139-147MHz"
+    lowfreq=138
+    midfreq=154235000
+    highfreq=169
+elif [[ $color == "white" ]]
+then
+    fiducial_freq="170-177MHz"
+    lowfreq=169
+    midfreq=200315000
+    highfreq=232
+fi
+
+cd $datadir/$proj/$week
+
+list=`ls -d *MHz`
+freqs=""
+
+for file in $list
+do
+    startfreq=`basename $file | awk 'BEGIN {FS="-"} {print int($1)}'`
+    if [[ $startfreq -gt $lowfreq && $startfreq -lt $highfreq ]]
+    then
+        freqs="$freqs "$file
+    fi
+done
+
+if [[ ! -d ${color} ]]
+then
+    mkdir ${color}
+fi
+cd ${color}
+
+# Get list of frequencies and zenith psf from the header of the final mosaic, which itself should be using the zenith PSF
+bmaj=`pyhead.py -p BMAJ ../${fiducial_freq}/${week}_${fiducial_freq}.fits | awk '{print $3}'`
+bmin=`pyhead.py -p BMIN ../${fiducial_freq}/${week}_${fiducial_freq}.fits | awk '{print $3}'`
+echo "Final resolution will be $bmaj x $bmin deg."
+
+for freq in $freqs
+do
+    for file in ../${freq}/mosaic*ied.fits
+    do
+        localname=`basename $file`
+        if [[ ! -e $localname ]]
+        then
+            robust=`echo $localname | awk 'BEGIN {FS="_"} {print $4}'`
+# Load and convolve-down all of the individual mosaics, setting up for the weighted run
+            root=`echo $localname | awk 'BEGIN {FS="_"} {print $1"_"$2}'`
+            echo "Using ${root}_${fiducial_freq}_${robust}_recomb_polyapplied.fits to convolve $localname"
+            if [[ "$localname" != "${root}_${fiducial_freq}_${robust}_recomb_polyapplied.fits" ]]
+            then
+                convbeam=`pyhead.py -p BMAJ ../${fiducial_freq}/${root}_${fiducial_freq}_${robust}_recomb_polyapplied.fits | awk '{print $3*3600}'`
+                echo "Convolving $file to resolution of $convbeam arcsec."
+                imname=`basename $file | sed "s/.fits/.im/"`
+                $aprunsingle fits_unmask.py -i $file -o temp.fits
+                fits op=xyin in=temp.fits out=$imname
+                rm temp.fits
+                puthd in=$imname/bunit value="JY/BEAM"
+                convol map=$imname options="final" fwhm=$convbeam out=temp.im
+                fits op=xyout in=temp.im out=$localname
+                rm -rf temp.im
+                echo "Writing $localname."
+            else
+                echo "$localname is already at the lowest resolution; linking instead."
+                ln -s $file
+            fi
+        fi
+   done
+# Copy all of the mosaic rms images without worrying about convolution
+   for file in ../${freq}/mosaic*oid.fits
+   do
+       localname=`basename $file`
+       if [[ ! -e $localname ]]
+       then
+           cp $file $localname
+       fi
+   done
+done
+
+if [[ ! -e ${week}_${color}_lownoise.fits ]]
+then
+# Rescale RMS maps in preparation for swarping
+    for file in *_polyapplied_rms_sigmoid.fits
+    do
+        $aprunsingle pyhead.py -u BSCALE  0.000001
+    done
+    $aprun swarp -c ../weight.swarp mosaic*ed.fits -IMAGEOUT_NAME ${week}_${color}_lownoise.fits -WEIGHTOUT_NAME ${week}_${color}_lownoise.weight.fits
+    $aprunsingle fits_trim.py ${week}_${color}_lownoise.fits temp.fits
+    mv temp.fits ${week}_${color}_lownoise.fits
+    $aprunsingle fits_trim.py ${week}_${color}_lownoise.weight.fits temp.fits
+    mv temp.fits ${week}_${color}_lownoise.weight.fits
+# Update with zenith fiducial frequency beam
+    pyhead.py -u BMAJ $bmaj ${week}_${color}_lownoise.fits
+    pyhead.py -u BMIN $bmin ${week}_${color}_lownoise.fits
+    pyhead.py -u BPA 0.0 ${week}_${color}_lownoise.fits
+# Update with frequency of middle observation
+    pyhead.py -u FREQ ${midfreq} ${week}_${color}_lownoise.fits
+# De-rescale RMS maps
+    for file in *_polyapplied_rms_sigmoid.fits
+    do
+        $aprunsingle pyhead.py -u BSCALE 1.0 $file
+    done
+# Update with frequency of middle observation
+    num=`ls ${week}*z.fits | wc -l | awk '{print $1/2}'`
+    freq=`ls ${week}*z.fits | head -$num | tail -1 | awk '{print 1000000*substr($1,11,3)}'`
+    pyhead.py -u FREQ ${freq} ${week}_${color}_noweight.fits
+fi
+
+$aprun BANE.py --cores=${ncpus} --noclobber --compress ${week}_${color}_lownoise.fits 
+if [[ ! -e ${week}_${color}_lownoise_bkg.fits ]]
+then
+    echo "BANE failed to run!"
+    echo "Trying again with a single core."
+    $aprun BANE.py --noclobber --compress --cores=1 ${week}_${color}_lownoise.fits 
+    if [[ ! -e ${week}_${color}_lownoise_bkg.fits ]]
+    then
+        echo "BANE wouldn't run even with a single core!"
+        exit 1
+    fi
+fi
+
+# Run some blind source-finding so I can do other tasks
+if [[ ! -e ${week}_${color}_lownoise_comp.vot ]]
+then
+    $aprun aegean.py --cores=${ncpus} --telescope=mwa --island --maxsummits=5 --autoload --out=/dev/null --table=${week}_${color}_lownoise.vot,${week}_${color}_lownoise.reg ${week}_${color}_lownoise.fits
+fi
+
+# Make PSF maps
+if [[ ! -e ${week}_${color}_lownoise_comp_psf.fits ]]
+then
+    $aprunsingle psf_select.py --input=${week}_${color}_lownoise_comp.vot
+    $aprunsingle phg.py --input=${week}_${color}_lownoise_comp_psf.vot
+fi
+
+# Rescale the map using the PSF, so that peak fluxes agree with int fluxes
+
+$aprunsingle dd_flux_mod.py --mosaic=${week}_${color}_lownoise.fits --psf=${week}_${color}_lownoise_comp_psf.fits --output=${week}_${color}_lownoise_ddmod.fits
+$aprunsingle dd_flux_mod.py --mosaic=${week}_${color}_lownoise_bkg.fits --psf=${week}_${color}_lownoise_comp_psf.fits --output=${week}_${color}_lownoise_ddmod_bkg.fits
+$aprunsingle dd_flux_mod.py --mosaic=${week}_${color}_lownoise_rms.fits --psf=${week}_${color}_lownoise_comp_psf.fits --output=${week}_${color}_lownoise_ddmod_rms.fits
+
+# Re-run the source-finding using the new PSF maps
+if [[ ! -e ${week}_${color}_lownoise_wpsf_comp.vot ]]
+then
+    $aprun aegean.py --cores=${ncpus} --psf=${week}_${color}_lownoise_comp_psf.fits --island --maxsummits=5 --autoload --out=/dev/null --table=${week}_${color}_lownoise_wpsf.vot,${week}_${color}_lownoise_wpsf.reg ${week}_${color}_lownoise_ddmod.fits
+fi
+
+# Filter everything in order to generate a flux scale
+if [[ ! -e ${week}_${color}_lownoise_wpsf_comp_filter.vot ]]
+then
+    if [[ ${week} != "Week5" ]]
+    then
+        weekfilter="--week=${week:4:1}"
+    fi
+    $aprunsingle QC_filter.py --input=${week}_${color}_lownoise_wpsf_comp.vot --output=${week}_${color}_lownoise_wpsf_comp_filter.vot --mimtable=$MWA_CODE_BASE/MWA_Tools/gleam_scripts/mosaics/scripts/all.mim $weekfilter
+fi
+
+# Rescale to correct flux
+if [[ ! -e ${week}_${color}_lownoise_ddmod_fluxscale.fits ]]
+then
+    $aprunsingle check_flux_scale.py --mosaic=${week}_${color}_lownoise_ddmod.fits --catalog=${week}_${color}_lownoise_wpsf_comp_filter.vot --isles=${week}_${color}_lownoise_wpsf_isle.vot --plot --write --table
+    $aprunsingle rescale_flux.py --mosaic=${week}_${color}_lownoise_ddmod.fits --zerofits=${week}_${color}_lownoise_ddmod_fluxscale.fits
+    $aprunsingle rescale_flux.py --mosaic=${week}_${color}_lownoise_ddmod_bkg.fits --zerofits=${week}_${color}_lownoise_ddmod_fluxscale.fits
+    $aprunsingle rescale_flux.py --mosaic=${week}_${color}_lownoise_ddmod_rms.fits --zerofits=${week}_${color}_lownoise_ddmod_fluxscale.fits
+fi
+
+exit 0
+
