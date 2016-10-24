@@ -196,14 +196,21 @@ def adjust_errors(table):
     A scant few columns have err==-1.
     Modify these errors to be equal to the value (ie 100% error)
     """
-    cols = ["ra", "dec", "peak_flux", "int_flux"] #, "a", "b","pa"]
+    # -1 error on fluxes -> 100% flux error
+    cols = ["peak_flux", "int_flux"]
     err_cols = [ "err_"+a for a in cols]
 
     for v,e in zip(cols, err_cols):
         mask = np.where(table[e]<0)
         print v,e,len(mask[0])
         table[e][mask] = table[v][mask]
+    
+    # -1 error on ra/dec -> error is just semi-major axis.
+    mask = np.where[table['err_ra']<0]
+    table['err_ra'][mask] = table['a'][mask]
 
+    mask = np.where[table['err_dec']<0]
+    table['err_dec'][mask] = table['a'][mask]
 
 def make_mim():
     """
