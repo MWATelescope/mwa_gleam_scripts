@@ -48,7 +48,7 @@ def filter_RADEC(table, week):
     print "RADEC filter"
     if week==1:
         band1 =                       (table['dec']<-30)  & (table['ra']>=21*15) 
-        band2 = (table['dec']>=-30) & (table['dec']<0)    & (table['ra']>=20*15)
+        band2 = (table['dec']>=-30) & (table['dec']<0)    & (table['ra']>=20.5*15)
         good = np.where(band1 | band2)
     elif week==2:
         good = np.where( (table['ra']<8*15) & (table['dec']<30) )
@@ -59,9 +59,11 @@ def filter_RADEC(table, week):
         good = np.where(band1 | band2 | band3)
     elif week==4:
         band1 =                      (table['dec']<-30)  & (table['ra']>=13.5*15) & (table['ra']<21*15)
-        band2 = (table['dec']>=-30) & (table['dec']<0)   & (table['ra']>=15.5*15) & (table['ra']<20*15)
+        band2 = (table['dec']>=-30) & (table['dec']<0)   & (table['ra']>=15.5*15) & (table['ra']<20.5*15)
         band3 = (table['dec']>=0)   & (table['dec']<30)  & (table['ra']>=14.5*15) & (table['ra']<22*15)
         good = np.where(band1 | band2 | band3)
+    elif week==5:
+        return table
     else:
         print "bad week"
         sys.exit(1)
@@ -181,6 +183,34 @@ def filter_intpeak(table):
     good = np.where( table['int_flux']/table['peak_flux']<10)
     return table[good]
 
+def filter_cena_reflection(table):
+    """
+    """
+    bad = (table['ra'] > (13+7./60)*15) & (table['ra'] < (13+53./60)*15) & (table['dec']>20) & (table['dec']<30)
+    good = np.bitwise_not(bad)
+    return table[good]
+
+
+def adjust_errors(table):
+    """
+    A scant few columns have err==-1.
+    Modify these errors to be equal to the value (ie 100% error)
+    """
+    # -1 error on fluxes -> 100% flux error
+    cols = ["peak_flux", "int_flux"]
+    err_cols = [ "err_"+a for a in cols]
+
+    for v,e in zip(cols, err_cols):
+        mask = np.where(table[e]<0)
+        print v,e,len(mask[0])
+        table[e][mask] = table[v][mask]
+    
+    # -1 error on ra/dec -> error is just semi-major axis.
+    mask = np.where[table['err_ra']<0]
+    table['err_ra'][mask] = table['a'][mask]
+
+    mask = np.where[table['err_dec']<0]
+    table['err_dec'][mask] = table['a'][mask]
 
 def make_mim():
     """
@@ -197,9 +227,9 @@ def make_mim():
         srclist[name] = (pos.ra.degree,pos.dec.degree, radius)
     for k in srclist.keys():
         v = srclist[k]
-        print 'MIMAS.py +c {0} {1} {2} -o {3}.mim'.format(v[0],v[1],v[2],k)
+        print 'MIMAS +c {0} {1} {2} -o {3}.mim'.format(v[0],v[1],v[2],k)
     everything = srclist.keys()
-    print "MIMAS.py ",
+    print "MIMAS ",
     for e in everything:
         print "+r {0}.mim".format(e),
     print " -o all.mim"
@@ -273,5 +303,7 @@ if __name__=="__main__":
     table = filter_intpeak(table)
     table = filter_region(table,mimtable)
     table = filter_aliases(table, options.week)
+    table = filter_cena_reflection(table)
+    adjust_errors(table)
     save(table, outfile)
 
