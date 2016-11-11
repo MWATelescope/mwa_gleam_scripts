@@ -479,7 +479,7 @@ int readUVFITSnextIter(uvdata *obj, uvReadContext *iter) {
 
         // calculate the time, which might be the sum of two "DATE" fields
         this_time = iter->grp_par[iter->ptype_map.date];
-        if (iter->ptype_map.date > 0) {
+        if (iter->ptype_map.date0 > 0) {
             this_time += iter->grp_par[iter->ptype_map.date0];  // add optional second date field
         }
 
