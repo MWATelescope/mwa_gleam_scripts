@@ -211,7 +211,7 @@ int readUVFITSInitIterator(char *filename, uvdata **data, uvReadContext **iterat
     assert(iter != NULL);
     *iterator = iter;
     iter->fptr = fptr;
-    iter->base_date = -1;   // set this sentinel for check below.
+    iter->base_date = 0;   // set this sentinel for check below.
 
     /* find out how many groups there are. There is one group for each source,time,baseline combination.
        we don't know how many baselines there are yet- have to work this out while reading the data.
@@ -264,15 +264,17 @@ int readUVFITSInitIterator(char *filename, uvdata **data, uvReadContext **iterat
 
         /* remember the stuff we care about */
         if (strncmp("DATE",typedesc,4)==0) {
-            iter->base_date = temp_pzero;
+            iter->base_date += temp_pzero;
             // handle 2nd occurance of DATE field which can be in non-standard CASA format
             // in this case, the first DATE is what should be in the CRVALs in the header, which is the
             // base date that the offsets in the visibilities are added to to get the JD
             // so copy over the index of the previous occurrance of DATE for date0
             if (iter->ptype_map.date != 0) {
-                iter->ptype_map.date0 = iter->ptype_map.date;
+                iter->ptype_map.date0 = i;
             }
-            iter->ptype_map.date = i;
+            else {
+                iter->ptype_map.date = i;
+            }
         }
         if (strncmp("UU",typedesc,2)==0) {
             iter->pscal[0] = temp_pscal;
@@ -296,7 +298,7 @@ int readUVFITSInitIterator(char *filename, uvdata **data, uvReadContext **iterat
             iter->ptype_map.fq = i;
         }
     }
-    if(iter->base_date < 0.0) {
+    if(iter->base_date <= 0.0) {
         fprintf(stderr,"ERROR: no JD base date read from PTYPE keywords in header.\n");
     }
 
@@ -392,7 +394,7 @@ int readUVFITSInitIterator(char *filename, uvdata **data, uvReadContext **iterat
 
 /******************************
  ! NAME:      addGroupRow
- ! PURPOSE:   add a row of data (one baseline/time) to the output data structure.
+ ! PURPOSE:   add a row of parameters (one baseline/time) to the output data structure.
  ! ARGUMENTS: obj: data structure returned by InitIterator for resulting data
  !            iter: a uvReadContext iterator context structure
  ! RETURNS:   void
@@ -403,7 +405,9 @@ void addGroupRow(uvdata *obj, uvReadContext *iter) {
 
     j = obj->n_baselines[time_index];
     obj->baseline[time_index][j] = iter->grp_par[iter->ptype_map.bl];
-    obj->date[time_index] = iter->grp_par[iter->ptype_map.date]+iter->base_date;
+    obj->date[time_index] = iter->grp_par[iter->ptype_map.date];
+    if (iter->ptype_map.date0 > 0) obj->date[time_index] += iter->grp_par[iter->ptype_map.date0];   // add optional second DATE
+    obj->date[time_index] += iter->base_date;
     // handle special non-standard CASA dates
     if (iter->ptype_map.date0 != 0) {
         obj->date[time_index] = (double) iter->grp_par[iter->ptype_map.date] + (double) iter->grp_par[iter->ptype_map.date0];
@@ -445,7 +449,7 @@ void addGroupRow(uvdata *obj, uvReadContext *iter) {
 int readUVFITSnextIter(uvdata *obj, uvReadContext *iter) {
     int grp_row_size,status=0,done=0;
     int max_bl,n_bl=0;
-    float currtime=FLT_MAX;
+    double currtime=FLT_MAX,this_time;
     fitsfile *fptr;
  
     fptr = (fitsfile *)iter->fptr;
@@ -462,7 +466,7 @@ int readUVFITSnextIter(uvdata *obj, uvReadContext *iter) {
     }
 
     while (!done) {
-
+        
         /* read a row from the parameters. contains U,V,W,baseline,time */
         fits_read_grppar_flt(fptr,iter->grp_index+1,1,iter->pcount, iter->grp_par, &status);
         if (status != 0) {
@@ -473,12 +477,18 @@ int readUVFITSnextIter(uvdata *obj, uvReadContext *iter) {
 
         if (debug > 1) fprintf(stdout,"Read group %d of %d. Time: %f\n",iter->grp_index+1,iter->gcount,iter->grp_par[4]);
 
+        // calculate the time, which might be the sum of two "DATE" fields
+        this_time = iter->grp_par[iter->ptype_map.date];
+        if (iter->ptype_map.date0 > 0) {
+            this_time += iter->grp_par[iter->ptype_map.date0];  // add optional second date field
+        }
+
         /* if the time changes, we're done for this chunk */
-        if (currtime != iter->grp_par[4] && currtime != FLT_MAX) {
+        if (currtime != this_time && currtime != FLT_MAX) {
 
             if (debug) printf("*** new time *** %f\n",iter->grp_par[4]);
             /* check that time is increasing only */
-            if (iter->grp_par[4] < currtime) {
+            if (this_time < currtime) {
                 fprintf(stderr,"readUVFITSnextIter ERROR: data is not time ordered. current: %f, new: %f\n",currtime,iter->grp_par[4]);
                 return -1;
             }
@@ -499,7 +509,7 @@ int readUVFITSnextIter(uvdata *obj, uvReadContext *iter) {
                 fprintf(stderr,"ERROR: counted %d baselines for time %g. Expected max: %d\n",n_bl,iter->grp_par[4],max_bl);
             }
             iter->grp_index++;
-            currtime = iter->grp_par[4];
+            currtime = this_time;
         }
         if (iter->grp_index >= iter->gcount) {
             // we've reached the end

@@ -43,7 +43,7 @@ int main(int argc, const char * argv[])
 {
     fitsfile *in;       // pointer to input FITS file
     fitsfile *out;      // pointer to output FITS file
-    int status;         // returned status of FITS functions
+    int status=0;         // returned status of FITS functions
     float bscale = 1;     // scale for forced precision
     int comp = RICE_1;  // compression type
     bool c = true;      // compress/decompress flag

@@ -37,7 +37,7 @@ def unwrap(x):
 vunwrap=numpy.vectorize(unwrap)
 
 catdir=os.environ['MWA_CODE_BASE']
-MRCvot=catdir+"/MRC.vot"
+MRCvot=catdir+"/MWA_Tools/catalogues/MRC.vot"
 
 if not os.path.exists(MRCvot):
     print "Can't find MRC.vot in $MWA_CODE_BASE! Either it's not there or the variable wasn't set properly. Make sure you set it to the directory in which MWA_Tools resides."
@@ -51,6 +51,7 @@ else:
     else:
     # Expecting to be in a directory named with the date in format YYYYMMDD
         date=re.search("201[0-9]{5}",os.getcwd()).group()
+        chan=re.search("\/[0-9]{2,3}\/",os.getcwd()).group().replace("/","")
         if date=="20130817" or date=="20131111" or date=="20140308" or date=="20140615" :
             plotdec=18.6
         elif date=="20130808" or date=="20131107" or date=="20140306" or date=="20140611":
@@ -69,6 +70,9 @@ else:
             print "Defaulting to zenith in the absence of a known plotdeclination."
             plotdec=-27
 
+corrfile=date+"_"+"Dec"+str(plotdec)+"_"+chan+"_corrections.txt"
+f=open(corrfile,"w")
+
 # Expects to act on a directory full of Phase 2 XX, YY, I snapshots and their source-finding results.
 # Would probably work on Phase 1 but hasn't been tested.
 files=sorted(glob.glob("10*XX*2.?.fits")) #[::-1]
@@ -81,9 +85,10 @@ if options.make_plots:
 ras=[]
 docorr=[]
 for Xfits in files:
-    Yfits=re.sub("XX","YY",Xfits)
-    Ifits=re.sub("XX","I",Xfits)
-    Ivot=re.sub(".fits","_comp.vot",Ifits)
+    Yfits=Xfits.replace("XX","YY")
+    Ifits=Xfits.replace("XX","I")
+    print Ifits
+    Ivot=Ifits.replace(".fits","_comp.vot")
     if not os.path.exists(Yfits):
         print "Missing "+Yfits
         sys.exit(1)
@@ -134,68 +139,87 @@ for Xfits,corr in files_to_check:
     freq_str="%03.0f" % (freq/1e6)
 
 # surely these filename substitutions can be made more pythonic
-# inputs
-    Yfits=re.sub("XX","YY",Xfits)
     Ifits=re.sub("XX","I",Xfits)
+    Yfits=re.sub("XX","YY",Xfits)
+# inputs
+    Xpb=Xfits.replace(".fits","_pb.fits")
+    Ypb=Xpb.replace("XX","YY")
+
+    Xvot=Xpb.replace(".fits","_comp.vot")
+    Yvot=Ypb.replace(".fits","_comp.vot")
+
     Iroot=re.sub(".fits","",Ifits)
     Ivot=re.sub(".fits","_comp.vot",Ifits)
-    matchvot=re.sub(".fits","_MRC.vot",Ifits)
 
-    if not os.path.exists(matchvot):
-        print "Missing "+matchvot+", trying unused/"+matchvot
-        matchvot="unused/"+matchvot
+# Generate matched MRC catalogues with primary-beam-corrected images
+    for image in Xpb, Ypb, Ifits:
+        print image
+        vot=image.replace(".fits","_comp.vot")
+        matchvot=image.replace(".fits","_MRC.vot")
+
         if not os.path.exists(matchvot):
-            os.system('stilts tpipe in='+MRCvot+' cmd=\'select NULL_MFLAG\' cmd=\'addcol PA "0.0"\' cmd=\'addcol S_'+freq_str+' "S408*pow(('+str(freq)+'/408000000.0),-0.85)"\' out=temp1.vot')
-            os.system('stilts tpipe in='+Ivot+' cmd=\'select local_rms<1.0\' out=temp2.vot')
-            os.system('stilts tmatch2 matcher=skyellipse params=30 in1=temp1.vot in2=temp2.vot out=temp.vot values1="_RAJ2000 _DEJ2000 e_RA2000 e_DE2000 PA" values2="ra dec a b pa" ofmt=votable')
-        # Exclude extended sources
-            os.system('stilts tpipe in=temp.vot cmd=\'select ((int_flux/peak_flux)<2)\' cmd=\'addcol logratio "(ln(S_'+freq_str+'/int_flux))"\' cmd=\'addcol weight "(int_flux/local_rms)"\' cmd=\'addcol delRA "(_RAJ2000-ra)"\' cmd=\'addcol delDec "(_DEJ2000-dec)"\' omode=out ofmt=vot out=temp3.vot')
-            os.system('stilts tpipe in=temp3.vot cmd=\'select abs(delRA)<1.0\' out='+matchvot)
-            os.remove('temp.vot')
-            os.remove('temp1.vot')
-            os.remove('temp2.vot')
-            os.remove('temp3.vot')
+            print "Missing "+matchvot+", trying unused/"+matchvot
+            if os.path.exists("unused/"+matchvot):
+                matchvot="unused/"+matchvot
+# Need to make a new matchtable
+            else:
+                os.system('stilts tpipe in='+MRCvot+' cmd=\'select NULL_MFLAG\' cmd=\'addcol PA "0.0"\' cmd=\'addcol S_'+freq_str+' "S408*pow(('+str(freq)+'/408000000.0),-0.85)"\' out=temp1.vot')
+                os.system('stilts tpipe in='+vot+' cmd=\'select local_rms<1.0\' out=temp2.vot')
+                os.system('stilts tmatch2 matcher=skyellipse params=30 in1=temp1.vot in2=temp2.vot out=temp.vot values1="_RAJ2000 _DEJ2000 e_RA2000 e_DE2000 PA" values2="ra dec a b pa" ofmt=votable')
+            # Exclude extended sources
+# weight is currently S/N
+                os.system('stilts tpipe in=temp.vot cmd=\'select ((int_flux/peak_flux)<2)\' cmd=\'addcol logratio "(ln(S_'+freq_str+'/int_flux))"\' cmd=\'addcol weight "(int_flux/local_rms)"\' cmd=\'addcol delRA "(_RAJ2000-ra)"\' cmd=\'addcol delDec "(_DEJ2000-dec)"\' omode=out ofmt=vot out=temp3.vot')
+                os.system('stilts tpipe in=temp3.vot cmd=\'select abs(delRA)<1.0\' out='+matchvot)
+                os.remove('temp.vot')
+                os.remove('temp1.vot')
+                os.remove('temp2.vot')
+                os.remove('temp3.vot')
 
-    t = parse_single_table(matchvot)
-    if corr:
+# First do the ionospheric corrections, using the "I" table, since it has the best S/N
 # Check the matched table actually has entries
-        if t.array.shape[0]>0:
-    # weight is currently S/N
-            ratio=numpy.exp(numpy.average(a=t.array['logratio'],weights=(t.array['weight']))) #*(distfunc)))
-            stdev=numpy.exp(numpy.std(a=t.array['logratio']))
-            print "Ratio of "+str(ratio)+" between "+Ifits+" and MRC."
-            print "stdev= "+str(stdev)
+    Imatchvot=Ifits.replace(".fits","_MRC.vot")
+    t = parse_single_table(Imatchvot)
+    if t.array.shape[0]>0:
 
-        # Calculate ionospheric offsets
-            delRA=numpy.average(a=t.array['delRA'],weights=(t.array['weight'])) #*(distfunc)))
-            delDec=numpy.average(a=t.array['delDec'],weights=(t.array['weight'])) #*(distfunc)))
-        #    delRAstdev=numpy.std(a=t.array['delRA'])
-        #    delDecstdev=numpy.std(a=t.array['delDec'])
+    # Calculate ionospheric offsets
+        delRA=numpy.average(a=t.array['delRA'],weights=(t.array['weight'])) #*(distfunc)))
+        delDec=numpy.average(a=t.array['delDec'],weights=(t.array['weight'])) #*(distfunc)))
+        delRAstdev=numpy.std(a=t.array['delRA'])
+        delDecstdev=numpy.std(a=t.array['delDec'])
 
-        # Write new fits files
+    # Now calculate the correction factors for the I, XX and YY snapshots
+        for pb in Ifits,Xpb,Ypb:
+            image = pb.replace("_pb.fits",".fits")
+            matchvot = pb.replace(".fits","_MRC.vot")
+            t = parse_single_table(matchvot)
+            if t.array.shape[0]>0:
+                ratio=numpy.exp(numpy.average(a=t.array['logratio'],weights=(t.array['weight']))) #*(distfunc)))
+                stdev=numpy.std(a=t.array['logratio'])
+                print "Ratio of "+str(ratio)+" between "+image+" and MRC."
+                print "stdev= "+str(stdev)
 
-            for fitsfile in Ifits,Xfits,Yfits:
-                hdu_in = fits.open(fitsfile)
-            # Modify to fix ionosphere
-                hdr_in = hdu_in[0].header
-                hdr_in['CRVAL1'] = ra + delRA
-                hdr_in['CRVAL2'] = dec + delDec
-            # Modify to fix flux scaling
-                hdu_in[0].data=hdu_in[0].data*ratio
-            # Remove stupid bonus keywords, if they have been added
-                try:
-                    hdr_in.remove('DATAMIN')
-                    hdr_in.remove('DATAMAX')
-                except:
-                    pass
-            # Write out
-                fits_corr=re.sub(".fits","_corrected.fits",fitsfile)
-                hdu_in.writeto(fits_corr,clobber=True)
-        else:
-            print Ifits+" had no valid matches with MRC. Moving files to unused/ ."
-            obsid=Ifits.split("_")[0]
-            for file in glob.glob(obsid+"*"):
-                shutil.move(file,"./unused/")
+                if corr:
+                    # Write new NON-primary-beam-corrected fits files
+                    hdu_in = fits.open(image)
+                # Modify to fix ionosphere
+                    hdr_in = hdu_in[0].header
+                    hdr_in['CRVAL1'] = ra + delRA
+                    hdr_in['CRVAL2'] = dec + delDec
+                # Modify to fix flux scaling
+                    hdu_in[0].data=hdu_in[0].data*ratio
+                # Remove stupid bonus keywords, if they have been added
+                    try:
+                        hdr_in.remove('DATAMIN')
+                        hdr_in.remove('DATAMAX')
+                    except:
+                        pass
+                # Write out
+                    fits_corr=image.replace(".fits","_corrected.fits")
+                    hdu_in.writeto(fits_corr,clobber=True)
+                    f.write("{0:s} {1:10.8f} {2:10.8f} {3:10.8f} {4:10.8f} {5:10.8f} {6:10.8f}\n".format(image,delRA,delRAstdev,delDec,delDecstdev,ratio,stdev))
+            else:
+                print pb+" had no valid matches with MRC. Moving it to unused/ ."
+                shutil.move(pb,"./unused/")
 
     if options.make_plots:
         outputpng=Iroot+"_vect.png"
@@ -230,3 +254,5 @@ for Xfits,corr in files_to_check:
         ax.set_ylabel('Declination (deg)')
         ax.set_xlabel('RA (deg)')
         plt.savefig(outputpng)
+
+f.close()

@@ -76,12 +76,14 @@ if __name__== "__main__":
                       help="Specify step size in degrees (default = 1 deg)")
     parser.add_option('--output', dest="output", default=None,
                       help="Output psf fits file -- default is based on input table")
-    parser.add_option('--bmaj', dest="bmaj", default=None,
+    parser.add_option('--bmaj', dest="bmaj", default=None, type='float',
                       help="Original restoring beam major axis (default = search for matching fits file)")
-    parser.add_option('--bmin', dest="bmin", default=None,
+    parser.add_option('--bmin', dest="bmin", default=None, type='float',
                       help="Original restoring beam minor axis (default = search for matching fits file)")
     parser.add_option('--order', dest="order", default=4, type='int',
                       help='Healpix order')
+    parser.add_option('--zeropa', dest='zeropa', action='store_true', default=False,
+                      help='For the psf position angle to be identically zero')
     (options, args) = parser.parse_args()
 
     if options.bmaj is None or options.bmin is None:
@@ -126,7 +128,7 @@ if __name__== "__main__":
         # calculate the median values of a/b/pa
         a = np.mean(table[src_mask]['a'])/3600.
         b = np.mean(table[src_mask]['b'])/3600.
-        pa = np.mean(table[src_mask]['pa'])
+        pa = np.mean(table[src_mask]['pa']) if  not options.zeropa else 0
         blur = np.mean(table[src_mask]['a']*table[src_mask]['b']*np.cos(np.radians(latitude-table[src_mask]['dec']))/(bmaj*bmin*3600*3600))
         nsrc = len(src_mask)
         pix_dict[p] = (a,b,pa,blur,nsrc)
@@ -142,7 +144,7 @@ if __name__== "__main__":
         ## calculate the median values of a/b/pa
         a = np.mean(table[src_mask]['a'])/3600.
         b = np.mean(table[src_mask]['b'])/3600.
-        pa = np.mean(table[src_mask]['pa'])
+        pa = np.mean(table[src_mask]['pa']) if  not options.zeropa else 0
         blur = np.mean(table[src_mask]['a']*table[src_mask]['b']*np.cos(np.radians(latitude-table[src_mask]['dec']))/(bmaj*bmin*3600*3600))
         nsrc = len(src_mask)
         pix_dict[p] = (a,b,pa,blur,nsrc)
