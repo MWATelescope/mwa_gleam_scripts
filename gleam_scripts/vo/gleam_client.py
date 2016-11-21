@@ -8,7 +8,7 @@ Usage example
 ====
 import gleam_client
 gleam_client.vo_get(50.67, -37.02, 1.0, freq=['072-080', '080-088'],
-                    download_dir='/tmp')
+                    proj_opt='SIN', download_dir='/tmp')
 ====
 
 Author: chen.wu@icrar.org
@@ -104,10 +104,10 @@ def usage_examples():
     dl_dir = '/tmp'
 
     # example 1 - just to see what is going to be downloaded (low frequencies)
-    vo_get(ra, dec, ang_size, freq=freq_low)
+    vo_get(ra, dec, ang_size, proj_opt=projection, freq=freq_low)
 
     # example 2 - now really get them
-    vo_get(ra, dec, ang_size, freq=freq_low, download_dir=dl_dir)
+    vo_get(ra, dec, ang_size, proj_opt=projection, freq=freq_low, download_dir=dl_dir)
 
     # example 3 - download all frequencies (Not specifying freq means ALL freqs)
-    vo_get(ra, dec, ang_size, download_dir=dl_dir)
+    vo_get(ra, dec, ang_size, proj_opt=projection, download_dir=dl_dir)
