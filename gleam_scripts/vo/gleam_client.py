@@ -18,6 +18,8 @@ from urllib2 import urlopen, quote, HTTPError
 from astropy.io.votable import parse_single_table
 
 PROJ_OPTS = ['ZEA', 'ZEA_regrid', 'SIN']
+VO_URL = "http://{0}/gleam_postage/q/siap.xml?FORMAT=ALL&VERB=2"\
+      "&NTERSECT=OVERLAPS&"
 
 class GleamClientException(Exception):
     pass
@@ -38,7 +40,7 @@ def download_file(url, ra, dec, freq, download_dir):
                     fulnm = download_dir + "/" + filename
                     with open(fulnm, 'wb') as f:
                         f.write(err_msg)
-                    print "Error '{0}' is at '{1}'".format(fulnm, download_dir)
+                    print("Error info at '{0}'".format(fulnm))
                     return
                 else:
                     raise hpe
@@ -46,11 +48,14 @@ def download_file(url, ra, dec, freq, download_dir):
                 raise hpe
         else:
             raise hpe
+
     if (u.headers['content-type'] == 'image/fits'):
         # we know for sure this is a fits image file
         filename = "{0}_{1}_{2}.fits".format(ra, dec, freq)
+        derror = False
     else:
         filename = "error_{0}_{1}_{2}.html".format(ra, dec, freq)
+        derror = True
 
     block_sz = u.fp.bufsize
     fulnm = download_dir + "/" + filename
@@ -61,12 +66,16 @@ def download_file(url, ra, dec, freq, download_dir):
                 break
 
             f.write(buff)
-        print "File '{0}' downloaded to '{1}'".format(fulnm, download_dir)
+        if (derror):
+            msg = "Error info at '{0}'".format(fulnm)
+        else:
+            msg = "File '{0}' downloaded".format(fulnm)
+        print(msg)
 
 def vo_get(ra, dec, ang_size, proj_opt='ZEA',
                    download_dir=None,
                    vo_host='mwa-web.icrar.org',
-                   freq=[]):
+                   freq=[], **kwargs):
     """
     proj_opt:   string, possible values:
                 'ZEA'   (default)
@@ -84,8 +93,7 @@ def vo_get(ra, dec, ang_size, proj_opt='ZEA',
               " Should be one of {1}"\
               .format(proj_opt, PROJ_OPTS))
 
-    url = "http://{0}/gleam_postage/q/siap.xml?FORMAT=ALL&VERB=2"\
-          "&NTERSECT=OVERLAPS&".format(vo_host)
+    url = VO_URL.format(vo_host)
     pos_p = 'POS=%s' % quote('{0},{1}'.format(ra, dec))
     proj_opt_p = 'proj_opt=%s' % proj_opt
     size_p = 'SIZE=%f' % (float(ang_size))
@@ -97,10 +105,16 @@ def vo_get(ra, dec, ang_size, proj_opt='ZEA',
     warnings.simplefilter("default")
     ignore_freq = len(freq) == 0
     c = 0
+    if (len(kwargs) > 0):
+        tail = '&'.join(['{0}={1}'.format(k, v) for k, v in kwargs.items()])
+    else:
+        tail = None
     for row in tbl:
         r_freq = row[0]
         r_url = row[1]
         if (ignore_freq or r_freq in freq):
+            if (tail):
+                r_url += '&%s' % tail
             if (download_dir):
                 download_file(r_url, ra, dec, r_freq, download_dir)
             else:
