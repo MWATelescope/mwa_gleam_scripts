@@ -14,7 +14,7 @@ gleam_client.vo_get(50.67, -37.02, 1.0, freq=['072-080', '080-088'],
 Author: chen.wu@icrar.org
 """
 import os, warnings
-from urllib2 import urlopen, quote
+from urllib2 import urlopen, quote, HTTPError
 from astropy.io.votable import parse_single_table
 
 PROJ_OPTS = ['ZEA', 'ZEA_regrid', 'SIN']
@@ -26,7 +26,26 @@ def download_file(url, ra, dec, freq, download_dir):
     """
 
     """
-    u = urlopen(url, timeout=200)
+    try:
+        u = urlopen(url, timeout=200)
+    except HTTPError as hpe:
+        if (500 == hpe.code):
+            err_msg = None
+            try:
+                err_msg = hpe.fp.read()
+                if (err_msg):
+                    filename = "error_{0}_{1}_{2}.txt".format(ra, dec, freq)
+                    fulnm = download_dir + "/" + filename
+                    with open(fulnm, 'wb') as f:
+                        f.write(err_msg)
+                    print "Error '{0}' is at '{1}'".format(fulnm, download_dir)
+                    return
+                else:
+                    raise hpe
+            except:
+                raise hpe
+        else:
+            raise hpe
     if (u.headers['content-type'] == 'image/fits'):
         # we know for sure this is a fits image file
         filename = "{0}_{1}_{2}.fits".format(ra, dec, freq)
