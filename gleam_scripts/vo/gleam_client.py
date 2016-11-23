@@ -24,10 +24,28 @@ VO_URL = "http://{0}/gleam_postage/q/siap.xml?FORMAT=ALL&VERB=2"\
 class GleamClientException(Exception):
     pass
 
-def download_file(url, ra, dec, freq, download_dir):
+def create_filename(ra, dec, ang_size, freq, error=False):
+    """
+    You can write your own create_filename function however you like
+    Here is a dummy example
+    """
+    if (error):
+        return "error_{0}_{1}_{2}_{3}.html".format(ra, dec, ang_size, freq)
+    else:
+        return "{0}_{1}_{2}_{3}.fits".format(ra, dec, ang_size, freq)
+
+def download_file(url, ra, dec, ang_size, freq, download_dir,
+                  file_name_func=None, clobber=True):
     """
 
     """
+    if (file_name_func is None):
+        file_name_func = create_filename
+    filename = file_name_func(ra, dec, ang_size, freq)
+    fulnm = download_dir + "/" + filename
+    if (os.path.exists(fulnm) and not clobber):
+        print("File '%s' exists already" % fulnm)
+        return
     try:
         u = urlopen(url, timeout=200)
     except HTTPError as hpe:
@@ -36,7 +54,7 @@ def download_file(url, ra, dec, freq, download_dir):
             try:
                 err_msg = hpe.fp.read()
                 if (err_msg):
-                    filename = "error_{0}_{1}_{2}.txt".format(ra, dec, freq)
+                    filename = file_name_func(ra, dec, ang_size, freq, error=True)
                     fulnm = download_dir + "/" + filename
                     with open(fulnm, 'wb') as f:
                         f.write(err_msg)
@@ -51,10 +69,10 @@ def download_file(url, ra, dec, freq, download_dir):
 
     if (u.headers['content-type'] == 'image/fits'):
         # we know for sure this is a fits image file
-        filename = "{0}_{1}_{2}.fits".format(ra, dec, freq)
+        # filename = "{0}_{1}_{2}.fits".format(ra, dec, freq)
         derror = False
     else:
-        filename = "error_{0}_{1}_{2}.html".format(ra, dec, freq)
+        filename = file_name_func(ra, dec, ang_size, freq, error=True)
         derror = True
 
     block_sz = u.fp.bufsize
@@ -75,7 +93,8 @@ def download_file(url, ra, dec, freq, download_dir):
 def vo_get(ra, dec, ang_size, proj_opt='ZEA',
                    download_dir=None,
                    vo_host='mwa-web.icrar.org',
-                   freq=[], **kwargs):
+                   freq=[], clobber=True, file_name_func=None,
+                   **kwargs):
     """
     proj_opt:   string, possible values:
                 'ZEA'   (default)
@@ -83,6 +102,9 @@ def vo_get(ra, dec, ang_size, proj_opt='ZEA',
                 'SIN'
     freq:       A list of frequencies, e.g. ['223-231' '216-223']
                 An empty list means ALL
+    file_name_func:
+                is an optional function to create file name as you like.
+                Leaving it None will use the default "create_filename()"
     """
     if (download_dir and (not os.path.exists(download_dir))):
         raise GleamClientException("Invalid download dir: {0}"\
@@ -116,7 +138,9 @@ def vo_get(ra, dec, ang_size, proj_opt='ZEA',
             if (tail):
                 r_url += '&%s' % tail
             if (download_dir):
-                download_file(r_url, ra, dec, r_freq, download_dir)
+                download_file(r_url, ra, dec, ang_size, r_freq,
+                              download_dir, clobber=clobber,
+                              file_name_func=file_name_func)
             else:
                 print(r_freq, r_url)
             c += 1
