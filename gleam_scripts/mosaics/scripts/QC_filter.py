@@ -206,10 +206,10 @@ def adjust_errors(table):
         table[e][mask] = table[v][mask]
     
     # -1 error on ra/dec -> error is just semi-major axis.
-    mask = np.where[table['err_ra']<0]
+    mask = np.where(table['err_ra']<0)
     table['err_ra'][mask] = table['a'][mask]
 
-    mask = np.where[table['err_dec']<0]
+    mask = np.where(table['err_dec']<0)
     table['err_dec'][mask] = table['a'][mask]
 
 def make_mim():
