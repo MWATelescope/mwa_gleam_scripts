@@ -8,6 +8,10 @@ chan=CHAN
 date=DATE
 datadir=DATADIR
 proj=PROJ
+solobs=SOLOBS
+bkgthresh=BKGTHRESH
+filelist=FILELIST
+redorms=True
 
 if [[ ! $PBS_ARRAY_INDEX ]]
 then
@@ -27,10 +31,12 @@ function fcomp() {
 # Harder to match MRC further north since it runs out at +20
 if [[ $dec == "18.6" || $dec == "+18.6"  || $dec == "19" || $dec == "+19" ]]
 then
-    MRCtarget=50
+    extraxm=True
+    MRCtarget=25
 else
-    MRCtarget=100
+    MRCtarget=75
 fi
+
 
 #if [[ ! $xsize || ! $ysize ]]
 #then
@@ -64,39 +70,65 @@ else
 fi
 
 cd $datadir/$proj/$date/$chan
+
+Xfile=`sed "${PBS_ARRAY_INDEX}q;d" $filelist`
+cd `dirname $Xfile`
+
 if [[ ! -d unused ]]
 then
     mkdir unused
+else
+    mv unused/${obsid}*_I_* ./
 fi
 
-
-Xfile=`sed "${PBS_ARRAY_INDEX}q;d" snapshots_to_process.txt`
-cd `dirname $Xfile`
 Xfile=`basename $Xfile`
 obsid=`echo $Xfile | awk 'BEGIN {FS="_"} {print $1}'`
 
 echo "Processing $Xfile from week $date, channel $chan."
 
-
-# Storing the Is in unused/ as we won't need them until we've done the QA on the XX and YY images
-mv $obsid*_I_*2.?.fits unused/
-
-# If the pointing is Dec -72, flag out the SCP
-if [[ $docrop == "True" ]]
+# Use the corrections from another observation if within 15 deg of the Galactic plane
+# Also, don't worry about matching enough MRC sources, because the GP will dominate
+testfile=`ls ${obsid}*v2.?.fits | head -1`
+RA=`pyhead.py -p CRVAL1 $testfile | awk '{print $3}'`
+b=`fk5_to_gal.py $RA $dec | awk '{printf("%d",$2)}' | sed "s/-//"`
+if [[ $b -lt 15 ]]
 then
-    echo "Low Dec observation: blanking edges of $Xfile"
-    $aprunsingle blank_SCP.py --filename=$Xfile
+    MRCtarget=0
 fi
+# HACK : turn off fluxscaling modification for the old mosaicking
+b=20
 
 Yfile=`echo $Xfile | sed "s/XX/YY/g"`
+Ifile=`echo $Xfile | sed "s/XX/I/g"`
 if [[ ! -e $Yfile ]] || [[ ! -e $Xfile ]]
 then
     echo "Either $Xfile or $Yfile is missing. Moving to unused/"
     mv $Xfile unused/
     mv $Yfile unused/
     exit 0
-else
-    mv unused/${obsid}*_I_* ./
+fi
+
+# First check image size; if it's unusual, crop it and save an old uncropped version
+xaxis=`pyhead.py -p NAXIS1 $Xfile | awk '{print $3}'`
+if [[ $xaxis -ne 4000 ]]
+then
+    echo "$Xfile is not a standard size: $xaxis pixels across instead of 4000."
+    echo "Cropping $Xfile and associated YY and I files to match the standard size."
+    rstart=`expr \( $xaxis - 4000 \) / 2`
+    rend=`expr $xaxis - $rstart - 1`
+    for file in $Xfile $Yfile $Ifile
+    do
+        fullsize=`echo $file | sed "s/.fits/_full.fits/"`
+        if [[ ! -e $fullsize ]]
+        then
+            $aprunsingle getfits -o ${obsid}temp.fits $file $rstart-$rend $rstart-$rend
+            $aprunsingle unflatten.py ${obsid}temp.fits
+            mv $file unused/$fullsize
+            mv ${obsid}temp.fits $file
+        else
+            echo "$file already cropped to 4000 pixels."
+        fi
+    done
 fi
 
 # Make primary-beam-corrected XX and YY images in order to measure correction w.r.t. MRC
@@ -113,63 +145,43 @@ then
     mkdir ../../../pbeams/Dec${dec}
 fi
 
-imsize=`pyhead.py -p NAXIS2 $Xfile | awk '{print $3}'`
-if [[ $imsize -eq 4000 ]]
-then
 # Generate the primary beam, if it doesn't already exist
-    if [[ ! -e ../../../pbeams/Dec${dec}/beam_${freq}_XX.fits ]]
-    then
-        $aprun make_beam.py -d $delays -f $Xfile
-        Xb=`echo $Xfile | sed "s/.fits/_beamXX.fits/"`
-        Yb=`echo $Xfile | sed "s/.fits/_beamYY.fits/"`
-        mv $Xb ../../../pbeams/Dec${dec}/beam_${freq}_XX.fits
-        mv $Yb ../../../pbeams/Dec${dec}/beam_${freq}_YY.fits
-    fi
-# Use the standard sized beam to correct the image
-    Xcorr=`echo $Xfile | sed "s/.fits/_pb.fits/"`
-    Yfile=`echo $Xfile | sed "s/XX/YY/"`
-    Ycorr=`echo $Yfile | sed "s/.fits/_pb.fits/"`
-    if [[ ! -e $Xcorr ]]
-    then
-        $aprunsingle pb_correct.py --input $Xfile --output $Xcorr --beam ../../../pbeams/Dec${dec}/beam_${freq}_XX.fits
-    fi
-    if [[ ! -e $Ycorr ]]
-    then
-        $aprunsingle pb_correct.py --input $Yfile --output $Ycorr --beam ../../../pbeams/Dec${dec}/beam_${freq}_YY.fits
-    fi
-else
-# Sometimes we make extra-large images, and they can't use the usual beams
-# Make an observation-specific primary beam instead
+if [[ ! -e ../../../pbeams/Dec${dec}/beam_${freq}_XX.fits ]]
+then
     $aprun make_beam.py -d $delays -f $Xfile
     Xb=`echo $Xfile | sed "s/.fits/_beamXX.fits/"`
     Yb=`echo $Xfile | sed "s/.fits/_beamYY.fits/"`
-    $aprunsingle pb_correct.py --input $Xfile --output $Xcorr -beam $Xb
-    $aprunsingle pb_correct.py --input $Yfile --output $Ycorr -beam $Yb
+    mv $Xb ../../../pbeams/Dec${dec}/beam_${freq}_XX.fits
+    mv $Yb ../../../pbeams/Dec${dec}/beam_${freq}_YY.fits
+fi
+# Use the standard sized beam to correct the image
+Xcorr=`echo $Xfile | sed "s/.fits/_pb.fits/"`
+Yfile=`echo $Xfile | sed "s/XX/YY/"`
+Ycorr=`echo $Yfile | sed "s/.fits/_pb.fits/"`
+if [[ ! -e $Xcorr ]]
+then
+    $aprunsingle pb_correct.py --input $Xfile --output $Xcorr --beam ../../../pbeams/Dec${dec}/beam_${freq}_XX.fits
+fi
+if [[ ! -e $Ycorr ]]
+then
+    $aprunsingle pb_correct.py --input $Yfile --output $Ycorr --beam ../../../pbeams/Dec${dec}/beam_${freq}_YY.fits
 fi
 
 # Source-finding on the I and pb-corrected XX and YY snapshots
 # We can use cheap backgrounding since we only need bright source fluxes
-snaplist=`ls $obsid*_I_*v2.?.fits $obsid*_??_*v2.?_pb.fits*`
+snaplist=`ls ${obsid}*_I_*v2.?.fits ${obsid}*_??_*v2.?_pb.fits*`
 
 for file in $snaplist
 do
-    xaxis=`pyhead.py -p NAXIS1 $file | awk '{print $3}'`
-    if [[ $xaxis -ne 4000 ]]
-    then
-        echo "$file is not a standard size: $xaxis pixels across instead of 4000."
-        echo "Cropping $file to match the standard size."
-        rstart=`expr \( $xaxis - 4000 \) / 2`
-        rend=`expr $xaxis - $rstart - 1`
-        $aprunsingle getfits -o temp.fits $file $rstart-$rend $rstart-$rend
-        $aprunsingle unflatten.py temp.fits
-        mv $file unused/
-        mv temp.fits $file
-    fi
     vot=`echo $file | sed "s/.fits/_comp.vot/"`
+    root=`echo $file | sed "s/.fits//"`
     if [[ ! -e $vot ]]
     then
         echo "Source-finding on $file."
-        $aprun aegean_snapshot.sh $file
+        MIMAS -o ${obsid}_fov.mim +c $RA $dec 40
+        MIMAS -o ${obsid}_nogal.mim +r ${obsid}_fov.mim -r $MWA_CODE_BASE/MWA_Tools/gleam_scripts/catalogue/gp.mim
+        $aprun BANE --noclobber --compress $file
+        $aprun aegean --region=${obsid}_nogal.mim --cores=${ncpus} --seedclip=8 --island --maxsummits=5 --autoload --out=/dev/null --table=$root.vot,$root.reg $file
     else
         echo "Source-finding has already been performed on $file."
     fi
@@ -181,25 +193,78 @@ do
         mv ${obsid}* unused/
         exit 0
     else
-# Check how many sources were in the file
-        nmatch=`grep "<TR>" $vot | wc -l`
-        if [[ $nmatch -lt $MRCtarget ]]
+        if [[ $b -gt 15 ]]
         then
-            echo "$file did not match enough MRC sources. Moving all files associated with $obsid to unused and terminating QA for this snapshot."
-            mv ${obsid}* unused/
-            exit 0
+    # Check how many sources were in the file
+            nmatch=`grep "<TR>" $vot | wc -l`
+            if [[ $nmatch -lt $MRCtarget ]]
+            then
+                echo "$file did not have enough sources. Moving all files associated with $obsid to unused and terminating QA for this snapshot."
+                mv ${obsid}* unused/
+                exit 0
+            fi
         fi
     fi
 done
 
-# MRC flux and position corrections to smooth out any changes in flux scale and astrometry with RA
+# For GP images, check the background to make sure multiscale went ok
+if [[ $b -lt 15 ]]
+then
+    snaplist=`ls ${obsid}*_??_*v2.?_pb.fits*`
+    for file in $snaplist
+    do
+        bkg=`echo $file | sed "s/.fits/_bkg.fits/"`
+# Background images are compressed so we only need to use a tiny box to get quite a big area
+        min=`rms_measure.py --min --middle --boxsize=40 -f $bkg`
+        orifile=`echo $file | sed "s/_pb//"`
+        rms=`rms_measure.py --corners --boxsize=200 -f $orifile`
+        snr=`echo "100 * $min / $rms" | bc -l | awk '{printf "%d",$1}' | sed "s/-//"`
+        if [[ $snr -gt $bkgthresh ]]
+        then
+            killobs=True
+        fi
+    done
+fi
+       
+if [[ $killobs == "True" ]]
+then
+    echo "An image from $obsid had too negative a background: moving to unused and terminating QA for this snapshot."
+    mv ${obsid}* unused/
+    exit 0
+fi
 
-ncorr=`ls ${obsid}*_corrected.fits | wc -l | awk '{print $1}'`
+# MRC flux scaling
 
+ncorr=`ls ${obsid}*_fluxscaled.fits | wc -l | awk '{print $1}'`
 if [[ $ncorr -lt 3 ]]
 then
-    echo "Running MRC-based correction script on $obsid."
-    $aprunsingle correct_mrc_snapshot.py --input=$obsid --plot --dec=TARGETDEC
+    if [[ $b -le 15 ]]
+    then
+        fluxcorrs=${solobs}_flux_corrections.txt
+        $aprunsingle xmatch_mrc.py --input=$obsid
+        if [[ ! -e $fluxcorrs ]]
+        then
+            echo "Couldn't find flux corrections derived from ${solobs}! Please check what went wrong. Terminating QA (and also mosaicking)."
+            exit 1
+        else
+            for file in ${obsid}*_v2.?.fits
+            do
+                solutionfile=`echo $file | sed "s/${obsid}/${solobs}/"`
+                corr=`grep $solutionfile $fluxcorrs | awk '{print $2}'`
+                corrected=`echo $file | sed "s/.fits/_fluxscaled.fits/"`
+                $aprunsingle rescale_image.py --mosaic=$file --factor=$corr --output=$corrected
+                if [[ ! -e $corrected ]]
+                then
+                    echo "Failed to create $corrected from $file using $fluxcorrs, attempting scaling factor of $corr."
+                else
+                    echo "Created $corrected from $file using scaling factor of $corr."
+                fi
+            done
+        fi
+    else
+        echo "Running MRC-based flux correction on $obsid."
+        $aprunsingle correct_mrc_flux.py --input=$obsid
+    fi
 elif [[ $ncorr -eq 3 ]]
 then
     echo "$obsid has already been corrected to MRC flux scale."
@@ -208,7 +273,42 @@ else
     exit 1
 fi
 
-mv ${obsid}*_I_* unused/
+ncorr=`ls ${obsid}*_fluxscaled.fits | wc -l | awk '{print $1}'`
+if [[ $ncorr -lt 3 ]]
+then
+    echo "Could not correct all images for $obsid to MRC flux scale. Moving files to unused/ and exiting."
+    mv ${obsid}* unused/
+    exit 0
+fi
+
+# Warp the images for the astrometric corrections
+
+ncorr=`ls ${obsid}*_corrected.fits | wc -l | awk '{print $1}'`
+
+if [[ $ncorr -lt 3 ]]
+then
+    if ls ${obsid}*MHz_I_r*_v2.?_MRC.vot 1>> /dev/null 2>> /dev/null
+    then
+        MRC=`ls ${obsid}*MHz_I_r*_v2.?_MRC.vot | head -1`
+    else
+        MRC=`ls unused/${obsid}*MHz_I_r*_v2.?_MRC.vot | head -1`
+    fi
+# For Dec +18, I replace the input catalogue with a VLSSr/NVSS hybrid
+    echo "Running fits warping script on $obsid."
+    $aprunsingle fits_warp.py --plot --xm $MRC --infits "${obsid}*MHz_*_r*_v2.?_fluxscaled.fits" --suffix corrected --ra1 ra --dec1 dec --ra2 _RAJ2000 --dec2 _DEJ2000
+    for file in ${obsid}*MHz_*_r*_v2.?_fluxscaled_corrected.fits
+    do
+        newfile=`echo $file | sed "s/fluxscaled_corrected/corrected/"`
+        $aprunsingle unflatten.py $file
+        mv $file $newfile
+    done
+elif [[ $ncorr -eq 3 ]]
+then
+    echo "$obsid has already been astrometrically warped."
+else
+    echo "$obsid has $ncorr corrected files -- that's a bit weird!"
+    exit 1
+fi
 
 Xfile=`echo $Xfile | sed "s/.fits/_corrected.fits/"`
 Yfile=`echo $Xfile | sed "s/XX/YY/g"`
@@ -219,18 +319,53 @@ then
     exit 0
 fi
 
-snaplist=`ls $obsid*_??_*v2.?_corrected.fits*`
-# Generate image RMS for XX and YY corrected images
-for file in $snaplist
-do
-    imagerms=`pyhead.py -p IMAGERMS $file | awk '{print $3}'`
-    if [[ $imagerms == "open" ]]
-    then
-        $aprunsingle rms_measure.py --corners --write -f $file
-    fi
-done
+# Rediscovering the IMAGERMS is optional, because Galaxy takes SO long to do this!
+if [[ $redorms != "" ]]
+then
+    snaplist=`ls $obsid*_??_*v2.?_corrected.fits*`
+    # Generate image RMS for XX and YY corrected images
+    for file in $snaplist
+    do
+    # Restore unblanked images first
+        if [[ $docrop == "True" ]]
+        then
+            unblanked=`echo $file | sed "s/corrected/unblanked/"`
+            if [[ -e $unblanked ]]
+            then
+                mv $unblanked $file
+            fi
+        fi
+    #    imagerms=`pyhead.py -p IMAGERMS $file | awk '{print $3}'`
+    # Use previously made RMS maps
+        rmsmap=`ls ${file:0:23}*_rms.fits | head -1`
+        imagerms=`$aprunsingle rms_measure.py --middle --mean --file $rmsmap`
+    # Multiply by flux rescaling factor for most accurate RMS
+        if [[ $b -le 15 ]]
+        then
+            fluxcorrs=${solobs}_flux_corrections.txt
+        else
+            fluxcorrs=${obsid}_flux_corrections.txt
+        fi
+        resc=`grep ${file:11:12} $fluxcorrs | awk '{print $2}'`
+        imagerms=`echo "$imagerms * $resc" | bc -l`
+        $aprunsingle pyhead.py -u IMAGERMS $imagerms $file
+        # If the pointing is Dec -72, flag out the SCP
+        if [[ $docrop == "True" ]]
+        then
+            echo "Low Dec observation: blanking edges of $file"
+            temp=`echo $file | sed "s/corrected/temp/"`
+            $aprunsingle blank_SCP.py --filename=$file -o $temp
+            mv $file $unblanked
+            mv $temp $file
+        fi
+    done
+else
+    echo "IMAGERMS already set for $obsid."
+fi
 
+mv ${obsid}*_I_* unused/
 
+echo "Ending QA for $obsid."
 
 ## Start the enormous QA process! -- NB: this needs updating/replacing
 #    for file in $obsid*2.?.fits
