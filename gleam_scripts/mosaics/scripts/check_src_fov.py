@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+import os,sys
 from astropy import wcs
 from astropy.io import fits
 from astropy.coordinates import SkyCoord
