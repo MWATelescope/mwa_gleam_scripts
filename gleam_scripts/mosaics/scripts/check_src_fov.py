@@ -9,7 +9,7 @@ from optparse import OptionParser
 
 usage="Usage: %prog [options] <file>\n"
 parser = OptionParser(usage=usage)
-parser.add_option('-f','--filename',dest="filename",default=None,
+parser.add_option('-f','--file',dest="file",default=None,
                   help="Fits image to check <FILE>",metavar="FILE")
 parser.add_option('-s','--source',dest="source",default=None,
                   help="Source to measure")
