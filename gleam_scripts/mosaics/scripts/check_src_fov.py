@@ -38,3 +38,5 @@ else:
 
 if 0 < x < hdu_in[0].header["NAXIS1"] and 0 < y < hdu_in[0].header["NAXIS2"]:
     print "True"
+else:
+    print "False"
