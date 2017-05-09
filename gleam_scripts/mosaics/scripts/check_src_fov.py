@@ -11,8 +11,8 @@ usage="Usage: %prog [options] <file>\n"
 parser = OptionParser(usage=usage)
 parser.add_option('-f','--filename',dest="filename",default=None,
                   help="Fits image to check <FILE>",metavar="FILE")
-parser.add_option('-s','--source',dest="output",default=None,
-                  help="Source to measure",default=None)
+parser.add_option('-s','--source',dest="source",default=None,
+                  help="Source to measure")
 (options, args) = parser.parse_args()
 
 sources = {'Crab': '05:34:31.94 +22:00:52.2', 'PicA': '05:19:49.7229 -45:46:43.853', 'HydA': '09:18:05.651 -12:05:43.99', 'HerA': '16:51:11.4 +04:59:20' , 'VirA': '12:30:49.42338 +12:23:28.0439' , 'CygA': '19:59:28.35663 +40:44:02.0970' ,'CasA': '23:23:24.000 +58:48:54.00'}
