@@ -1,0 +1,44 @@
+#!/bin/bash
+#SBATCH --account=mwaops
+#SBATCH --partition=gpuq
+#SBATCH --time=01:00:00
+#SBATCH --nodes=1
+#SBATCH --mem=32gb
+#SBATCH --output=/home/phancock/queue/make_white_neg_WEEK.sh.o%A_%a
+#SBATCH --error=/home/phancock/queue/make_white_neg_WEEK.sh.e%A_%a
+
+aprun="aprun -n 1 -d 8 -b"
+
+# Get the new version of Aegean
+export PATH=/group/mwaops/phancock/code/Aegean:$PATH
+export PYTHONPATH=/group/mwaops/phancock/code/Aegean:$PYTHONPATH
+
+datadir=/scratch2/mwaops/phancock
+proj=G0008
+week=WEEK
+ncpus=8
+
+# Convert SLURM id to PBS id
+if [[ ! $PBS_ARRAY_INDEX ]]
+then
+    PBS_ARRAY_INDEX=$SLURM_ARRAY_TASK_ID
+fi
+
+freq='white'
+
+cd $datadir/$proj/$week/$freq
+
+# input image
+inputimage="${week}_${freq}_noweight.fits"
+
+# blind source finding
+outbase="${week}_${freq}_blind_neg"
+blindcat="${outbase}_comp.vot"
+if [[ ! -e ${blindcat} ]]
+then
+    echo "Making ${blindcat}"
+    $aprun aegean.py --cores=${ncpus} --telescope=mwa --island --maxsummits=5 --autoload --out=/dev/null \
+                     --table=${outbase}.vot,${outbase}.reg,${outbase}.fits ${inputimage} --negative
+else
+    echo "${blindcat} already exists"
+fi

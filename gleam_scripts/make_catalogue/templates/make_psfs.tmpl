@@ -1,0 +1,107 @@
+#!/bin/bash -l
+#SBATCH --account=mwasci
+#SBATCH --partition=gpuq
+#SBATCH --time=01:00:00
+#SBATCH --nodes=1
+#SBATCH --mem=32gb
+#SBATCH --output=/home/phancock/queue/make_psfs_WEEK.sh.o%A_%a
+#SBATCH --error=/home/phancock/queue/make_psfs_WEEK.sh.e%A_%a
+#SBATCH --array=1-20
+
+function doit {
+    echo "$@"
+    aprun -n 1 -d 8 -b $@
+}
+
+# Get the new version of Aegean
+export PATH=/group/mwaops/phancock/code/Aegean:$PATH
+export PYTHONPATH=/group/mwaops/phancock/code/Aegean:$PYTHONPATH
+
+datadir=/scratch2/mwaops/phancock
+proj=G0008
+week=WEEK
+
+# Convert SLURM id to PBS id
+if [[ ! $PBS_ARRAY_INDEX ]]
+then
+    PBS_ARRAY_INDEX=$SLURM_ARRAY_TASK_ID
+fi
+
+cd $datadir/$proj/$week
+
+# Include RGBW images by changing *z/ to */ (and change array=1-20 to array=1-24, above)
+freq=`ls -d *z/ | sed "s;/;;g" | head -${PBS_ARRAY_INDEX} | tail -1`
+
+cd $freq
+
+
+# Find the right input file
+if [[ -e ${week}_${freq}_rescaled.fits ]]
+then
+# Individual sub-bands
+    inputimage=${week}_${freq}_rescaled.fits
+else
+# Red, green, blue and white images
+    exit
+fi
+
+
+# blind source finding
+outbase="${inputimage%%.fits}"
+blindbase="${outbase}_blind"
+blindcat="${blindbase}_comp.vot"
+if [[ ! -e ${blindcat} ]]
+then
+    echo "Making ${blindcat}"
+    doit aegean.py --telescope=mwa --island --maxsummits=5 --autoload --out=/dev/null \
+                     --table=${blindbase}.vot,${blindbase}.reg ${inputimage}
+else
+    echo "${blindcat} already exists"
+fi
+
+# psf characterisation
+psfimg="${inputimage%%.fits}_psf.fits"
+if [[ ! -e ${psfimg} ]]
+then
+    echo "making ${psfimg}"
+    doit python $MWA_CODE_BASE/MWA_Tools/gleam_scripts/mosaics/scripts/QC_filter.py \
+                  --input ${blindcat} --output ${blindcat%%_comp.vot}_QC_comp.vot
+    echo "$MWA_CODE_BASE/MWA_Tools/gleam_scripts/mosaics/scripts/psf_prep.sh ${blindcat%%_comp.vot}_QC_comp.vot > prep.sh"
+    doit $MWA_CODE_BASE/MWA_Tools/gleam_scripts/mosaics/scripts/psf_prep.sh ${blindcat%%_comp.vot}\
+_QC_comp.vot > prep.sh
+    echo "source prep.sh"
+    source prep.sh
+    doit python $MWA_CODE_BASE/MWA_Tools/gleam_scripts/mosaics/scripts/phg.py \
+                  --input ${blindcat%%_comp.vot}_QC_prep_comp.vot --output ${psfimg}
+else
+    echo "${psfimg} exists"
+fi
+
+
+## below is the old template
+# Blind source finding
+#outbase="${week}_${freq}_blind"
+#blindcat="${outbase}_comp.vot"
+#if [[ ! -e ${blindcat} ]]
+#then
+#    echo "Making ${blindcat}"
+#    $aprun aegean.py --telescope=mwa --island --maxsummits=5 --autoload --out=/dev/null \
+#                     --table=${outbase}.vot,${outbase}.reg,${outbase}.fits ${inputimage}
+#else
+#    echo "${blindcat} already exists"
+#fi
+#
+## PSF characterisation
+#psfimg="${inputimage%%.fits}_psf.fits"
+#if [[ ! -e ${psfimg} ]]
+#then
+#    echo "making ${psfimg}"
+#    $aprun python $MWA_CODE_BASE/MWA_Tools/gleam_scripts/mosaics/scripts/psf_banechar.py \
+#                  --input ${blindcat} --fitsfile ${inputimage}
+## remove/rename the files as required
+#    rm ${outbase}_{a,b,pa,int_peak,nsrc}.fits   
+#    rm ${outbase}_{isolated_comp,psf}.vot
+#    mv ${outbase}_triple.fits ${psfimg}
+#else
+#    echo '${psfimg} exists'
+#fi
