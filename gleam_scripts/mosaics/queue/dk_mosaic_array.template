@@ -82,7 +82,8 @@ then
 # Get info to rename mosaics
     file_to_check=`ls *2.?_corrected.fits | head -1`
     crval3=`pyhead.py -p CRVAL3 $file_to_check | awk '{print $3}'`
-    beam=`pyhead.py -p BMAJ $file_to_check | awk '{print $3}'`
+    bmaj=`pyhead.py -p BMAJ $file_to_check | awk '{print $3}'`
+    bmin=`pyhead.py -p BMIN $file_to_check | awk '{print $3}'`
     freqrange=`echo $file_to_check | awk 'BEGIN {FS="_"} {print $2}'`
     robustness=`echo $file_to_check | awk 'BEGIN {FS="_"} {print $4}'`
 
@@ -110,8 +111,8 @@ then
             then
 # add sensible keywords to the header
                 pyhead.py -u FREQ $crval3 $newname
-                pyhead.py -u BMAJ $beam $newname
-                pyhead.py -u BMIN $beam $newname
+                pyhead.py -u BMAJ $bmaj $newname
+                pyhead.py -u BMIN $bmin $newname
                 pyhead.py -u BPA 0.0 $newname
 # delete unrefined mosaic
                 rm $mosaicfile
@@ -145,7 +146,7 @@ done
 file_to_check=`ls *2.?_corrected.fits | head -1`
 crval3=`pyhead.py -p CRVAL3 $file_to_check | awk '{print $3}'`
 # Correct the XX:YY to make "recomb" mosaic
-recomfile=`echo $mosaicfile | sed "s/[XY][XY]_r-1.0/r-1.0_recomb/" | sed "s/[XY][XY]_r0.0/r0.0_recomb/"`
+recomfile=`echo $mosaicfile | sed "s/[XY][XY]_r-1.0/r-1.0_recomb/" | sed "s/[XY][XY]_r0.0/r0.0_recomb/" | sed  "s/[XY][XY]_r-2.0/r-2.0_recomb/"`
 if [[ ! -e $recomfile ]]
 then
     echo "Running XX:YY correction and combination script." | tee -a checkpoint.log
@@ -171,10 +172,6 @@ if [[ ! -e $deccorrfile ]]
 then
     echo "Running Dec-dependent flux corrections." | tee -a checkpoint.log
     root=`echo $mosaicfile | sed "s/.fits//"`
-    if [[ $date=="20131125" || $date=="20130810" || $date=="20140303" || $date=="20140609" ]]
-    then
-        zenithflag="--zenith"
-    fi
     $aprunsingle derive_dec_polynomial.py --mosaic=$mosaicfile --plot --write
     $aprunsingle apply_dec_polynomial.py --mosaic=$mosaicfile
 fi
