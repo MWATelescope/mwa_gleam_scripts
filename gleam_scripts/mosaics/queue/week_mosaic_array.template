@@ -97,7 +97,7 @@ then
     for file in *_polyapplied_rms_sigmoid.fits
     do
 # Modified 16/01/16 to 1000x smaller value to see if that fixes nans
-        $aprunsingle pyhead.py -u BSCALE 0.000000001
+        $aprunsingle pyhead.py -u BSCALE 0.000000001 $file
     done
 
     $aprun swarp -c ../weight.swarp mosaic*_polyapplied.fits -IMAGEOUT_NAME ${week}_${freq}.fits -WEIGHTOUT_NAME ${week}_${freq}.weight.fits
@@ -153,14 +153,20 @@ fi
 #fi
 
 # Make an unfiltered PSF -- the filtered one wasn't that useful
-$aprunsingle psf_select.py --input=${week}_${freq}_comp.vot
-$aprunsingle phg.py --input=${week}_${freq}_comp_psf.vot
+if [[ ! -e ${week}_${freq}_comp_psf.fits ]]
+then
+    $aprunsingle psf_select.py --input=${week}_${freq}_comp.vot
+    $aprunsingle phg.py --input=${week}_${freq}_comp_psf.vot
+fi
 
 # Rescale the map using the PSF, so that peak fluxes agree with int fluxes
 
-$aprunsingle dd_flux_mod.py --mosaic=${week}_${freq}.fits --psf=${week}_${freq}_comp_psf.fits --output=${week}_${freq}_ddmod.fits
-$aprunsingle dd_flux_mod.py --mosaic=${week}_${freq}_bkg.fits --psf=${week}_${freq}_comp_psf.fits --output=${week}_${freq}_ddmod_bkg.fits
-$aprunsingle dd_flux_mod.py --mosaic=${week}_${freq}_rms.fits --psf=${week}_${freq}_comp_psf.fits --output=${week}_${freq}_ddmod_rms.fits
+if [[ ! -e ${week}_${freq}_ddmod.fits ]]
+then
+    $aprunsingle dd_flux_mod.py --mosaic=${week}_${freq}.fits --psf=${week}_${freq}_comp_psf.fits --output=${week}_${freq}_ddmod.fits
+    $aprunsingle dd_flux_mod.py --mosaic=${week}_${freq}_bkg.fits --psf=${week}_${freq}_comp_psf.fits --output=${week}_${freq}_ddmod_bkg.fits
+    $aprunsingle dd_flux_mod.py --mosaic=${week}_${freq}_rms.fits --psf=${week}_${freq}_comp_psf.fits --output=${week}_${freq}_ddmod_rms.fits
+fi
 
 # Run the source-finding using the new PSF
 if [[ ! -e ${week}_${freq}_wpsf_comp.vot ]]

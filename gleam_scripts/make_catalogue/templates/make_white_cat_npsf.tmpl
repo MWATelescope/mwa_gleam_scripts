@@ -1,0 +1,68 @@
+#!/bin/bash -l
+#SBATCH --account=mwasci
+#SBATCH --partition=gpuq
+#SBATCH --time=02:00:00
+#SBATCH --nodes=1
+#SBATCH --mem=32gb
+#SBATCH --output=/home/phancock/queue/make_white_cat_npsf_WEEK.sh.o%A
+#SBATCH --error=/home/phancock/queue/make_white_cat_npsf_WEEK.sh.e%A
+
+function doit {
+    echo "$@"
+    aprun -n 1 -d 8 -b $@
+}
+
+#aprun="aprun -n 1 -d 8 "
+
+# Get the new version of Aegean
+export PATH=/group/mwaops/phancock/code/Aegean:$PATH
+export PYTHONPATH=/group/mwaops/phancock/code/Aegean:$PYTHONPATH
+
+datadir=/scratch2/mwaops/phancock
+proj=G0008
+week=WEEK
+
+# Convert SLURM id to PBS id
+if [[ ! $PBS_ARRAY_INDEX ]]
+then
+    PBS_ARRAY_INDEX=$SLURM_ARRAY_TASK_ID
+fi
+
+freq='170-231MHz'
+
+cd $datadir/$proj/$week/white/
+
+# input image
+inputimage="mosaic_${week}_${freq}.fits"
+
+
+# source finding without psf
+outbase="${inputimage%%.fits}_nopsf"
+blindcat="${outbase}_comp.vot"
+if [[ ! -e ${blindcat} ]]
+then
+    echo "Making ${blindcat}"
+    doit aegean.py --telescope=mwa --island --maxsummits=5 --out=/dev/null \
+                   --background ${inputimage%%.fits}_bkg.fits --noise ${inputimage%%.fits}_rms.fits \
+                   --table=${outbase}.vot,${outbase}.reg,${outbase}.fits ${inputimage}
+else
+    echo "${blindcat} already exists"
+fi
+
+
+# do QC filtering
+bestcat="${outbase}_QC_comp.vot"
+if [[ ! -e ${bestcat} ]]
+then
+    echo "making ${bestcat}"
+    doit python $MWA_CODE_BASE/MWA_Tools/gleam_scripts/mosaics/scripts/QC_filter.py --input ${blindcat} --output ${bestcat} --week=${week##Week}
+else
+    echo "${bestcat} exists"
+fi
+
+# make a fits version of this file
+if [[ -e ${bestcat} && ! -e ${bestcat%%.vot}.fits ]]
+then
+    echo "stilts tcopy ${bestcat} ${bestcat%%.vot}.fits"
+    aprun -n 1 -d 1 -b stilts tcopy ${bestcat} ${bestcat%%.vot}.fits 
+fi

@@ -958,14 +958,6 @@ source {
   }
   component {
     type point
-    position 05h15m46.5s -45d55m56s
-    measurement {
-      frequency 215.675 MHz
-      fluxdensity Jy 1.16368 0 0 0
-    }
-  }
-  component {
-    type point
     position 05h20m07.0s -45d47m49s
     measurement {
       frequency 215.675 MHz
@@ -1010,14 +1002,6 @@ source {
     measurement {
       frequency 215.675 MHz
       fluxdensity Jy 1.00335 0 0 0
-    }
-  }
-  component {
-    type point
-    position 05h15m44.3s -45d55m56s
-    measurement {
-      frequency 215.675 MHz
-      fluxdensity Jy 0.843882 0 0 0
     }
   }
   component {
@@ -1138,14 +1122,6 @@ source {
     measurement {
       frequency 215.675 MHz
       fluxdensity Jy 0.678218 0 0 0
-    }
-  }
-  component {
-    type point
-    position 05h15m46.5s -45d56m21s
-    measurement {
-      frequency 215.675 MHz
-      fluxdensity Jy 0.651627 0 0 0
     }
   }
   component {

@@ -112,7 +112,7 @@ then
 # Rescale RMS maps in preparation for swarping
     for file in *_polyapplied_rms_sigmoid.fits
     do
-        $aprunsingle pyhead.py -u BSCALE  0.000001
+        $aprunsingle pyhead.py -u BSCALE  0.000001 $file
     done
     $aprun swarp -c ../weight.swarp mosaic*ed.fits -IMAGEOUT_NAME ${week}_${color}_lownoise.fits -WEIGHTOUT_NAME ${week}_${color}_lownoise.weight.fits
     $aprunsingle fits_trim.py ${week}_${color}_lownoise.fits temp.fits

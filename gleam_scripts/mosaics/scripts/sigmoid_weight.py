@@ -37,8 +37,10 @@ def wfunc(x,d,lowerlimit,upperlimit):
     else:
         if x < (n.log(99)/d)+lowerlimit:
             return n.sqrt(1+n.exp(-d*(x-lowerlimit)))
-        if x > upperlimit-(n.log(99)/d):
+        elif x > upperlimit-(n.log(99)/d):
             return n.sqrt(1+n.exp(d*(x-upperlimit)))
+        else:
+            return n.nan
 vwfunc=n.vectorize(wfunc)
 
 # Get the dec cuts
