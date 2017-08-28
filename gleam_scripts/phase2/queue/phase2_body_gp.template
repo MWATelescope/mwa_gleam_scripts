@@ -21,26 +21,47 @@ minuv=75
 robusts="-1.0 0.0"
 # Galaxy queue currently too slow to do more than one
 robusts="-1.0"
+# HACK for HS
+#robusts="2.0"
 # Kinds of image to rescale and upload to NGAS
 #images="image model"
 images="image"
+# HACK
 # Dirty image size
-#dirtysize=5240
 dirtysize=5120
 # Trimmed image size
-#imsize=5120
 imsize=4000
+#imsize=5000
+# HACK
+peelthreshold=10
+#peelthreshold=500
+# HACK
+uvrange=""
+#uvrange=" -minuv-l 6 -maxuv-l 690 "
+#uvrange=" -minuv-l 3.5 -maxuv-l 687 "
+#uvrange=" -minuv-l 5.93 -maxuv-l 1624 "
+#uvrange=" -minuv-l 4.37 -maxuv-l 688 "
+# HACK
+# WSClean auto-threshold
+tsigma=3
+#tsigma=4
 # Model for auto-peeling
 model=$MWA_CODE_BASE/MWA_Tools/gleam_scripts/phase2/bsm_v1.txt
 # Version number of this data reduction (based on WSClean parameters)
 # 2.0 = Version 1.5, restoring with longest projected baseline
 # 2.1 = Version 1.7, restoring with -fitbeam (not correct for weights more uniform than robust -1)
 # 2.2 = Version 1.10, restoring with -fitbeam (correct, at last)
-# 2.3 = multiscale clean testing
-# 2.4 = overlapping uv-range only
+# 2.3 = Version 1.10 multiscale clean testing
+# 2.4 = Version 1.10 overlapping uv-range only
 # 2.5 = Version 2.3.4
+# 2.6 = Version 2.3.4, strictly overlapping uv-range only: 6 to 690
+# 2.7 = Version 2.3.4, overlapping uv-range only, 3.44 to 687.84
+# 2.8 = Version 2.4, overlapping uv-range only, 5.93 to 1624
+# 2.9 = Version 2.4, overlapping uv-range only, 4.37 to 688
 # HACK
 version="2.5"
+#docal=True
+#skipall=True
 
 # List of sources that will be checked for peeling
 sources=`grep name $model | sed 's/"//g' | awk '{print $2}'`
@@ -136,12 +157,6 @@ then
         rm -rf *MHz*v1.0*
     fi
 
-# HACK
-# Temporary: flag some subbands
-#    flagsubbands $obsnum.ms 24 0 1 2 3 4 5
-# Flag the antennas with really bad positions
-#    flagantennae $obsnum.ms 87,88,95,105
-
 # Hack to work around broken PYTHONPATH look-up
     if [[ ! -d mwapy ]]
     then
@@ -187,11 +202,11 @@ then
 
         if [[ $skipall != "True" ]]
         then
-            $aprun autoprocess -peelthreshold 10.0 -noselfcal $model ${obsnum}.ms | tee peel_test.txt
+            $aprun autoprocess -peelthreshold $peelthreshold -noselfcal $model ${obsnum}.ms | tee peel_test.txt
             for source in $sources
             do
                 appflux=`grep "^$source" peel_test.txt | sed "s/(//" | awk '{printf("%.0f",$2)}'`
-                if [[ $appflux -gt 10 ]]
+                if [[ $appflux -gt $peelthreshold ]]
                 then
                     testsources="$source $testsources"
                 fi
@@ -245,7 +260,6 @@ then
                 caldatacolumn="-datacolumn CORRECTED_DATA"
                 for source in $peelsources
                 do
-        #                $aprun autoprocess -peelthreshold 10.0 -noselfcal -go $model ${obsnum}.ms
                     calmodel=`ls $MWA_CODE_BASE/anoko/mwa-reduce/models/model-$source*comp.txt | tail -1`
                     if [[ ! -e $calmodel ]]
                     then
@@ -275,15 +289,21 @@ then
             fi
 
         # Generate the primary beam, if it doesn't already exist
-            if [[ ! -e ../pbeams/Dec${dec}_${chan}/beam-MFS-xxi.fits ]]
+            if [[ $skipall == "True" ]]
             then
+                echo "Generating unusually-sized primary beam ($imsize)"
                 $aprun beam -2014 -proto ${obsnum}_initial-XX-model.fits -ms ${obsnum}.ms -name beam-MFS
-                mv beam-MFS*fits ../pbeams/Dec${dec}_${chan}/
+            else
+                if [[ ! -e ../pbeams/Dec${dec}_${chan}/beam-MFS-xxi.fits ]]
+                then
+                    $aprun beam -2014 -proto ${obsnum}_initial-XX-model.fits -ms ${obsnum}.ms -name beam-MFS
+                    mv beam-MFS*fits ../pbeams/Dec${dec}_${chan}/
+                fi
+                for beamfile in ../pbeams/Dec${dec}_${chan}/beam-MFS*fits
+                do
+                    ln -s $beamfile
+                done
             fi
-            for beamfile in ../pbeams/Dec${dec}_${chan}/beam-MFS*fits
-            do
-                ln -s $beamfile
-            done
 
         # Make a pb-corrected image, for later use in source-finding
             $aprun pbcorrect ${obsnum}_initial image.fits beam-MFS ${obsnum}_initial
@@ -348,16 +368,8 @@ then
     for robust in $robusts
     do
         #echo "Cleaning to new clean threshold $newthreshold Jy, using robust=${robust} Briggs weighting, and $multiscale."
-        echo "Cleaning to auto threshold using robust=${robust} Briggs weighting, and $multiscale."
-# Running multiscale with fewer niter, so that I don't end up going back and forth forever with multiscale clean
-# min--max uvrange
-# HACK
-#        $aprun wsclean $multiscale -name ${obsnum}_deeper -size ${imsize} ${imsize} -threshold $newthreshold -pol XX,YY,XY,YX -weight briggs ${robust} -scale ${scale:0:8} -absmem ${absmem} -smallinversion -joinpolarizations -joinchannels -j ${ncpus} -mgain 0.85 -fitbeam -channelsout 4 -minuv-l 6 -maxuv-l 690 ${obsnum}.ms | tee wsclean.log
-#        $aprun wsclean $multiscale -name ${obsnum}_deeper -size ${imsize} ${imsize} -threshold $newthreshold -pol XX,YY,XY,YX -weight briggs ${robust} -scale ${scale:0:8} -absmem ${absmem} -smallinversion -joinpolarizations -joinchannels -j ${ncpus} -mgain 0.85 -fitbeam -channelsout 4 ${obsnum}.ms | tee wsclean.log
-        $aprun wsclean $multiscale -niter 1000000 -name ${obsnum}_deeper -size ${dirtysize} ${dirtysize} -trim ${imsize} ${imsize} -auto-threshold 3 -pol XX,YY,XY,YX -weight briggs ${robust} -scale ${scale:0:8} -absmem ${absmem} -joinpolarizations -joinchannels -channelsout 4 ${obsnum}.ms | tee wsclean.log
-
-# HACK for this specific ch 93 problem
-#        $aprun wsclean $multiscale -name ${obsnum}_deeper -size ${imsize} ${imsize} -threshold $newthreshold -pol XX,YY,XY,YX -weight briggs ${robust} -scale ${scale:0:8} -absmem ${absmem} -smallinversion -joinpolarizations -joinchannels -j ${ncpus} -mgain 0.85 -fitbeam -channelsout 3 -channelrange 192 767 ${obsnum}.ms | tee wsclean.log
+        echo "Cleaning to auto threshold $tsigma sigma using robust=${robust} Briggs weighting, and $multiscale."
+        $aprun wsclean $multiscale -niter 1000000 -name ${obsnum}_deeper -size ${dirtysize} ${dirtysize} -trim ${imsize} ${imsize} -auto-threshold $tsigma -pol XX,YY,XY,YX -weight briggs ${robust} -scale ${scale:0:8} -absmem ${absmem} -joinpolarizations -joinchannels -channelsout 4 $uvrange ${obsnum}.ms | tee wsclean.log
 
 # If multiscale is set, check whether it actually worked or if it blew up
 # Shouldn't need this anymore...!
@@ -377,7 +389,7 @@ then
                     rm *deeper*
                     echo "Rerunning with $niter iterations."
                     multiscale="-multiscale -mgain 0.6 -niter $niter"
-                    $aprun wsclean $multiscale -name ${obsnum}_deeper -size ${dirtysize} ${dirtysize} -trim ${imsize} ${imsize} -auto-threshold 3 -pol XX,YY,XY,YX -weight briggs ${robust} -scale ${scale:0:8} -absmem ${absmem} -joinpolarizations -joinchannels -channelsout 4 ${obsnum}.ms | tee wsclean.log
+                    $aprun wsclean $multiscale -name ${obsnum}_deeper -size ${dirtysize} ${dirtysize} -trim ${imsize} ${imsize} -auto-threshold $tsigma -pol XX,YY,XY,YX -weight briggs ${robust} -scale ${scale:0:8} -absmem ${absmem} -joinpolarizations -joinchannels -channelsout 4 $uvrange ${obsnum}.ms | tee wsclean.log
                 else
                     echo "Multiscale clean ran correctly."
                 fi
@@ -401,26 +413,39 @@ then
                 mkdir ../pbeams/Dec${dec}_${chan}/
             fi
         # Generate the primary beam, if it doesn't already exist
-            if [[ ! -e ../pbeams/Dec${dec}_${chan}/beam-${subchan}-xxi.fits ]]
+            beamimsize=`pyhead.py -p NAXIS2 ../pbeams/Dec${dec}_${chan}/beam-${subchan}-xxi.fits | awk '{print $3}'`
+            if [[ $beamimsize -ne $imsize ]]
             then
-                $aprun beam -2014 -proto ${obsnum}_deeper-${subchan}-XX-model.fits -ms ${obsnum}.ms -name beam-${subchan}
-                beamimsize=`pyhead.py -p NAXIS2 ./beam-${subchan}-xxi.fits | awk '{print $3}'`
-  # Only save them if they are the standard size
-                if [[ $beamimsize -eq 4000 ]]
+                if [[ ! -e beam-${subchan}-xxi.fits ]]
                 then
-                    mv beam-${subchan}*fits ../pbeams/Dec${dec}_${chan}/
+                    echo "Generating unusually-sized primary beam ($imsize)"
+                    $aprun beam -2014 -proto ${obsnum}_deeper-${subchan}-XX-model.fits -ms ${obsnum}.ms -name beam-${subchan}
+                else
+                    beamimsize=`pyhead.py -p NAXIS2 ./beam-${subchan}-xxi.fits | awk '{print $3}'`
+                    if [[ $beamimsize -ne $imsize ]]
+                    then
+                        echo "Generating unusually-sized primary beam ($imsize)"
+                        $aprun beam -2014 -proto ${obsnum}_deeper-${subchan}-XX-model.fits -ms ${obsnum}.ms -name beam-${subchan}
+                    else
+                        echo "Using unusually-sized primary beam ($imsize)"
+                    fi
                 fi
             else
-                beamimsize=`pyhead.py -p NAXIS2 ../pbeams/Dec${dec}_${chan}/beam-MFS-xxi.fits | awk '{print $3}'`
-                if [[ $beamimsize -ne $imsize ]]
+                if [[ ! -e ../pbeams/Dec${dec}_${chan}/beam-${subchan}-xxi.fits ]]
                 then
                     $aprun beam -2014 -proto ${obsnum}_deeper-${subchan}-XX-model.fits -ms ${obsnum}.ms -name beam-${subchan}
+                    beamimsize=`pyhead.py -p NAXIS2 ./beam-${subchan}-xxi.fits | awk '{print $3}'`
+      # Only save them if they are the standard size
+                    if [[ $beamimsize -eq 4000 ]]
+                    then
+                        mv beam-${subchan}*fits ../pbeams/Dec${dec}_${chan}/
+                    fi
                 fi
+                for beamfile in ../pbeams/Dec${dec}_${chan}/beam-${subchan}*fits
+                do
+                    ln -s $beamfile
+                done
             fi
-            for beamfile in ../pbeams/Dec${dec}_${chan}/beam-${subchan}*fits
-            do
-                ln -s $beamfile
-            done
 
         # Make polarised images and models
             for imagetype in $images
@@ -549,12 +574,19 @@ cd $datadir/$proj/
 
 if ls ${obsnum}/*MHz*v${version}.fits &> /dev/null
 then
-# At the moment I think it's better to upload everything
+# At the moment I think it's better to upload everything -- we can always delete old measurement set tarballs
 #    if [[ $docal == "True" || -e ${obsnum}/$solobs-solutions.bin ]]
 #    then
-# HACK
-        echo "Creating measurement set tarball."
-        $aprun tar -I pigz -cf ${obsnum}_phase2.tar.gz ${obsnum}/${obsnum}.ms* ${obsnum}/*solutions.bin ${obsnum}/calibrate.log ${obsnum}/*.txt ${obsnum}/*.vot ${obsnum}/$metafits
+        if [[ $prep != "" ]]
+        then
+            echo "Creating measurement set tarball."
+            if [[ $docal == "True" ]]
+            then
+                $aprun tar -I pigz -cf ${obsnum}_phase2.tar.gz ${obsnum}/${obsnum}.ms* ${obsnum}/*solutions.bin ${obsnum}/calibrate.log ${obsnum}/*.txt ${obsnum}/*.vot ${obsnum}/$metafits
+            else
+                $aprun tar -I pigz -cf ${obsnum}_phase2.tar.gz ${obsnum}/${obsnum}.ms* ${obsnum}/*.txt ${obsnum}/*.vot ${obsnum}/$metafits
+            fi
+        fi
         echo "Creating images tarball."
         $aprunsingle tar -cf ${obsnum}_images_v${version}.tar ${obsnum}/${obsnum}*MHz*v${version}.fits
 #    else
