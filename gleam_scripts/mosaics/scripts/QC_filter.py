@@ -64,6 +64,10 @@ def filter_RADEC(table, week):
         good = np.where(band1 | band2 | band3)
     elif week==5:
         return table
+    elif week==6:
+        band1 = (table['dec']<-2) & (table['dec']>-48) 
+        band2 = (table['ra']>310) | (table['ra']<76)
+        good = np.where(band1 & band2)
     else:
         print "bad week"
         sys.exit(1)
