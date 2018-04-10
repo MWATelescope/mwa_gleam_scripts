@@ -44,8 +44,8 @@ SLA_INC_DIR = $(INSTALL_DIR)/
 # give the name of your preferred C compiler and compilation flags
 # here.
 
-#CCOMPC = gcc
-CCOMPC = cc
+CCOMPC = gcc
+#CCOMPC = cc
 CFLAGC = -c -pedantic -Wall -O2
 
 #----YOU SHOULDN'T HAVE TO MODIFY ANYTHING BELOW THIS LINE---------
