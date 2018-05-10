@@ -93,8 +93,8 @@ def fit_spectrum(name,freq_array,flux_array,flux_errors): #,plot):
         alpha=P[1]
         amp = np.exp(P[0])
     # Errors
-        err_alpha = np.sqrt(covar[0][0])
-        err_amp = np.sqrt(covar[1][1])
+        err_alpha = np.sqrt(covar[1][1])
+        err_amp = np.sqrt(covar[0][0])
     else:
         chi2red=None
         alpha=None
