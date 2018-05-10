@@ -154,7 +154,7 @@ print "Fitting",len(brightsrcs),"source spectral energy distributions"
 calibration_error = options.hldec_calerror*np.ones(len(brightsrcs))
 
 # Mid-range Dec sources = 2% calibration error
-midsrcs = np.intersect1d(np.where(data["DEJ2000"][brightsrcs]<=18.5,np.where(data["DEJ2000"][brightsrcs]>=-72.)))
+midsrcs = np.intersect1d(np.where(data["DEJ2000"][brightsrcs]<=18.5),np.where(data["DEJ2000"][brightsrcs]>=-72.))
 midsrcs = np.squeeze(midsrcs)
 calibration_error[midsrcs] = options.calerror
 
