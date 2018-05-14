@@ -93,8 +93,8 @@ def fit_spectrum(name,freq_array,flux_array,flux_errors): #,plot):
         alpha=P[1]
         amp = np.exp(P[0])
     # Errors
-        err_alpha = np.sqrt(covar[0][0])
-        err_amp = np.sqrt(covar[1][1])
+        err_alpha = np.sqrt(covar[1][1])
+        err_amp = np.sqrt(covar[0][0])
     else:
         chi2red=None
         alpha=None
@@ -154,8 +154,7 @@ print "Fitting",len(brightsrcs),"source spectral energy distributions"
 calibration_error = options.hldec_calerror*np.ones(len(brightsrcs))
 
 # Mid-range Dec sources = 2% calibration error
-midsrcs = np.intersect1d(brightsrcs,np.where(data["DEJ2000"]<=18.5))
-midsrcs = np.intersect1d(midsrcs,np.where(data["DEJ2000"]>=-72.))
+midsrcs = np.intersect1d(np.where(data["DEJ2000"][brightsrcs]<=18.5),np.where(data["DEJ2000"][brightsrcs]>=-72.))
 midsrcs = np.squeeze(midsrcs)
 calibration_error[midsrcs] = options.calerror
 
