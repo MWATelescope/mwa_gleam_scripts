@@ -1,3 +1,0 @@
-[submodule "externals/fits_warp"]
-	path = externals/fits_warp
-	url = git@github.com:nhurleywalker/fits_warp.git
